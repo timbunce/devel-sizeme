@@ -168,7 +168,7 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     total_size += sizeof(XPVCV);
     total_size += magic_size(thing, tracking_hash);
     if (go_yell) {
-      carp("CV isn't complete");
+      carp("Devel::Size: Calculated sizes for CVs are incomplete");
     }
     break;
   case SVt_PVGV:
@@ -187,23 +187,76 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     if (GvGP(thing)) {
       if (check_new(tracking_hash, GvGP(thing))) {
 	total_size += sizeof(GP);
+	{
+	  SV *generic_thing;
+	  if (generic_thing = (SV *)(GvGP(thing)->gp_sv)) {
+	    total_size += thing_size(generic_thing, tracking_hash);
+	  }
+	  if (generic_thing = (SV *)(GvGP(thing)->gp_form)) {
+	    total_size += thing_size(generic_thing, tracking_hash);
+	  }
+	  if (generic_thing = (SV *)(GvGP(thing)->gp_av)) {
+	    total_size += thing_size(generic_thing, tracking_hash);
+	  }
+	  if (generic_thing = (SV *)(GvGP(thing)->gp_hv)) {
+	    total_size += thing_size(generic_thing, tracking_hash);
+	  }
+	  if (generic_thing = (SV *)(GvGP(thing)->gp_egv)) {
+	    total_size += thing_size(generic_thing, tracking_hash);
+	  }
+	  if (generic_thing = (SV *)(GvGP(thing)->gp_cv)) {
+	    total_size += thing_size(generic_thing, tracking_hash);
+	  }
+	}
       }
     }
     break;
   case SVt_PVFM:
     total_size += sizeof(XPVFM);
     if (go_yell) {
-      carp("FM isn't complete");
+      carp("Devel::Size: Calculated sizes for FMs are incomplete");
     }
     break;
   case SVt_PVIO:
     total_size += sizeof(XPVIO);
-    if (go_yell) {
-      carp("IO isn't complete");
+    total_size += magic_size(thing, tracking_hash);
+    if (check_new(tracking_hash, ((XPVIO *) SvANY(thing))->xpv_pv)) {
+      total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
     }
+    /* Some embedded char pointers */
+    if (check_new(tracking_hash, ((XPVIO *) SvANY(thing))->xio_top_name)) {
+      total_size += strlen(((XPVIO *) SvANY(thing))->xio_top_name);
+    }
+    if (check_new(tracking_hash, ((XPVIO *) SvANY(thing))->xio_fmt_name)) {
+      total_size += strlen(((XPVIO *) SvANY(thing))->xio_fmt_name);
+    }
+    if (check_new(tracking_hash, ((XPVIO *) SvANY(thing))->xio_bottom_name)) {
+      total_size += strlen(((XPVIO *) SvANY(thing))->xio_bottom_name);
+    }
+    /* Throw the GVs on the list to be walked if they're not-null */
+    if (((XPVIO *) SvANY(thing))->xio_top_gv) {
+      total_size += thing_size((SV *)((XPVIO *) SvANY(thing))->xio_top_gv, 
+			       tracking_hash);
+    }
+    if (((XPVIO *) SvANY(thing))->xio_bottom_gv) {
+      total_size += thing_size((SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, 
+			       tracking_hash);
+    }
+    if (((XPVIO *) SvANY(thing))->xio_fmt_gv) {
+      total_size += thing_size((SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, 
+			       tracking_hash);
+    }
+
+    /* Only go trotting through the IO structures if they're really
+       trottable. If USE_PERLIO is defined we can do this. If
+       not... we can't, so we don't even try */
+#ifdef USE_PERLIO
+    /* Dig into xio_ifp and xio_ofp here */
+    croak("Devel::Size: Can't size up perlio layers yet");
+#endif
     break;
   default:
-    croak("Unknown variable type");
+    croak("Devel::Size: Unknown variable type");
   }
   return total_size;
 }

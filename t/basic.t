@@ -6,7 +6,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..7\n"; }
+BEGIN { $| = 1; print "1..8\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Devel::Size qw(size total_size);
 $loaded = 1;
@@ -18,6 +18,10 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
+use vars qw($foo @foo %foo);
+$foo = "12";
+@foo = (1,2,3);
+%foo = (a => 1, b => 2);
 
 my $x = "A string";
 my $y = "A longer string";
@@ -70,3 +74,8 @@ if( total_size($c1) == total_size($c2) ) {
     print "not ok 7\n";
 }
 
+if (total_size(*foo)) {
+   print "ok 8\n";
+} else {
+  print "not ok 8\n";
+}

@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.58';
+$VERSION = '0.59';
 
 bootstrap Devel::Size $VERSION;
 
@@ -200,6 +200,39 @@ pointers, two integers, and two bytes worth of storage, plus
 potential alignment and bucket overhead, per thing it looks at. This
 memory is released at the end, but it may fragment your free pool,
 and will definitely expand your process' memory footprint.
+
+=head1 Messages: texts originating from this module.
+
+=head2 Errors
+
+=over 4
+
+=item	"Devel::Size: Unknown variable type"
+
+The thing (or something contained within it) that you gave to 
+total_size() was unrecognisable as a Perl entity.
+
+=back
+
+=head2 warnings
+
+These messages warn you that for some types, the sizes calculated may not include 
+everything that could be associated with those types. The differences are usually 
+insignificant for most uses of this module.
+
+These may be disabled by setting
+
+	$Devel::Size::warn = 0
+
+=over 4
+
+=item	"Devel::Size: Calculated sizes for CVs are incomplete"
+
+=item	"Devel::Size: Calculated sizes for FMs are incomplete"
+
+=item	"Devel::Size: Calculated sizes for IOs are incomplete"
+
+=back
 
 =head1 BUGS
 

@@ -28,3 +28,7 @@ Revision history for Perl extension Devel::Size.
         - Fix for problems triggered by perl 5.8.0 and up, more tests, and
 	  removal of an "our" for better backwards compatibility. (Courtesy
 	  of Marcus Holland-Moritz <mhx-perl@gmx.net>)
+
+0.59  Sat Nov 27 16:42:42 2004
+        - Applied documentation and sane warning patch from Nigel Sandever
+        - Taught Devel::Size how to size up IO and globs properly

@@ -4,3 +4,4 @@ Makefile.PL
 Size.pm
 Size.xs
 t/basic.t
+META.yml                                Module meta-data (added by MakeMaker)
