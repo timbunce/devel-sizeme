@@ -1,0 +1,6 @@
+Revision history for Perl extension Devel::Size.
+
+0.01  Mon Oct  7 01:05:32 2002
+	- original version; created by h2xs 1.2 with options
+		-A -n Devel::Size
+
