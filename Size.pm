@@ -1,13 +1,12 @@
 package Devel::Size;
 
-require 5.005_62;
 use strict;
-use warnings;
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD %EXPORT_TAGS);
 
 require Exporter;
 require DynaLoader;
 
-our @ISA = qw(Exporter DynaLoader);
+@ISA = qw(Exporter DynaLoader);
 
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
@@ -16,16 +15,16 @@ our @ISA = qw(Exporter DynaLoader);
 # This allows declaration	use Devel::Size ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
+%EXPORT_TAGS = ( 'all' => [ qw(
 	size
 ) ] );
 
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+@EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our @EXPORT = qw(
+@EXPORT = qw(
 	
 );
-our $VERSION = '0.01';
+$VERSION = '0.02';
 
 bootstrap Devel::Size $VERSION;
 
@@ -62,7 +61,7 @@ None by default.
 Only does plain scalars and arrays. No sizes for hashes, globs, code refs, or magic scalars. Yet.
 
 Also, this module currently only returns the size used by the variable
-itself, E<not> the contents of arrays or hashes, nor does it follow
+itself, I<not> the contents of arrays or hashes, nor does it follow
 references past one level. That's for later.
 
 =head1 AUTHOR

@@ -2,6 +2,10 @@
 #include "perl.h"
 #include "XSUB.h"
 
+#if !defined(NV)
+#define NV double
+#endif
+
 UV thing_size(SV *orig_thing) {
   SV *thing = orig_thing;
   UV total_size = sizeof(SV);
@@ -78,7 +82,27 @@ UV thing_size(SV *orig_thing) {
     }
     break;
   case SVt_PVHV:
-    croak("Not yet");
+    /* First the base struct */
+    total_size += sizeof(XPVHV);
+    /* Now the array of buckets */
+    total_size += (sizeof(HE *) * (HvMAX(thing) + 1));
+    /* Now walk the bucket chain */
+    {
+      HE *cur_entry;
+      IV cur_bucket = 0;
+      puts("Foo!");
+      for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
+	cur_entry = *(HvARRAY(thing) + cur_bucket);
+	while (cur_entry) {
+	  total_size += sizeof(HE);
+	  if (cur_entry->hent_hek) {
+	    total_size += sizeof(HEK);
+	    total_size += cur_entry->hent_hek->hek_len - 1;
+	  }
+	  cur_entry = cur_entry->hent_next;
+	}
+      }
+    }
     break;
   case SVt_PVCV:
     croak("Not yet");
@@ -101,8 +125,9 @@ UV thing_size(SV *orig_thing) {
 
 MODULE = Devel::Size		PACKAGE = Devel::Size		
 
-UV
-size(SV *orig_thing)
+IV
+size(orig_thing)
+     SV *orig_thing
 CODE:
 {
   RETVAL = thing_size(orig_thing);
