@@ -2,19 +2,66 @@
 #include "perl.h"
 #include "XSUB.h"
 
+#define carp puts
+
 #if !defined(NV)
 #define NV double
 #endif
 
-UV thing_size(SV *orig_thing) {
+/* Checks to see if thing is in the hash. Returns true or false, and
+   notes thing in the hash.
+
+   This code does one Evil Thing. Since we're tracking pointers, we
+   tell perl that the string key is the address in the pointer. We do this by
+   passing in the address of the address, along with the size of a
+   pointer as the length. Perl then uses the four (or eight, on
+   64-bit machines) bytes of the address as the string we're using as
+   the key */
+IV check_new(HV *tracking_hash, void *thing) {
+  if (hv_exists(tracking_hash, (char *)&thing, sizeof(void *))) {
+    return FALSE;
+  }
+  hv_store(tracking_hash, (char *)&thing, sizeof(void *), &PL_sv_undef, 0);
+  return TRUE;
+
+}
+
+/* Figure out how much magic is attached to the SV and return the
+   size */
+IV magic_size(SV *thing, HV *tracking_hash) {
+  IV total_size = 0;
+  MAGIC *magic_pointer;
+
+  /* Is there any? */
+  if (!SvMAGIC(thing)) {
+    /* No, bail */
+    return 0;
+  }
+
+  /* Get the base magic pointer */
+  magic_pointer = SvMAGIC(thing);
+
+  /* Have we seen the magic pointer? */
+  while (magic_pointer && check_new(tracking_hash, magic_pointer)) {
+    total_size += sizeof(MAGIC);
+
+    /* Have we seen the magic vtable? */
+    if (magic_pointer->mg_virtual &&
+	check_new(tracking_hash, magic_pointer->mg_virtual)) {
+      total_size += sizeof(MGVTBL);
+    }
+
+    /* Get the next in the chain */
+    magic_pointer = magic_pointer->mg_moremagic;
+  }
+
+  return total_size;
+}
+
+
+UV thing_size(SV *orig_thing, HV *tracking_hash) {
   SV *thing = orig_thing;
   UV total_size = sizeof(SV);
-  
-  /* If they passed us a reference then dereference it. This is the
-     only way we can check the sizes of arrays and hashes */
-  if (SvOK(thing) && SvROK(thing)) {
-    thing = SvRV(thing);
-  }
   
   switch (SvTYPE(thing)) {
     /* Is it undef? */
@@ -60,12 +107,17 @@ UV thing_size(SV *orig_thing) {
   case SVt_PVMG:
     total_size += sizeof(XPVMG);
     total_size += SvLEN(thing);
+    total_size += magic_size(thing, tracking_hash);
     break;
   case SVt_PVBM:
-    croak("Not yet");
+    total_size += sizeof(XPVBM);
+    total_size += SvLEN(thing);
+    total_size += magic_size(thing, tracking_hash);
     break;
   case SVt_PVLV:
-    croak("Not yet");
+    total_size += sizeof(XPVLV);
+    total_size += SvLEN(thing);
+    total_size += magic_size(thing, tracking_hash);
     break;
     /* How much space is dedicated to the array? Not counting the
        elements in the array, mind, just the array itself */
@@ -79,8 +131,11 @@ UV thing_size(SV *orig_thing) {
     total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
     /* Is there something hanging off the arylen element? */
     if (AvARYLEN(thing)) {
-      total_size += thing_size(AvARYLEN(thing));
+      if (check_new(tracking_hash, AvARYLEN(thing))) {
+	total_size += thing_size(AvARYLEN(thing), tracking_hash);
+      }
     }
+    total_size += magic_size(thing, tracking_hash);
     break;
   case SVt_PVHV:
     /* First the base struct */
@@ -88,7 +143,7 @@ UV thing_size(SV *orig_thing) {
     /* Now the array of buckets */
     total_size += (sizeof(HE *) * (HvMAX(thing) + 1));
     /* Now walk the bucket chain */
-    {
+    if (HvARRAY(thing)) {
       HE *cur_entry;
       IV cur_bucket = 0;
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
@@ -96,25 +151,33 @@ UV thing_size(SV *orig_thing) {
 	while (cur_entry) {
 	  total_size += sizeof(HE);
 	  if (cur_entry->hent_hek) {
-	    total_size += sizeof(HEK);
-	    total_size += cur_entry->hent_hek->hek_len - 1;
+	    /* Hash keys can be shared. Have we seen this before? */
+	    if (check_new(tracking_hash, cur_entry->hent_hek)) {
+	      total_size += sizeof(HEK);
+	      total_size += cur_entry->hent_hek->hek_len - 1;
+	    }
 	  }
 	  cur_entry = cur_entry->hent_next;
 	}
       }
     }
+    total_size += magic_size(thing, tracking_hash);
     break;
   case SVt_PVCV:
-    croak("Not yet");
+    total_size += sizeof(XPVCV);
+    carp("CV isn't complete");
     break;
   case SVt_PVGV:
-    croak("Not yet");
+    total_size += sizeof(XPVGV);
+    carp("GC isn't complete");
     break;
   case SVt_PVFM:
-    croak("Not yet");
+    total_size += sizeof(XPVFM);
+    carp("FM isn't complete");
     break;
   case SVt_PVIO:
-    croak("Not yet");
+    total_size += sizeof(XPVIO);
+    carp("IO isn't complete");
     break;
   default:
     croak("Unknown variable type");
@@ -130,7 +193,99 @@ size(orig_thing)
      SV *orig_thing
 CODE:
 {
-  RETVAL = thing_size(orig_thing);
+  SV *thing = orig_thing;
+  /* Hash to track our seen pointers */
+  HV *tracking_hash = newHV();
+
+  /* If they passed us a reference then dereference it. This is the
+     only way we can check the sizes of arrays and hashes */
+  if (SvOK(thing) && SvROK(thing)) {
+    thing = SvRV(thing);
+  }
+  
+  RETVAL = thing_size(thing, tracking_hash);
+  /* Clean up after ourselves */
+  SvREFCNT_dec(tracking_hash);
 }
 OUTPUT:
   RETVAL
+
+
+IV
+total_size(orig_thing)
+       SV *orig_thing
+CODE:
+{
+  SV *thing = orig_thing;
+  /* Hash to track our seen pointers */
+  HV *tracking_hash = newHV();
+  AV *pending_array = newAV();
+
+  /* Size starts at zero */
+  RETVAL = 0;
+
+  /* If they passed us a reference then dereference it. This is the
+     only way we can check the sizes of arrays and hashes */
+  if (SvOK(thing) && SvROK(thing)) {
+    thing = SvRV(thing);
+  }
+
+  /* Put it on the pending array */
+  av_push(pending_array, thing);
+
+  /* Now just yank things off the end of the array until it's done */
+  while (&PL_sv_undef != (thing = av_pop(pending_array))) {
+    /* Process it if we've not seen it */
+    if (check_new(tracking_hash, thing)) {
+      /* First, is it pointing to or contraining something else? */
+      if (SvOK(thing)) {
+	/* Yes, it is. So let's check the type */
+
+	switch (SvTYPE(thing)) {
+	case SVt_RV:
+	  av_push(pending_array, SvRV(thing));
+	  break;
+
+	case SVt_PVAV:
+	  {
+	    /* Quick alias to cut down on casting */
+	    AV *tempAV = (AV *)thing;
+	    SV **tempSV;
+	    
+	    /* Any elements? */
+	    if (av_len(tempAV) != -1) {
+	      IV index;
+	      /* Run through them all */
+	      for (index = 0; index <= av_len(tempAV); index++) {
+		/* Did we get something? */
+		if (tempSV = av_fetch(tempAV, index, 0)) {
+		  /* Was it undef? */
+		  if (*tempSV != &PL_sv_undef) {
+		    /* Apparently not. Save it for later */
+		    av_push(pending_array, *tempSV);
+		  }
+		}
+	      }
+	    }
+	  }
+	  break;
+
+	case SVt_PVHV:
+	  break;
+	 
+	default:
+	  puts("Dunno");
+	}
+      }
+
+      RETVAL += thing_size(thing, tracking_hash);
+    }
+  }
+  
+  /* Clean up after ourselves */
+  SvREFCNT_dec(tracking_hash);
+  SvREFCNT_dec(pending_array);
+}
+OUTPUT:
+  RETVAL
+

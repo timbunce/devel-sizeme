@@ -16,7 +16,7 @@ require DynaLoader;
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
 %EXPORT_TAGS = ( 'all' => [ qw(
-	size
+	size, total_size
 ) ] );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.03';
+$VERSION = '0.50';
 
 bootstrap Devel::Size $VERSION;
 
@@ -58,7 +58,8 @@ None by default.
 
 =head1 BUGS
 
-Only does plain scalars, hashes, and arrays. No sizes for globs or code refs. Yet.
+Doesn't currently walk all the bits for code refs, globs, formats, and
+IO. Those throw a warning, but a minimum size for them is returned.
 
 Also, this module currently only returns the size used by the variable
 itself, I<not> the contents of arrays or hashes, nor does it follow
