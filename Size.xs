@@ -58,7 +58,8 @@ UV thing_size(SV *orig_thing) {
     total_size += SvLEN(thing);
     break;
   case SVt_PVMG:
-    croak("Not yet");
+    total_size += sizeof(XPVMG);
+    total_size += SvLEN(thing);
     break;
   case SVt_PVBM:
     croak("Not yet");
@@ -90,7 +91,6 @@ UV thing_size(SV *orig_thing) {
     {
       HE *cur_entry;
       IV cur_bucket = 0;
-      puts("Foo!");
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
 	cur_entry = *(HvARRAY(thing) + cur_bucket);
 	while (cur_entry) {

@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 bootstrap Devel::Size $VERSION;
 
@@ -58,7 +58,7 @@ None by default.
 
 =head1 BUGS
 
-Only does plain scalars and arrays. No sizes for hashes, globs, code refs, or magic scalars. Yet.
+Only does plain scalars, hashes, and arrays. No sizes for globs or code refs. Yet.
 
 Also, this module currently only returns the size used by the variable
 itself, I<not> the contents of arrays or hashes, nor does it follow
