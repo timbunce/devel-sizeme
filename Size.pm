@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.53';
+$VERSION = '0.54';
 
 bootstrap Devel::Size $VERSION;
 
@@ -82,7 +82,7 @@ None but default, but optionally C<size> and C<total_size>.
 
 =head1 BUGS
 
-Doesn't currently walk all the bits for code refs, globs, formats, and
+Doesn't currently walk all the bits for code refs, formats, and
 IO. Those throw a warning, but a minimum size for them is returned.
 
 =head1 AUTHOR

@@ -8,3 +8,6 @@ Revision history for Perl extension Devel::Size.
         - Finally started updating Changes file
 	- Applied doc patch from Ann Barcomb
 	- Got globs sizing right
+
+0.54  Sat Oct 12 14:11:00 2002
+	- Applied a patch to get it working on 5.8.0 under Tru64

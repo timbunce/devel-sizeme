@@ -199,8 +199,9 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
   return total_size;
 }
 
-
 MODULE = Devel::Size		PACKAGE = Devel::Size		
+
+PROTOTYPES: DISABLE
 
 IV
 size(orig_thing)
