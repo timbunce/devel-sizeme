@@ -1,7 +1,7 @@
 package Devel::Size;
 
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD %EXPORT_TAGS);
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD %EXPORT_TAGS $warn);
 
 require Exporter;
 require DynaLoader;
@@ -24,11 +24,11 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.57';
+$VERSION = '0.58';
 
 bootstrap Devel::Size $VERSION;
 
-our $warn = 1;
+$warn = 1;
 
 # Preloaded methods go here.
 

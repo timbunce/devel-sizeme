@@ -20,3 +20,11 @@ Revision history for Perl extension Devel::Size.
 
 0.56  Mon Feb 24 12:10:13 2003
         - Chopped out some C++ comments. D'oh! Version incremented for CPAN
+
+0.57  Thu Mar 20 13:21:14 2003
+        - setting $Devel::Size::warn to 0 disables not complete warnings
+
+0.58  Fri Jul 18 11:42:32 2003
+        - Fix for problems triggered by perl 5.8.0 and up, more tests, and
+	  removal of an "our" for better backwards compatibility. (Courtesy
+	  of Marcus Holland-Moritz <mhx-perl@gmx.net>)

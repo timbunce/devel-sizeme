@@ -23,7 +23,7 @@ IV check_new(HV *tracking_hash, void *thing) {
   if (hv_exists(tracking_hash, (char *)&thing, sizeof(void *))) {
     return FALSE;
   }
-  hv_store(tracking_hash, (char *)&thing, sizeof(void *), &PL_sv_undef, 0);
+  hv_store(tracking_hash, (char *)&thing, sizeof(void *), &PL_sv_yes, 0);
   return TRUE;
 
 }
@@ -175,12 +175,14 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     total_size += magic_size(thing, tracking_hash);
     total_size += sizeof(XPVGV);
     total_size += GvNAMELEN(thing);
+#ifdef GvFILE
     /* Is there a file? */
     if (GvFILE(thing)) {
       if (check_new(tracking_hash, GvFILE(thing))) {
 	total_size += strlen(GvFILE(thing));
       }
     }
+#endif
     /* Is there something hanging off the glob? */
     if (GvGP(thing)) {
       if (check_new(tracking_hash, GvGP(thing))) {
@@ -223,7 +225,7 @@ CODE:
   /* Check warning status */
   go_yell = 0;
 
-  if (NULL != (warn_flag = get_sv("Devel::Size::warn", FALSE))) {
+  if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
     go_yell = SvIV(warn_flag);
   }
   
@@ -262,7 +264,7 @@ CODE:
   /* Check warning status */
   go_yell = 0;
 
-  if (NULL != (warn_flag = get_sv("Devel::Size::warn", FALSE))) {
+  if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
     go_yell = SvIV(warn_flag);
   }
   

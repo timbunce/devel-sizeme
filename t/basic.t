@@ -6,7 +6,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..5\n"; }
+BEGIN { $| = 1; print "1..7\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Devel::Size qw(size total_size);
 $loaded = 1;
@@ -46,5 +46,27 @@ if (total_size(\@x) < total_size(\@y)) {
     print "ok 5\n";
 } else {
     print "not ok 5\n";
+}
+
+# check that the tracking_hash is working
+
+my($a,$b) = (1,2);
+my @ary1 = (\$a, \$a);
+my @ary2 = (\$a, \$b);
+
+if (total_size(\@ary1) < total_size(\@ary2)) {
+    print "ok 6\n";
+} else {
+    print "not ok 6\n";
+}
+
+# check that circular references don't mess things up
+
+my($c1,$c2); $c2 = \$c1; $c1 = \$c2;
+
+if( total_size($c1) == total_size($c2) ) {
+    print "ok 7\n";
+} else {
+    print "not ok 7\n";
 }
 
