@@ -153,8 +153,7 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
 	  if (cur_entry->hent_hek) {
 	    /* Hash keys can be shared. Have we seen this before? */
 	    if (check_new(tracking_hash, cur_entry->hent_hek)) {
-	      total_size += sizeof(HEK);
-	      total_size += cur_entry->hent_hek->hek_len - 1;
+	      total_size += HEK_BASESIZE + cur_entry->hent_hek->hek_len + 2;
 	    }
 	  }
 	  cur_entry = cur_entry->hent_next;
@@ -235,6 +234,9 @@ CODE:
   /* Hash to track our seen pointers */
   HV *tracking_hash = newHV();
   AV *pending_array = newAV();
+  IV size = 0;
+
+  IV count = 0;
 
   /* Size starts at zero */
   RETVAL = 0;
@@ -318,11 +320,15 @@ CODE:
 	}
       }
 
-      RETVAL += thing_size(thing, tracking_hash);
+      
+      size = thing_size(thing, tracking_hash);
+      RETVAL += size;
+      //      printf("added thing of size %i, thing #%i\n", size, count++);
     }
   }
   
   /* Clean up after ourselves */
+  //  printf("For info, refcounts are %i, %i\n", SvREFCNT(tracking_hash), SvREFCNT(pending_array));
   SvREFCNT_dec(tracking_hash);
   SvREFCNT_dec(pending_array);
 }

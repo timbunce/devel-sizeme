@@ -11,3 +11,9 @@ Revision history for Perl extension Devel::Size.
 
 0.54  Sat Oct 12 14:11:00 2002
 	- Applied a patch to get it working on 5.8.0 under Tru64
+
+0.55  Sat Feb 22 17:21:00 2003
+        - Fixed a bad size calculation (we were overestimating by one byte)
+	- Updated the docs to show some of the places that there might be 'dark'
+	  memory that Devel::Size can't see.
+	- Added in tests from Ken Williams
