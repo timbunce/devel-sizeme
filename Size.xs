@@ -234,13 +234,13 @@ CODE:
   av_push(pending_array, thing);
 
   /* Now just yank things off the end of the array until it's done */
-  while (&PL_sv_undef != (thing = av_pop(pending_array))) {
+  while (av_len(pending_array) >= 0) {
+    thing = av_pop(pending_array);
     /* Process it if we've not seen it */
     if (check_new(tracking_hash, thing)) {
-      /* First, is it pointing to or contraining something else? */
-      if (SvOK(thing)) {
+      /* Is it valid? */
+      if (thing) {
 	/* Yes, it is. So let's check the type */
-
 	switch (SvTYPE(thing)) {
 	case SVt_RV:
 	  av_push(pending_array, SvRV(thing));
@@ -271,10 +271,18 @@ CODE:
 	  break;
 
 	case SVt_PVHV:
+	  /* Is there anything in here? */
+	  if (hv_iterinit((HV *)thing)) {
+	    SV *temp_thing;
+	    while (&PL_sv_undef != 
+		   (temp_thing = hv_iternextsv((HV *)thing, NULL, NULL))) {
+	      av_push(pending_array, temp_thing);
+	    }
+	  }
 	  break;
 	 
 	default:
-	  puts("Dunno");
+	  break;
 	}
       }
 
