@@ -3,4 +3,4 @@ MANIFEST
 Makefile.PL
 Size.pm
 Size.xs
-test.pl
+t/basic.t

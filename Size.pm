@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.51';
+$VERSION = '0.52';
 
 bootstrap Devel::Size $VERSION;
 
@@ -44,6 +44,11 @@ Devel::Size - Perl extension for finding the memory usage of perl variables
   $size = size("abcde");
   $other_size = size(\@foo);
 
+  $foo = {a => [1, 2, 3],
+	  b => {a => [1, 3, 4]}
+         };
+  $total_size = total_size($foo);
+
 =head1 DESCRIPTION
 
 This module figures out the real sizes of perl variables. Call it with
@@ -51,6 +56,17 @@ a reference to the variable you want the size of. If you pass in a
 plain scalar it returns the size of that scalar. (Just be careful if
 you're asking for the size of a reference, as it'll follow the
 reference if you don't reference it first)
+
+The C<size> function returns the amount of memory the variable
+uses. If the variable is a hash or array, it only reports the amount
+used by the variable structure, I<not> the contents.
+
+The C<total_size> function will walk the variable and look at the
+sizes of the contents. If the variable contains references those
+references will be walked, so if you have a multidimensional data
+structure you'll get the total structure size. (There isn't, at the
+moment, a way to get the size of an array or hash and its elements
+without a full walk)
 
 =head2 EXPORT
 
@@ -60,10 +76,6 @@ None by default.
 
 Doesn't currently walk all the bits for code refs, globs, formats, and
 IO. Those throw a warning, but a minimum size for them is returned.
-
-Also, this module currently only returns the size used by the variable
-itself, I<not> the contents of arrays or hashes, nor does it follow
-references past one level. That's for later.
 
 =head1 AUTHOR
 

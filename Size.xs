@@ -165,10 +165,19 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     break;
   case SVt_PVCV:
     total_size += sizeof(XPVCV);
+    total_size += magic_size(thing, tracking_hash);
     carp("CV isn't complete");
     break;
   case SVt_PVGV:
+    total_size += magic_size(thing, tracking_hash);
     total_size += sizeof(XPVGV);
+    total_size += GvNAMELEN(thing);
+    /* Is there something hanging off the glob? */
+    if (GvGP(thing)) {
+      if (check_new(tracking_hash, GvGP(thing))) {
+	total_size += sizeof(GP);
+      }
+    }
     carp("GC isn't complete");
     break;
   case SVt_PVFM:
@@ -273,14 +282,14 @@ CODE:
 	case SVt_PVHV:
 	  /* Is there anything in here? */
 	  if (hv_iterinit((HV *)thing)) {
-	    SV *temp_thing;
-	    while (&PL_sv_undef != 
-		   (temp_thing = hv_iternextsv((HV *)thing, NULL, NULL))) {
-	      av_push(pending_array, temp_thing);
+	    HE *temp_he;
+	    while (temp_he = hv_iternext((HV *)thing)) {
+	      av_push(pending_array, hv_iterval((HV *)thing, temp_he));
 	    }
 	  }
 	  break;
 	 
+	case SVt_PVGV:
 	default:
 	  break;
 	}
