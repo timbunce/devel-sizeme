@@ -16,7 +16,7 @@ require DynaLoader;
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
 %EXPORT_TAGS = ( 'all' => [ qw(
-	size, total_size
+	size total_size
 ) ] );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.52';
+$VERSION = '0.53';
 
 bootstrap Devel::Size $VERSION;
 
@@ -32,45 +32,53 @@ bootstrap Devel::Size $VERSION;
 
 1;
 __END__
-# Below is stub documentation for your module. You better edit it!
 
 =head1 NAME
 
-Devel::Size - Perl extension for finding the memory usage of perl variables
+Devel::Size - Perl extension for finding the memory usage of Perl variables
 
 =head1 SYNOPSIS
 
-  use Devel::Size qw(size);
-  $size = size("abcde");
-  $other_size = size(\@foo);
+  use Devel::Size qw(size total_size);
 
-  $foo = {a => [1, 2, 3],
+  my $size = size("A string");
+
+  my @foo = (1, 2, 3, 4, 5);
+  my $other_size = size(\@foo);
+
+  my $foo = {a => [1, 2, 3],
 	  b => {a => [1, 3, 4]}
          };
-  $total_size = total_size($foo);
+  my  $total_size = total_size($foo);
 
 =head1 DESCRIPTION
 
-This module figures out the real sizes of perl variables. Call it with
-a reference to the variable you want the size of. If you pass in a
-plain scalar it returns the size of that scalar. (Just be careful if
-you're asking for the size of a reference, as it'll follow the
-reference if you don't reference it first)
+This module figures out the real sizes of Perl variables in bytes.  
+Call functions with a reference to the variable you want the size
+of.  If the variable is a plain scalar it returns the size of
+the scalar.  If the variable is a hash or an array, use a reference
+when calling.
+
+=head1 FUNCTIONS
+
+=head2 size($ref)
 
 The C<size> function returns the amount of memory the variable
-uses. If the variable is a hash or array, it only reports the amount
-used by the variable structure, I<not> the contents.
+returns.  If the variable is a hash or an array, it only reports
+the amount used by the structure, I<not> the contents.
 
-The C<total_size> function will walk the variable and look at the
-sizes of the contents. If the variable contains references those
-references will be walked, so if you have a multidimensional data
-structure you'll get the total structure size. (There isn't, at the
-moment, a way to get the size of an array or hash and its elements
-without a full walk)
+=head2 total_size($ref)
+
+The C<total_size> function will traverse the variable and look
+at the sizes of contents.  Any references contained in the variable
+will also be followed, so this function can be used to get the
+total size of a multidimensional data structure.  At the moment
+there is no way to get the size of an array or a hash and its
+elements without using this function.
 
 =head2 EXPORT
 
-None by default.
+None but default, but optionally C<size> and C<total_size>.
 
 =head1 BUGS
 

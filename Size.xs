@@ -172,13 +172,18 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     total_size += magic_size(thing, tracking_hash);
     total_size += sizeof(XPVGV);
     total_size += GvNAMELEN(thing);
+    /* Is there a file? */
+    if (GvFILE(thing)) {
+      if (check_new(tracking_hash, GvFILE(thing))) {
+	total_size += strlen(GvFILE(thing));
+      }
+    }
     /* Is there something hanging off the glob? */
     if (GvGP(thing)) {
       if (check_new(tracking_hash, GvGP(thing))) {
 	total_size += sizeof(GP);
       }
     }
-    carp("GC isn't complete");
     break;
   case SVt_PVFM:
     total_size += sizeof(XPVFM);
@@ -290,6 +295,23 @@ CODE:
 	  break;
 	 
 	case SVt_PVGV:
+	  /* Run through all the pieces and push the ones with bits */
+	  if (GvSV(thing)) {
+	    av_push(pending_array, (SV *)GvSV(thing));
+	  }
+	  if (GvFORM(thing)) {
+	    av_push(pending_array, (SV *)GvFORM(thing));
+	  }
+	  if (GvAV(thing)) {
+	    av_push(pending_array, (SV *)GvAV(thing));
+	  }
+	  if (GvHV(thing)) {
+	    av_push(pending_array, (SV *)GvHV(thing));
+	  }
+	  if (GvCV(thing)) {
+	    av_push(pending_array, (SV *)GvCV(thing));
+	  }
+	  break;
 	default:
 	  break;
 	}

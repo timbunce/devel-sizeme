@@ -4,3 +4,7 @@ Revision history for Perl extension Devel::Size.
 	- original version; created by h2xs 1.2 with options
 		-A -n Devel::Size
 
+0.53  Thu Oct 10 12:30:00 2002
+        - Finally started updating Changes file
+	- Applied doc patch from Ann Barcomb
+	- Got globs sizing right
