@@ -24,9 +24,11 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.56';
+$VERSION = '0.57';
 
 bootstrap Devel::Size $VERSION;
+
+our $warn = 1;
 
 # Preloaded methods go here.
 

@@ -8,6 +8,8 @@
 #define NV double
 #endif
 
+static int go_yell = 1;
+
 /* Checks to see if thing is in the hash. Returns true or false, and
    notes thing in the hash.
 
@@ -165,7 +167,9 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
   case SVt_PVCV:
     total_size += sizeof(XPVCV);
     total_size += magic_size(thing, tracking_hash);
-    carp("CV isn't complete");
+    if (go_yell) {
+      carp("CV isn't complete");
+    }
     break;
   case SVt_PVGV:
     total_size += magic_size(thing, tracking_hash);
@@ -186,11 +190,15 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     break;
   case SVt_PVFM:
     total_size += sizeof(XPVFM);
-    carp("FM isn't complete");
+    if (go_yell) {
+      carp("FM isn't complete");
+    }
     break;
   case SVt_PVIO:
     total_size += sizeof(XPVIO);
-    carp("IO isn't complete");
+    if (go_yell) {
+      carp("IO isn't complete");
+    }
     break;
   default:
     croak("Unknown variable type");
@@ -210,6 +218,15 @@ CODE:
   SV *thing = orig_thing;
   /* Hash to track our seen pointers */
   HV *tracking_hash = newHV();
+  SV *warn_flag;
+
+  /* Check warning status */
+  go_yell = 0;
+
+  if (NULL != (warn_flag = get_sv("Devel::Size::warn", FALSE))) {
+    go_yell = SvIV(warn_flag);
+  }
+  
 
   /* If they passed us a reference then dereference it. This is the
      only way we can check the sizes of arrays and hashes */
@@ -235,11 +252,20 @@ CODE:
   HV *tracking_hash = newHV();
   AV *pending_array = newAV();
   IV size = 0;
+  SV *warn_flag;
 
   IV count = 0;
 
   /* Size starts at zero */
   RETVAL = 0;
+
+  /* Check warning status */
+  go_yell = 0;
+
+  if (NULL != (warn_flag = get_sv("Devel::Size::warn", FALSE))) {
+    go_yell = SvIV(warn_flag);
+  }
+  
 
   /* If they passed us a reference then dereference it. This is the
      only way we can check the sizes of arrays and hashes */
