@@ -17,3 +17,6 @@ Revision history for Perl extension Devel::Size.
 	- Updated the docs to show some of the places that there might be 'dark'
 	  memory that Devel::Size can't see.
 	- Added in tests from Ken Williams
+
+0.56  Mon Feb 24 12:10:13 2003
+        - Chopped out some C++ comments. D'oh! Version incremented for CPAN

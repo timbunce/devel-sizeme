@@ -323,12 +323,10 @@ CODE:
       
       size = thing_size(thing, tracking_hash);
       RETVAL += size;
-      //      printf("added thing of size %i, thing #%i\n", size, count++);
     }
   }
   
   /* Clean up after ourselves */
-  //  printf("For info, refcounts are %i, %i\n", SvREFCNT(tracking_hash), SvREFCNT(pending_array));
   SvREFCNT_dec(tracking_hash);
   SvREFCNT_dec(pending_array);
 }
