@@ -288,9 +288,9 @@ UV op_size(OP *baseop, HV *tracking_hash) {
     if (check_new(tracking_hash, cLOOPx(baseop)->op_nextop)) {
       total_size += op_size(cLOOPx(baseop)->op_nextop, tracking_hash);
     }
-    if (check_new(tracking_hash, cLOOPx(baseop)->op_lastop)) {
-      total_size += op_size(cLOOPx(baseop)->op_lastop, tracking_hash);
-    }  
+//    if (check_new(tracking_hash, cLOOPx(baseop)->op_lastop)) {
+//      total_size += op_size(cLOOPx(baseop)->op_lastop, tracking_hash);
+//    }  
   case OPc_COP:
     {
       COP *basecop;

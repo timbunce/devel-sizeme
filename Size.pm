@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.60';
+$VERSION = '0.61';
 
 bootstrap Devel::Size $VERSION;
 
