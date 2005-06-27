@@ -3,6 +3,130 @@
 #include "XSUB.h"
 
 #define carp puts
+UV thing_size(SV *, HV *);
+typedef enum {
+    OPc_NULL,	/* 0 */
+    OPc_BASEOP,	/* 1 */
+    OPc_UNOP,	/* 2 */
+    OPc_BINOP,	/* 3 */
+    OPc_LOGOP,	/* 4 */
+    OPc_LISTOP,	/* 5 */
+    OPc_PMOP,	/* 6 */
+    OPc_SVOP,	/* 7 */
+    OPc_PADOP,	/* 8 */
+    OPc_PVOP,	/* 9 */
+    OPc_CVOP,	/* 10 */
+    OPc_LOOP,	/* 11 */
+    OPc_COP	/* 12 */
+} opclass;
+
+static opclass
+cc_opclass(OP *o)
+{
+    if (!o)
+	return OPc_NULL;
+
+    if (o->op_type == 0)
+	return (o->op_flags & OPf_KIDS) ? OPc_UNOP : OPc_BASEOP;
+
+    if (o->op_type == OP_SASSIGN)
+	return ((o->op_private & OPpASSIGN_BACKWARDS) ? OPc_UNOP : OPc_BINOP);
+
+#ifdef USE_ITHREADS
+    if (o->op_type == OP_GV || o->op_type == OP_GVSV || o->op_type == OP_AELEMFAST)
+	return OPc_PADOP;
+#endif
+
+    switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
+    case OA_BASEOP:
+	return OPc_BASEOP;
+
+    case OA_UNOP:
+	return OPc_UNOP;
+
+    case OA_BINOP:
+	return OPc_BINOP;
+
+    case OA_LOGOP:
+	return OPc_LOGOP;
+
+    case OA_LISTOP:
+	return OPc_LISTOP;
+
+    case OA_PMOP:
+	return OPc_PMOP;
+
+    case OA_SVOP:
+	return OPc_SVOP;
+
+    case OA_PADOP:
+	return OPc_PADOP;
+
+    case OA_PVOP_OR_SVOP:
+        /*
+         * Character translations (tr///) are usually a PVOP, keeping a 
+         * pointer to a table of shorts used to look up translations.
+         * Under utf8, however, a simple table isn't practical; instead,
+         * the OP is an SVOP, and the SV is a reference to a swash
+         * (i.e., an RV pointing to an HV).
+         */
+	return (o->op_private & (OPpTRANS_TO_UTF|OPpTRANS_FROM_UTF))
+		? OPc_SVOP : OPc_PVOP;
+
+    case OA_LOOP:
+	return OPc_LOOP;
+
+    case OA_COP:
+	return OPc_COP;
+
+    case OA_BASEOP_OR_UNOP:
+	/*
+	 * UNI(OP_foo) in toke.c returns token UNI or FUNC1 depending on
+	 * whether parens were seen. perly.y uses OPf_SPECIAL to
+	 * signal whether a BASEOP had empty parens or none.
+	 * Some other UNOPs are created later, though, so the best
+	 * test is OPf_KIDS, which is set in newUNOP.
+	 */
+	return (o->op_flags & OPf_KIDS) ? OPc_UNOP : OPc_BASEOP;
+
+    case OA_FILESTATOP:
+	/*
+	 * The file stat OPs are created via UNI(OP_foo) in toke.c but use
+	 * the OPf_REF flag to distinguish between OP types instead of the
+	 * usual OPf_SPECIAL flag. As usual, if OPf_KIDS is set, then we
+	 * return OPc_UNOP so that walkoptree can find our children. If
+	 * OPf_KIDS is not set then we check OPf_REF. Without OPf_REF set
+	 * (no argument to the operator) it's an OP; with OPf_REF set it's
+	 * an SVOP (and op_sv is the GV for the filehandle argument).
+	 */
+	return ((o->op_flags & OPf_KIDS) ? OPc_UNOP :
+#ifdef USE_ITHREADS
+		(o->op_flags & OPf_REF) ? OPc_PADOP : OPc_BASEOP);
+#else
+		(o->op_flags & OPf_REF) ? OPc_SVOP : OPc_BASEOP);
+#endif
+    case OA_LOOPEXOP:
+	/*
+	 * next, last, redo, dump and goto use OPf_SPECIAL to indicate that a
+	 * label was omitted (in which case it's a BASEOP) or else a term was
+	 * seen. In this last case, all except goto are definitely PVOP but
+	 * goto is either a PVOP (with an ordinary constant label), an UNOP
+	 * with OPf_STACKED (with a non-constant non-sub) or an UNOP for
+	 * OP_REFGEN (with goto &sub) in which case OPf_STACKED also seems to
+	 * get set.
+	 */
+	if (o->op_flags & OPf_STACKED)
+	    return OPc_UNOP;
+	else if (o->op_flags & OPf_SPECIAL)
+	    return OPc_BASEOP;
+	else
+	    return OPc_PVOP;
+    }
+    warn("can't determine class of operator %s, assuming BASEOP\n",
+	 PL_op_name[o->op_type]);
+    return OPc_BASEOP;
+}
+
 
 #if !defined(NV)
 #define NV double
@@ -20,6 +144,9 @@ static int go_yell = 1;
    64-bit machines) bytes of the address as the string we're using as
    the key */
 IV check_new(HV *tracking_hash, void *thing) {
+  if (NULL == thing) {
+    return FALSE;
+  }
   if (hv_exists(tracking_hash, (char *)&thing, sizeof(void *))) {
     return FALSE;
   }
@@ -60,6 +187,142 @@ IV magic_size(SV *thing, HV *tracking_hash) {
   return total_size;
 }
 
+UV regex_size(REGEXP *baseregex, HV *tracking_hash) {
+  UV total_size = 0;
+
+  return total_size;
+}
+
+UV op_size(OP *baseop, HV *tracking_hash) {
+  UV total_size = 0;
+
+  if (check_new(tracking_hash, baseop->op_next)) {
+    total_size += op_size(baseop->op_next, tracking_hash);
+  }
+  if (check_new(tracking_hash, baseop->op_next)) {
+    total_size += op_size(baseop->op_next, tracking_hash);
+  }
+
+  switch (cc_opclass(baseop)) {
+  case OPc_BASEOP:
+    total_size += sizeof(struct op);
+    break;
+  case OPc_UNOP:
+    total_size += sizeof(struct unop);
+    if (check_new(tracking_hash, cUNOPx(baseop)->op_first)) {
+      total_size += op_size(cUNOPx(baseop)->op_first, tracking_hash);
+    }
+    break;
+  case OPc_BINOP:
+    total_size += sizeof(struct binop);
+    if (check_new(tracking_hash, cBINOPx(baseop)->op_first)) {
+      total_size += op_size(cBINOPx(baseop)->op_first, tracking_hash);
+    }  
+    if (check_new(tracking_hash, cBINOPx(baseop)->op_last)) {
+      total_size += op_size(cBINOPx(baseop)->op_last, tracking_hash);
+    }
+    break;
+  case OPc_LOGOP:
+    total_size += sizeof(struct logop);
+    if (check_new(tracking_hash, cLOGOPx(baseop)->op_first)) {
+      total_size += op_size(cBINOPx(baseop)->op_first, tracking_hash);
+    }  
+    if (check_new(tracking_hash, cLOGOPx(baseop)->op_other)) {
+      total_size += op_size(cLOGOPx(baseop)->op_other, tracking_hash);
+    }
+    break;
+  case OPc_LISTOP:
+    total_size += sizeof(struct listop);
+    if (check_new(tracking_hash, cLISTOPx(baseop)->op_first)) {
+      total_size += op_size(cLISTOPx(baseop)->op_first, tracking_hash);
+    }  
+    if (check_new(tracking_hash, cLISTOPx(baseop)->op_last)) {
+      total_size += op_size(cLISTOPx(baseop)->op_last, tracking_hash);
+    }
+    break;
+  case OPc_PMOP:
+    total_size += sizeof(struct pmop);
+    if (check_new(tracking_hash, cPMOPx(baseop)->op_first)) {
+      total_size += op_size(cPMOPx(baseop)->op_first, tracking_hash);
+    }  
+    if (check_new(tracking_hash, cPMOPx(baseop)->op_last)) {
+      total_size += op_size(cPMOPx(baseop)->op_last, tracking_hash);
+    }
+    if (check_new(tracking_hash, cPMOPx(baseop)->op_pmreplroot)) {
+      total_size += op_size(cPMOPx(baseop)->op_pmreplroot, tracking_hash);
+    }
+    if (check_new(tracking_hash, cPMOPx(baseop)->op_pmreplstart)) {
+      total_size += op_size(cPMOPx(baseop)->op_pmreplstart, tracking_hash);
+    }
+    if (check_new(tracking_hash, cPMOPx(baseop)->op_pmnext)) {
+      total_size += op_size((OP *)cPMOPx(baseop)->op_pmnext, tracking_hash);
+    }
+    //    if (check_new(tracking_hash, cPMOPx(baseop)->op_pmregexp)) {
+    //  total_size += regex_size(cPMOPx(baseop)->op_pmregexp, tracking_hash);
+    //}
+    break;
+  case OPc_SVOP:
+    total_size += sizeof(struct pmop);
+    if (check_new(tracking_hash, cSVOPx(baseop)->op_sv)) {
+      total_size += thing_size(cSVOPx(baseop)->op_sv, tracking_hash);
+    }
+    break;
+  case OPc_PADOP:
+    total_size += sizeof(struct padop);
+    break;
+  case OPc_PVOP:
+    if (check_new(tracking_hash, cPVOPx(baseop)->op_pv)) {
+      total_size += strlen(cPVOPx(baseop)->op_pv);
+    }
+  case OPc_LOOP:
+    total_size += sizeof(struct loop);
+    if (check_new(tracking_hash, cLOOPx(baseop)->op_first)) {
+      total_size += op_size(cLOOPx(baseop)->op_first, tracking_hash);
+    }  
+    if (check_new(tracking_hash, cLOOPx(baseop)->op_last)) {
+      total_size += op_size(cLOOPx(baseop)->op_last, tracking_hash);
+    }
+    if (check_new(tracking_hash, cLOOPx(baseop)->op_redoop)) {
+      total_size += op_size(cLOOPx(baseop)->op_redoop, tracking_hash);
+    }  
+    if (check_new(tracking_hash, cLOOPx(baseop)->op_nextop)) {
+      total_size += op_size(cLOOPx(baseop)->op_nextop, tracking_hash);
+    }
+    if (check_new(tracking_hash, cLOOPx(baseop)->op_lastop)) {
+      total_size += op_size(cLOOPx(baseop)->op_lastop, tracking_hash);
+    }  
+  case OPc_COP:
+    {
+      COP *basecop;
+      basecop = (COP *)baseop;
+      total_size += sizeof(struct cop);
+
+      if (check_new(tracking_hash, basecop->cop_label)) {
+	total_size += strlen(basecop->cop_label);
+      }
+#ifdef USE_ITHREADS
+      if (check_new(tracking_hash, basecop->cop_file)) {
+	total_size += strlen(basecop->cop_file);
+      }
+      if (check_new(tracking_hash, basecop->cop_stashpv)) {
+	total_size += strlen(basecop->cop_stashpv);
+      }
+#else
+      if (check_new(tracking_hash, basecop->cop_stash)) {
+	total_size += thing_size((SV *)basecop->cop_stash, tracking_hash);
+      }
+      if (check_new(tracking_hash, basecop->cop_filegv)) {
+	total_size += thing_size((SV *)basecop->cop_filegv, tracking_hash);
+      }
+#endif
+
+    }
+    break;
+  default:
+    break;
+  }
+  return total_size;
+}
 
 UV thing_size(SV *orig_thing, HV *tracking_hash) {
   SV *thing = orig_thing;
@@ -167,9 +430,31 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
   case SVt_PVCV:
     total_size += sizeof(XPVCV);
     total_size += magic_size(thing, tracking_hash);
-    if (go_yell) {
-      carp("Devel::Size: Calculated sizes for CVs are incomplete");
+
+    total_size += ((XPVIO *) SvANY(thing))->xpv_len;
+    if (check_new(tracking_hash, CvSTASH(thing))) {
+      total_size += thing_size((SV *)CvSTASH(thing), tracking_hash);
     }
+    if (check_new(tracking_hash, SvSTASH(thing))) {
+      total_size += thing_size((SV *)SvSTASH(thing), tracking_hash);
+    }
+    if (check_new(tracking_hash, CvGV(thing))) {
+      total_size += thing_size((SV *)CvGV(thing), tracking_hash);
+    }
+    if (check_new(tracking_hash, CvPADLIST(thing))) {
+      total_size += thing_size((SV *)CvPADLIST(thing), tracking_hash);
+    }
+    if (check_new(tracking_hash, CvOUTSIDE(thing))) {
+      total_size += thing_size((SV *)CvOUTSIDE(thing), tracking_hash);
+    }
+
+    if (check_new(tracking_hash, CvSTART(thing))) {
+      total_size += op_size(CvSTART(thing), tracking_hash);
+    }
+    if (check_new(tracking_hash, CvROOT(thing))) {
+      total_size += op_size(CvROOT(thing), tracking_hash);
+    }
+
     break;
   case SVt_PVGV:
     total_size += magic_size(thing, tracking_hash);
@@ -213,6 +498,15 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     break;
   case SVt_PVFM:
     total_size += sizeof(XPVFM);
+    total_size += magic_size(thing, tracking_hash);
+    total_size += ((XPVIO *) SvANY(thing))->xpv_len;
+    if (check_new(tracking_hash, CvPADLIST(thing))) {
+      total_size += thing_size((SV *)CvPADLIST(thing), tracking_hash);
+    }
+    if (check_new(tracking_hash, CvOUTSIDE(thing))) {
+      total_size += thing_size((SV *)CvOUTSIDE(thing), tracking_hash);
+    }
+
     if (go_yell) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
     }

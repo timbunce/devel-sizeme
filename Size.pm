@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.59';
+$VERSION = '0.60';
 
 bootstrap Devel::Size $VERSION;
 
@@ -229,8 +229,6 @@ These may be disabled by setting
 =item	"Devel::Size: Calculated sizes for CVs are incomplete"
 
 =item	"Devel::Size: Calculated sizes for FMs are incomplete"
-
-=item	"Devel::Size: Calculated sizes for IOs are incomplete"
 
 =back
 
