@@ -33,6 +33,12 @@ Revision history for Perl extension Devel::Size.
         - Applied documentation and sane warning patch from Nigel Sandever
         - Taught Devel::Size how to size up IO and globs properly
 
-0.61  Mon Jun 17 16:19:00 2005
+0.61  Mon Jun 27 16:19:00 2005
         - Added more checks for formats
   	- Got CVs sizing right
+
+0.62  Tue Jun 28 11:59:00 2005
+        - Took out // comments
+  	- Added in copyright notice
+	- Some small amount of regex parsing
+	- Suppress multiple copies of each warning on each call

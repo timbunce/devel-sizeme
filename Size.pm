@@ -24,7 +24,7 @@ require DynaLoader;
 @EXPORT = qw(
 	
 );
-$VERSION = '0.61';
+$VERSION = '0.62';
 
 bootstrap Devel::Size $VERSION;
 
@@ -244,6 +244,15 @@ allocation alignments, or C library overhead.
 =head1 AUTHOR
 
 Dan Sugalski dan@sidhe.org
+
+Small portion taken from the B module as shipped with perl 5.6.2.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2005 Dan Sugalski.
+
+This module is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
 
 =head1 SEE ALSO
 

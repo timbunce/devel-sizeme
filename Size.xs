@@ -2,6 +2,10 @@
 #include "perl.h"
 #include "XSUB.h"
 
+static int regex_whine;
+static int fm_whine;
+
+
 #define carp puts
 UV thing_size(SV *, HV *);
 typedef enum {
@@ -190,6 +194,16 @@ IV magic_size(SV *thing, HV *tracking_hash) {
 UV regex_size(REGEXP *baseregex, HV *tracking_hash) {
   UV total_size = 0;
 
+  total_size += sizeof(REGEXP);
+  /* Note hte size of the paren offset thing */
+  total_size += sizeof(I32) * baseregex->nparens * 2;
+  total_size += strlen(baseregex->precomp);
+
+  if (go_yell && !regex_whine) {
+    carp("Devel::Size: Calculated sizes for compiled regexes are incomple, and probably always will be");
+    regex_whine = 1;
+  }
+
   return total_size;
 }
 
@@ -257,9 +271,17 @@ UV op_size(OP *baseop, HV *tracking_hash) {
     if (check_new(tracking_hash, cPMOPx(baseop)->op_pmnext)) {
       total_size += op_size((OP *)cPMOPx(baseop)->op_pmnext, tracking_hash);
     }
-    //    if (check_new(tracking_hash, cPMOPx(baseop)->op_pmregexp)) {
-    //  total_size += regex_size(cPMOPx(baseop)->op_pmregexp, tracking_hash);
-    //}
+    /* This is defined away in perl 5.8.x, but it is in there for
+       5.6.x */
+#ifdef PM_GETRE
+    if (check_new(tracking_hash, PM_GETRE((cPMOPx(baseop))))) {
+      total_size += regex_size(PM_GETRE(cPMOPx(baseop)), tracking_hash);
+    }
+#else
+    if (check_new(tracking_hash, cPMOPx(baseop)->op_pmregexp)) {
+      total_size += regex_size(cPMOPx(baseop)->op_pmregexp, tracking_hash);
+    }
+#endif
     break;
   case OPc_SVOP:
     total_size += sizeof(struct pmop);
@@ -288,9 +310,12 @@ UV op_size(OP *baseop, HV *tracking_hash) {
     if (check_new(tracking_hash, cLOOPx(baseop)->op_nextop)) {
       total_size += op_size(cLOOPx(baseop)->op_nextop, tracking_hash);
     }
-//    if (check_new(tracking_hash, cLOOPx(baseop)->op_lastop)) {
-//      total_size += op_size(cLOOPx(baseop)->op_lastop, tracking_hash);
-//    }  
+    /* Not working for some reason, but the code's here for later
+       fixing 
+    if (check_new(tracking_hash, cLOOPx(baseop)->op_lastop)) {
+      total_size += op_size(cLOOPx(baseop)->op_lastop, tracking_hash);
+    }  
+    */
   case OPc_COP:
     {
       COP *basecop;
@@ -507,8 +532,9 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
       total_size += thing_size((SV *)CvOUTSIDE(thing), tracking_hash);
     }
 
-    if (go_yell) {
+    if (go_yell && !fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
+      fm_whine = 1;
     }
     break;
   case SVt_PVIO:
@@ -571,6 +597,8 @@ CODE:
 
   /* Check warning status */
   go_yell = 0;
+  regex_whine = 0;
+  fm_whine = 0;
 
   if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
     go_yell = SvIV(warn_flag);
@@ -610,6 +638,8 @@ CODE:
 
   /* Check warning status */
   go_yell = 0;
+  regex_whine = 0;
+  fm_whine = 0;
 
   if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
     go_yell = SvIV(warn_flag);
