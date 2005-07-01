@@ -42,3 +42,8 @@ Revision history for Perl extension Devel::Size.
   	- Added in copyright notice
 	- Some small amount of regex parsing
 	- Suppress multiple copies of each warning on each call
+
+0.63  Thu Jun 30 14:29:43 2005
+        - Turns out that OP_TRANS is a basic op, not a loop op. This
+	  is a bug in versions of perl 5.8.x before 5.8.7. Work around
+	  it.

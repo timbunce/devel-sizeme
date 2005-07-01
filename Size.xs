@@ -19,9 +19,8 @@ typedef enum {
     OPc_SVOP,	/* 7 */
     OPc_PADOP,	/* 8 */
     OPc_PVOP,	/* 9 */
-    OPc_CVOP,	/* 10 */
-    OPc_LOOP,	/* 11 */
-    OPc_COP	/* 12 */
+    OPc_LOOP,	/* 10 */
+    OPc_COP	/* 11 */
 } opclass;
 
 static opclass
@@ -40,6 +39,10 @@ cc_opclass(OP *o)
     if (o->op_type == OP_GV || o->op_type == OP_GVSV || o->op_type == OP_AELEMFAST)
 	return OPc_PADOP;
 #endif
+
+    if (o->op_type = OP_TRANS) {
+      return OPc_BASEOP;
+    }
 
     switch (PL_opargs[o->op_type] & OA_CLASS_MASK) {
     case OA_BASEOP:
@@ -316,6 +319,7 @@ UV op_size(OP *baseop, HV *tracking_hash) {
       total_size += op_size(cLOOPx(baseop)->op_lastop, tracking_hash);
     }  
     */
+    break;
   case OPc_COP:
     {
       COP *basecop;
