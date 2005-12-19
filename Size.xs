@@ -150,7 +150,7 @@ static int go_yell = 1;
    pointer as the length. Perl then uses the four (or eight, on
    64-bit machines) bytes of the address as the string we're using as
    the key */
-IV check_new(HV *tracking_hash, void *thing) {
+IV check_new(HV *tracking_hash, const void *thing) {
   if (NULL == thing) {
     return FALSE;
   }
@@ -353,6 +353,10 @@ UV op_size(OP *baseop, HV *tracking_hash) {
   return total_size;
 }
 
+#if PERL_VERSION > 9 || (PERL_VERSION == 9 && PERL_SUBVERSION > 2)
+#  define NEW_HEAD_LAYOUT
+#endif
+
 UV thing_size(SV *orig_thing, HV *tracking_hash) {
   SV *thing = orig_thing;
   UV total_size = sizeof(SV);
@@ -364,10 +368,12 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     /* Just a plain integer. This will be differently sized depending
        on whether purify's been compiled in */
   case SVt_IV:
-#ifdef PURIFY
+#ifndef NEW_HEAD_LAYOUT
+#  ifdef PURIFY
     total_size += sizeof(sizeof(XPVIV));
-#else
+#  else
     total_size += sizeof(IV);
+#  endif
 #endif
     break;
     /* Is it a float? Like the int, it depends on purify */
@@ -380,7 +386,9 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     break;
     /* Is it a reference? */
   case SVt_RV:
+#ifndef NEW_HEAD_LAYOUT
     total_size += sizeof(XRV);
+#endif
     break;
     /* How about a plain string? In which case we need to add in how
        much has been allocated */
@@ -392,6 +400,7 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
   case SVt_PVIV:
     total_size += sizeof(XPVIV);
     total_size += SvLEN(thing);
+    total_size += SvIVX(thing);
     break;
     /* A string with a float part? */
   case SVt_PVNV:
@@ -544,7 +553,7 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
   case SVt_PVIO:
     total_size += sizeof(XPVIO);
     total_size += magic_size(thing, tracking_hash);
-    if (check_new(tracking_hash, ((XPVIO *) SvANY(thing))->xpv_pv)) {
+    if (check_new(tracking_hash, (SvPVX(thing)))) {
       total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
     }
     /* Some embedded char pointers */

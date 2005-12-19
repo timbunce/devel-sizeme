@@ -47,3 +47,8 @@ Revision history for Perl extension Devel::Size.
         - Turns out that OP_TRANS is a basic op, not a loop op. This
 	  is a bug in versions of perl 5.8.x before 5.8.7. Work around
 	  it.
+
+0.64  Mon Dec 19 18:46:00 2005
+        - Patch to make Devel::Size compile on bleadperl (Courtesy of
+	  Nick Clark)
+ 	- Fix up the PVIV string size calcs (Courtesy of Andrew Shirrayev)
