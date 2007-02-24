@@ -1,11 +1,29 @@
-use ExtUtils::MakeMaker;
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
-WriteMakefile(
-    'NAME'		=> 'Devel::Size',
-    'VERSION_FROM'	=> 'Size.pm', # finds $VERSION
-    'PREREQ_PM'		=> {}, # e.g., Module::Name => 1.1
-    'LIBS'		=> [''], # e.g., '-lm'
-    'DEFINE'		=> '', # e.g., '-DHAVE_SOMETHING'
-    'INC'		=> '', # e.g., '-I/usr/include/other'
-);
+
+use strict;
+
+# Load the Module::Install bundled in ./inc/
+use inc::Module::Install;
+
+# The name of your distribution
+name		'Devel-Size';
+
+# Get most of the details from the primary module
+all_from	'lib/Devel/Size.pm';
+
+requires	'DynaLoader'	=> 0;
+
+recommends	'Devel::Size::Report'	=> 0.11;
+
+build_requires	'Test::More'	=> 0.42;
+
+license		'perl';
+
+# It seems not to be possible to specifiy two authors here :/
+# Nor does a "maintainer" property exist
+author		'Tels <nospam-abuse@bloodgate.com>';
+
+# Do not index these
+no_index	directory	=> 'examples';
+
+# Generate the Makefile
+WriteAll;

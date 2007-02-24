@@ -1,22 +1,32 @@
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.pl'
+#!/usr/bin/perl -w
 
-######################### We start with some black magic to print on failure.
+use Test::More;
+use strict;
+   
+my $tests;
 
-# Change 1..1 below to 1..last_test_to_print .
-# (It may become useful if the test is moved to ./t subdirectory.)
+BEGIN
+   {
+   chdir 't' if -d 't';
+   plan tests => 13;
 
-BEGIN { $| = 1; print "1..8\n"; }
-END {print "not ok 1\n" unless $loaded;}
-use Devel::Size qw(size total_size);
-$loaded = 1;
-print "ok 1\n";
+   use lib '../lib';
+   use lib '../blib/arch';
+   use_ok('Devel::Size');
+   }
 
-######################### End of black magic.
+can_ok ('Devel::Size', qw/
+  size
+  total_size
+  /);
 
-# Insert your test code below (better if it prints "ok 13"
-# (correspondingly "not ok 13") depending on the success of chunk 13
-# of the test code):
+Devel::Size->import( qw(size total_size) );
+
+die ("Uhoh, test uses outdated version of Devel::Size")
+  unless is ($Devel::Size::VERSION, '0.65', 'VERSION MATCHES');
+
+#############################################################################
+# some basic checks:
 
 use vars qw($foo @foo %foo);
 $foo = "12";
@@ -24,58 +34,61 @@ $foo = "12";
 %foo = (a => 1, b => 2);
 
 my $x = "A string";
-my $y = "A longer string";
-if (size($x) < size($y)) {
-    print "ok 2\n";
-} else {
-    print "not ok 2\n";
-}
-
-if (total_size($x) < total_size($y)) {
-    print "ok 3\n";
-} else {
-    print "not ok 3\n";
-}
+my $y = "A much much longer string";		# need to be at least 7 bytes longer for 64 bit
+ok (size($x) < size($y), 'size() of strings');
+ok (total_size($x) < total_size($y), 'total_size() of strings');
 
 my @x = (1..4);
-my @y = (1..10);
+my @y = (1..200);
 
-if (size(\@x) < size(\@y)) {
-    print "ok 4\n";
-} else {
-    print "not ok 4\n";
-}
+my $size_1 = total_size(\@x);
+my $size_2 = total_size(\@y);
 
-if (total_size(\@x) < total_size(\@y)) {
-    print "ok 5\n";
-} else {
-    print "not ok 5\n";
-}
+ok ( $size_1 < $size_2, 'size() of array refs');
+ok (total_size(\@x) < total_size(\@y), 'total_size() of array refs');
 
+# the arrays alone should be the same size?
+$size_1 = size(\@x);
+$size_2 = size(\@y);
+
+is ( $size_1, $size_2, 'size() of array refs');
+
+#############################################################################
+# IV vs IV+PV (bug #17586)
+
+$x = 12;
+$y = 12; $y .= '';
+
+$size_1 = size($x);
+$size_2 = size($y);
+
+ok ($size_1 < $size_2, ' ."" makes string longer');
+
+#############################################################################
 # check that the tracking_hash is working
 
 my($a,$b) = (1,2);
 my @ary1 = (\$a, \$a);
 my @ary2 = (\$a, \$b);
 
-if (total_size(\@ary1) < total_size(\@ary2)) {
-    print "ok 6\n";
-} else {
-    print "not ok 6\n";
-}
+isnt ( total_size(\@ary2) - total_size(\@ary1), 0,
+	'total_size(\@ary1) < total_size(\@ary2)');
 
+#############################################################################
 # check that circular references don't mess things up
 
 my($c1,$c2); $c2 = \$c1; $c1 = \$c2;
 
-if( total_size($c1) == total_size($c2) ) {
-    print "ok 7\n";
-} else {
-    print "not ok 7\n";
-}
+is (total_size($c1), total_size($c2), 'circular references');
 
-if (total_size(*foo)) {
-   print "ok 8\n";
-} else {
-  print "not ok 8\n";
-}
+#############################################################################
+# GLOBS
+
+isnt (total_size(*foo), 0, 'total_size(*foo) > 0');
+
+#############################################################################
+# CODE ref
+
+my $code = sub { '1' };
+
+isnt (total_size($code), 0, 'total_size($code) > 0');

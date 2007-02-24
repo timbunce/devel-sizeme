@@ -40,7 +40,7 @@ cc_opclass(OP *o)
 	return OPc_PADOP;
 #endif
 
-    if (o->op_type = OP_TRANS) {
+    if ((o->op_type = OP_TRANS)) {
       return OPc_BASEOP;
     }
 
@@ -400,7 +400,9 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
   case SVt_PVIV:
     total_size += sizeof(XPVIV);
     total_size += SvLEN(thing);
-    total_size += SvIVX(thing);
+    if(SvOOK(thing)) {
+        total_size += SvIVX(thing);
+	}
     break;
     /* A string with a float part? */
   case SVt_PVNV:
@@ -412,11 +414,13 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     total_size += SvLEN(thing);
     total_size += magic_size(thing, tracking_hash);
     break;
+#if PERL_VERSION <= 8
   case SVt_PVBM:
     total_size += sizeof(XPVBM);
     total_size += SvLEN(thing);
     total_size += magic_size(thing, tracking_hash);
     break;
+#endif
   case SVt_PVLV:
     total_size += sizeof(XPVLV);
     total_size += SvLEN(thing);
@@ -431,7 +435,16 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
       total_size += sizeof(SV *) * AvMAX(thing);
     }
     /* Add in the bits on the other side of the beginning */
-    total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
+
+    /* 
+      printf ("total_size %li, sizeof(SV *) %li, AvARRAY(thing) %li, AvALLOC(thing)%li , sizeof(ptr) %li \n", 
+	total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )); */
+
+    /* under Perl 5.8.8 64bit threading, AvARRAY(thing) was a pointer while AvALLOC was 0,
+       resulting in grossly overstated sized for arrays */
+    if (AvALLOC(thing) != 0) {
+      total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
+      }
     /* Is there something hanging off the arylen element? */
     if (AvARYLEN(thing)) {
       if (check_new(tracking_hash, AvARYLEN(thing))) {
@@ -512,22 +525,22 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
 	total_size += sizeof(GP);
 	{
 	  SV *generic_thing;
-	  if (generic_thing = (SV *)(GvGP(thing)->gp_sv)) {
+	  if ((generic_thing = (SV *)(GvGP(thing)->gp_sv))) {
 	    total_size += thing_size(generic_thing, tracking_hash);
 	  }
-	  if (generic_thing = (SV *)(GvGP(thing)->gp_form)) {
+	  if ((generic_thing = (SV *)(GvGP(thing)->gp_form))) {
 	    total_size += thing_size(generic_thing, tracking_hash);
 	  }
-	  if (generic_thing = (SV *)(GvGP(thing)->gp_av)) {
+	  if ((generic_thing = (SV *)(GvGP(thing)->gp_av))) {
 	    total_size += thing_size(generic_thing, tracking_hash);
 	  }
-	  if (generic_thing = (SV *)(GvGP(thing)->gp_hv)) {
+	  if ((generic_thing = (SV *)(GvGP(thing)->gp_hv))) {
 	    total_size += thing_size(generic_thing, tracking_hash);
 	  }
-	  if (generic_thing = (SV *)(GvGP(thing)->gp_egv)) {
+	  if ((generic_thing = (SV *)(GvGP(thing)->gp_egv))) {
 	    total_size += thing_size(generic_thing, tracking_hash);
 	  }
-	  if (generic_thing = (SV *)(GvGP(thing)->gp_cv)) {
+	  if ((generic_thing = (SV *)(GvGP(thing)->gp_cv))) {
 	    total_size += thing_size(generic_thing, tracking_hash);
 	  }
 	}
@@ -644,8 +657,6 @@ CODE:
   IV size = 0;
   SV *warn_flag;
 
-  IV count = 0;
-
   /* Size starts at zero */
   RETVAL = 0;
 
@@ -693,7 +704,7 @@ CODE:
 	      /* Run through them all */
 	      for (index = 0; index <= av_len(tempAV); index++) {
 		/* Did we get something? */
-		if (tempSV = av_fetch(tempAV, index, 0)) {
+		if ((tempSV = av_fetch(tempAV, index, 0))) {
 		  /* Was it undef? */
 		  if (*tempSV != &PL_sv_undef) {
 		    /* Apparently not. Save it for later */
@@ -709,7 +720,7 @@ CODE:
 	  /* Is there anything in here? */
 	  if (hv_iterinit((HV *)thing)) {
 	    HE *temp_he;
-	    while (temp_he = hv_iternext((HV *)thing)) {
+	    while ((temp_he = hv_iternext((HV *)thing))) {
 	      av_push(pending_array, hv_iterval((HV *)thing, temp_he));
 	    }
 	  }

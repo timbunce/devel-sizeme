@@ -1,10 +1,18 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         Devel-Size
-version:      0.64
-version_from: Size.pm
-installdirs:  site
-requires:
-
+abstract: Perl extension for finding the memory usage of Perl variables
+author: Tels <nospam-abuse@bloodgate.com>
+build_requires: 
+  Test::More: 0.42
 distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.17
+generated_by: Module::Install version 0.64
+license: perl
+name: Devel-Size
+no_index: 
+  directory: 
+    - examples
+    - inc
+    - t
+recommends: 
+  Devel::Size::Report: 0.11
+requires: 
+  DynaLoader: 0
+version: 0.65

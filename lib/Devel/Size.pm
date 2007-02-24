@@ -1,36 +1,26 @@
 package Devel::Size;
 
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD %EXPORT_TAGS $warn);
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $warn);
 
 require Exporter;
 require DynaLoader;
 
 @ISA = qw(Exporter DynaLoader);
 
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
 # This allows declaration	use Devel::Size ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
 %EXPORT_TAGS = ( 'all' => [ qw(
 	size total_size
 ) ] );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-@EXPORT = qw(
-	
-);
-$VERSION = '0.64';
+@EXPORT = qw( );
+$VERSION = '0.65';
 
 bootstrap Devel::Size $VERSION;
 
 $warn = 1;
-
-# Preloaded methods go here.
 
 1;
 __END__
@@ -157,7 +147,7 @@ still have almost no memory actually allocated to the program running.
 =head2 Perl
 
 Perl's memory allocation scheme is a bit convoluted, and more complex
-than can really be addressed here, but there is one common spot where perl's
+than can really be addressed here, but there is one common spot where Perl's
 memory allocation is unintuitive, and that's for hash keys.
 
 When you have a hash, each entry has a structure that points to the
@@ -247,15 +237,18 @@ Dan Sugalski dan@sidhe.org
 
 Small portion taken from the B module as shipped with perl 5.6.2.
 
+Maintained now by Tels <http://bloodgate.com>
+
 =head1 COPYRIGHT
 
 Copyright (C) 2005 Dan Sugalski.
+Copyright (C) 2007 Tels
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), L<Devel::Size::Report>.
 
 =cut

@@ -1,7 +1,21 @@
-Changes
-MANIFEST
+Build.PL
+CHANGES
+inc/Module/Install.pm
+inc/Module/Install/Base.pm
+inc/Module/Install/Build.pm
+inc/Module/Install/Can.pm
+inc/Module/Install/Fetch.pm
+inc/Module/Install/Makefile.pm
+inc/Module/Install/Metadata.pm
+inc/Module/Install/Win32.pm
+inc/Module/Install/WriteAll.pm
+lib/Devel/Size.pm
 Makefile.PL
-Size.pm
+MANIFEST
+MANIFEST.SKIP
+META.yml			Module meta-data (added by MakeMaker)
+SIGNATURE
 Size.xs
 t/basic.t
-META.yml                                Module meta-data (added by MakeMaker)
+t/pod.t
+t/pod_cov.t
