@@ -23,7 +23,7 @@ can_ok ('Devel::Size', qw/
 Devel::Size->import( qw(size total_size) );
 
 die ("Uhoh, test uses outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.65', 'VERSION MATCHES');
+  unless is ($Devel::Size::VERSION, '0.66', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:
@@ -47,11 +47,11 @@ my $size_2 = total_size(\@y);
 ok ( $size_1 < $size_2, 'size() of array refs');
 ok (total_size(\@x) < total_size(\@y), 'total_size() of array refs');
 
-# the arrays alone should be the same size?
+# the arrays alone shouldn't be the same size
 $size_1 = size(\@x);
 $size_2 = size(\@y);
 
-is ( $size_1, $size_2, 'size() of array refs');
+isnt ( $size_1, $size_2, 'size() of array refs');
 
 #############################################################################
 # IV vs IV+PV (bug #17586)
