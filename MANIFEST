@@ -1,8 +1,6 @@
-Build.PL
 CHANGES
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
-inc/Module/Install/Build.pm
 inc/Module/Install/Can.pm
 inc/Module/Install/Fetch.pm
 inc/Module/Install/Makefile.pm
@@ -19,3 +17,4 @@ Size.xs
 t/basic.t
 t/pod.t
 t/pod_cov.t
+t/recurse.t

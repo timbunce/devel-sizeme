@@ -16,7 +16,7 @@ require DynaLoader;
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 @EXPORT = qw( );
-$VERSION = '0.66';
+$VERSION = '0.67';
 
 bootstrap Devel::Size $VERSION;
 
@@ -241,8 +241,7 @@ Maintained now by Tels <http://bloodgate.com>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005 Dan Sugalski.
-Copyright (C) 2007 Tels
+Copyright (C) 2005 Dan Sugalski, Copyright (C) 2007 Tels
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

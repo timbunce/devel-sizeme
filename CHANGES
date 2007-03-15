@@ -1,5 +1,16 @@
 Revision history for Perl extension Devel::Size.
 
+0.67 2007-03-15 Tels 20 tests
+  * rip out Build.PL since it doesn't actually work
+  * fix bug #1653: All SVPV subtype may contain an RV instead of a PV
+    (Thanx a lot Jan, and sorry for the truly horrible long delay!)
+  * fix bug #24846: Does not correctly recurse into references in PVNV
+    (Thanx STEVIEO)
+  * add t/recurse.t that tests the two bugfixes in combination
+
+0.66 2007-03-02 Tels 15 tests
+  * fix the failing test (the code was right, but the test wrong)
+
 0.65 2007-02-24 Tels 15 tests
   * fix the test failings under 64 bit (bugs #21037, #18596, #21404)
   * fix wrong size for strings (bug #17586)

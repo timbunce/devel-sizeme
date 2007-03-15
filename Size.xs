@@ -360,7 +360,7 @@ UV op_size(OP *baseop, HV *tracking_hash) {
 UV thing_size(SV *orig_thing, HV *tracking_hash) {
   SV *thing = orig_thing;
   UV total_size = sizeof(SV);
-  
+
   switch (SvTYPE(thing)) {
     /* Is it undef? */
   case SVt_NULL:
@@ -394,12 +394,12 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
        much has been allocated */
   case SVt_PV:
     total_size += sizeof(XPV);
-    total_size += SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
     break;
     /* A string with an integer part? */
   case SVt_PVIV:
     total_size += sizeof(XPVIV);
-    total_size += SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
     if(SvOOK(thing)) {
         total_size += SvIVX(thing);
 	}
@@ -407,23 +407,23 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     /* A string with a float part? */
   case SVt_PVNV:
     total_size += sizeof(XPVNV);
-    total_size += SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
     break;
   case SVt_PVMG:
     total_size += sizeof(XPVMG);
-    total_size += SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
     total_size += magic_size(thing, tracking_hash);
     break;
 #if PERL_VERSION <= 8
   case SVt_PVBM:
     total_size += sizeof(XPVBM);
-    total_size += SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
     total_size += magic_size(thing, tracking_hash);
     break;
 #endif
   case SVt_PVLV:
     total_size += sizeof(XPVLV);
-    total_size += SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
     total_size += magic_size(thing, tracking_hash);
     break;
     /* How much space is dedicated to the array? Not counting the
@@ -441,7 +441,7 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
 	total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )); */
 
     /* under Perl 5.8.8 64bit threading, AvARRAY(thing) was a pointer while AvALLOC was 0,
-       resulting in grossly overstated sized for arrays */
+       resulting in grossly overstated sized for arrays. Technically, this shouldn't happen... */
     if (AvALLOC(thing) != 0) {
       total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
       }
@@ -690,6 +690,14 @@ CODE:
 	switch (SvTYPE(thing)) {
 	case SVt_RV:
 	  av_push(pending_array, SvRV(thing));
+	  break;
+
+	/* fix for bug #24846 (Does not correctly recurse into references in a PVNV-type scalar) */
+	case SVt_PVNV:
+	  if (SvROK(thing))
+	    {
+	    av_push(pending_array, SvRV(thing));
+	    }
 	  break;
 
 	case SVt_PVAV:
