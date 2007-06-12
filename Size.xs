@@ -216,9 +216,6 @@ UV op_size(OP *baseop, HV *tracking_hash) {
   if (check_new(tracking_hash, baseop->op_next)) {
     total_size += op_size(baseop->op_next, tracking_hash);
   }
-  if (check_new(tracking_hash, baseop->op_next)) {
-    total_size += op_size(baseop->op_next, tracking_hash);
-  }
 
   switch (cc_opclass(baseop)) {
   case OPc_BASEOP:
@@ -404,7 +401,7 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
         total_size += SvIVX(thing);
 	}
     break;
-    /* A string with a float part? */
+    /* A scalar/string/reference with a float part? */
   case SVt_PVNV:
     total_size += sizeof(XPVNV);
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
@@ -432,12 +429,13 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     total_size += sizeof(XPVAV);
     /* Is there anything in the array? */
     if (AvMAX(thing) != -1) {
-      total_size += sizeof(SV *) * AvMAX(thing);
+      /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
+      total_size += sizeof(SV *) * (AvMAX(thing) + 1);
+      /* printf ("total_size: %li AvMAX: %li av_len: %i\n", total_size, AvMAX(thing), av_len(thing)); */
     }
     /* Add in the bits on the other side of the beginning */
 
-    /* 
-      printf ("total_size %li, sizeof(SV *) %li, AvARRAY(thing) %li, AvALLOC(thing)%li , sizeof(ptr) %li \n", 
+      /* printf ("total_size %li, sizeof(SV *) %li, AvARRAY(thing) %li, AvALLOC(thing)%li , sizeof(ptr) %li \n", 
 	total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )); */
 
     /* under Perl 5.8.8 64bit threading, AvARRAY(thing) was a pointer while AvALLOC was 0,
@@ -686,6 +684,8 @@ CODE:
     if (check_new(tracking_hash, thing)) {
       /* Is it valid? */
       if (thing) {
+	/* printf ("Found type %i at %p\n", SvTYPE(thing), thing); */
+
 	/* Yes, it is. So let's check the type */
 	switch (SvTYPE(thing)) {
 	case SVt_RV:
@@ -697,7 +697,7 @@ CODE:
 	  if (SvROK(thing))
 	    {
 	    av_push(pending_array, SvRV(thing));
-	    }
+	    } 
 	  break;
 
 	case SVt_PVAV:

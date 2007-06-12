@@ -15,9 +15,9 @@ BEGIN
 
 SKIP:
   {
-  skip("Test::Pod::Coverage 1.00 required for testing POD coverage", $tests)
+  skip("Test::Pod::Coverage 1.08 required for testing POD coverage", $tests)
     unless do {
-    eval "use Test::Pod::Coverage 1.00";
+    eval "use Test::Pod::Coverage 1.08";
     $@ ? 0 : 1;
     };
   for my $m (qw/

@@ -1,5 +1,11 @@
 Revision history for Perl extension Devel::Size.
 
+0.68 2007-06-12 Tels 69 tests
+  * remove a bit of duplicate code in op_size, the second instance
+    was a no-op anyway
+  * fix the failing tests by rewriting the test logic to be sane
+  * the count of array slots was off by one
+
 0.67 2007-03-15 Tels 20 tests
   * rip out Build.PL since it doesn't actually work
   * fix bug #1653: All SVPV subtype may contain an RV instead of a PV
