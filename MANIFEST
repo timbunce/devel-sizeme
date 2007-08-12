@@ -12,6 +12,7 @@ Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 META.yml			Module meta-data (added by MakeMaker)
+README
 SIGNATURE
 Size.xs
 t/basic.t

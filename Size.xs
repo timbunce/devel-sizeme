@@ -262,6 +262,7 @@ UV op_size(OP *baseop, HV *tracking_hash) {
     if (check_new(tracking_hash, cPMOPx(baseop)->op_last)) {
       total_size += op_size(cPMOPx(baseop)->op_last, tracking_hash);
     }
+#if PERL_VERSION < 9 || (PERL_VERSION == 9 && PERL_SUBVERSION < 5)
     if (check_new(tracking_hash, cPMOPx(baseop)->op_pmreplroot)) {
       total_size += op_size(cPMOPx(baseop)->op_pmreplroot, tracking_hash);
     }
@@ -271,6 +272,7 @@ UV op_size(OP *baseop, HV *tracking_hash) {
     if (check_new(tracking_hash, cPMOPx(baseop)->op_pmnext)) {
       total_size += op_size((OP *)cPMOPx(baseop)->op_pmnext, tracking_hash);
     }
+#endif
     /* This is defined away in perl 5.8.x, but it is in there for
        5.6.x */
 #ifdef PM_GETRE

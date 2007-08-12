@@ -1,5 +1,10 @@
 Revision history for Perl extension Devel::Size.
 
+0.69 2007-08-11 Tels 69 tests
+  * fix compilation under Perl v5.9.5 and v5.10 (Thanx Steve Peters!)
+  * clarify the license by specifying Perl v5.8.8's license
+  * smal doc fixes, add a README file
+
 0.68 2007-06-12 Tels 69 tests
   * remove a bit of duplicate code in op_size, the second instance
     was a no-op anyway

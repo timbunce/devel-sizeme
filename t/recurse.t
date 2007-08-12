@@ -28,8 +28,8 @@ can_ok ('Devel::Size', qw/
 
 Devel::Size->import( qw(size total_size) );
 
-die ("Uhoh, test uses outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.68', 'VERSION MATCHES');
+die ("Uhoh, test uses an outdated version of Devel::Size")
+  unless is ($Devel::Size::VERSION, '0.69', 'VERSION MATCHES');
 
 #############################################################################
 # verify that pointer sizes in array slots are sensible:

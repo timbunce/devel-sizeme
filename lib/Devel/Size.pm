@@ -16,7 +16,7 @@ require DynaLoader;
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 @EXPORT = qw( );
-$VERSION = '0.68';
+$VERSION = '0.69';
 
 bootstrap Devel::Size $VERSION;
 
@@ -41,14 +41,16 @@ Devel::Size - Perl extension for finding the memory usage of Perl variables
   my $foo = {a => [1, 2, 3],
 	  b => {a => [1, 3, 4]}
          };
-  my  $total_size = total_size($foo);
+  my $total_size = total_size($foo);
 
 =head1 DESCRIPTION
 
-This module figures out the real sizes of Perl variables in bytes.  
+This module figures out the real size of Perl variables in bytes, as
+accurately as possible.
+
 Call functions with a reference to the variable you want the size
 of.  If the variable is a plain scalar it returns the size of
-the scalar.  If the variable is a hash or an array, use a reference
+this scalar.  If the variable is a hash or an array, use a reference
 when calling.
 
 =head1 FUNCTIONS
@@ -244,7 +246,7 @@ Maintained now by Tels <http://bloodgate.com>
 Copyright (C) 2005 Dan Sugalski, Copyright (C) 2007 Tels
 
 This module is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
+under the same terms as Perl v5.8.8.
 
 =head1 SEE ALSO
 

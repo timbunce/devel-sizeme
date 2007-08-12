@@ -2,6 +2,7 @@
 # prevent this file to be added to the MANIFEST during a
 #
 #  make manifest
+#
 # command.
 #
 ^Devel-Size.*\.tar\.gz
@@ -11,3 +12,5 @@
 ^MANIFEST.(bak|old)
 ^Size.(c|o|bs)
 ^blib.*
+tmon.out
+\.txt\z
