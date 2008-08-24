@@ -16,7 +16,7 @@ requires	'perl'		=> 5.006;
 
 recommends	'Devel::Size::Report'	=> 0.11;
 
-build_requires	'Test::More'	=> 0.42;
+test_requires	'Test::More'	=> 0.42;
 
 license		'perl';		# from 5.8.8
 

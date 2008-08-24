@@ -1,5 +1,15 @@
 Revision history for Perl extension Devel::Size.
 
+0.71 2008-08-24 Tels 69 tests
+  * adapt patch from Reini Urban to fix failing RV under 5.10 and 5.11. AV
+    and HV were pushed directly onto the pending_array, and not the RV,
+    which caused #33530. So he rewrote the logic to deref the RV inside
+    the array traversal. Applied this with one small omission, which
+    caused test faiures.
+  * Fixed 5.11 RV/IV logic. (Thanx Reini Urban!)
+  * Removed one duplicate total_size arrayref test. (Thanx Reini Urban!)
+  * changed //printf to dbg_printf() (Thanx Reini again!)
+
 0.70 2008-08-23 Tels 69 tests
   * fix SEGFAULTS under v5.10 (Thanx Reini Urban!)
   * fix compilation under blead (Thanx Reini Urban!)
@@ -10,7 +20,7 @@ Revision history for Perl extension Devel::Size.
 0.69 2007-08-11 Tels 69 tests
   * fix compilation under Perl v5.9.5 and v5.10 (Thanx Steve Peters!)
   * clarify the license by specifying Perl v5.8.8's license
-  * smal doc fixes, add a README file
+  * small doc fixes, add a README file
 
 0.68 2007-06-12 Tels 69 tests
   * remove a bit of duplicate code in op_size, the second instance

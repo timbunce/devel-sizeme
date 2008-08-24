@@ -8,7 +8,7 @@ my $tests;
 BEGIN
    {
    chdir 't' if -d 't';
-   plan tests => 13;
+   plan tests => 12;
 
    use lib '../lib';
    use lib '../blib/arch';
@@ -23,7 +23,7 @@ can_ok ('Devel::Size', qw/
 Devel::Size->import( qw(size total_size) );
 
 die ("Uhoh, test uses an outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.70', 'VERSION MATCHES');
+  unless is ($Devel::Size::VERSION, '0.71', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:
@@ -45,7 +45,6 @@ my $size_1 = total_size(\@x);
 my $size_2 = total_size(\@y);
 
 ok ( $size_1 < $size_2, 'size() of array refs');
-ok (total_size(\@x) < total_size(\@y), 'total_size() of array refs');
 
 # the arrays alone shouldn't be the same size
 $size_1 = size(\@x);

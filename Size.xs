@@ -5,6 +5,11 @@
 static int regex_whine;
 static int fm_whine;
 
+#if 0 && defined(DEBUGGING)
+#define dbg_printf(x) printf x
+#else
+#define dbg_printf(x)
+#endif
 
 #define carp puts
 UV thing_size(SV *, HV *);
@@ -151,7 +156,7 @@ static int go_yell = 1;
    64-bit machines) bytes of the address as the string we're using as
    the key */
 IV check_new(HV *tracking_hash, const void *thing) {
-  if (NULL == thing) {
+  if (NULL == thing || NULL == tracking_hash) {
     return FALSE;
   }
   if (hv_exists(tracking_hash, (char *)&thing, sizeof(void *))) {
@@ -159,7 +164,6 @@ IV check_new(HV *tracking_hash, const void *thing) {
   }
   hv_store(tracking_hash, (char *)&thing, sizeof(void *), &PL_sv_yes, 0);
   return TRUE;
-
 }
 
 /* Figure out how much magic is attached to the SV and return the
@@ -330,9 +334,18 @@ UV op_size(OP *baseop, HV *tracking_hash) {
       basecop = (COP *)baseop;
       total_size += sizeof(struct cop);
 
+      /* Change 33656 by nicholas@mouse-mill on 2008/04/07 11:29:51
+      Eliminate cop_label from struct cop by storing a label as the first
+      entry in the hints hash. Most statements don't have labels, so this
+      will save memory. Not sure how much. 
+      The check below will be incorrect fail on bleadperls
+      before 5.11 @33656, but later than 5.10, producing slightly too
+      small memory sizes on these Perls. */
+#if (PERL_VERSION < 11)
       if (check_new(tracking_hash, basecop->cop_label)) {
 	total_size += strlen(basecop->cop_label);
       }
+#endif
 #ifdef USE_ITHREADS
       if (check_new(tracking_hash, basecop->cop_file)) {
 	total_size += strlen(basecop->cop_file);
@@ -400,12 +413,20 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
        much has been allocated */
   case SVt_PV:
     total_size += sizeof(XPV);
+#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
+#else
+    total_size += SvLEN(thing);
+#endif
     break;
     /* A string with an integer part? */
   case SVt_PVIV:
     total_size += sizeof(XPVIV);
+#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
+#else
+    total_size += SvLEN(thing);
+#endif
     if(SvOOK(thing)) {
         total_size += SvIVX(thing);
 	}
@@ -413,23 +434,39 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     /* A scalar/string/reference with a float part? */
   case SVt_PVNV:
     total_size += sizeof(XPVNV);
+#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
+#else
+    total_size += SvLEN(thing);
+#endif
     break;
   case SVt_PVMG:
     total_size += sizeof(XPVMG);
+#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
+#else
+    total_size += SvLEN(thing);
+#endif
     total_size += magic_size(thing, tracking_hash);
     break;
 #if PERL_VERSION <= 8
   case SVt_PVBM:
     total_size += sizeof(XPVBM);
+#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
+#else
+    total_size += SvLEN(thing);
+#endif
     total_size += magic_size(thing, tracking_hash);
     break;
 #endif
   case SVt_PVLV:
     total_size += sizeof(XPVLV);
+#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size( SvRV(thing), tracking_hash) : SvLEN(thing);
+#else
+    total_size += SvLEN(thing);
+#endif
     total_size += magic_size(thing, tracking_hash);
     break;
     /* How much space is dedicated to the array? Not counting the
@@ -440,12 +477,12 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     if (AvMAX(thing) != -1) {
       /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
       total_size += sizeof(SV *) * (AvMAX(thing) + 1);
-      /* printf ("total_size: %li AvMAX: %li av_len: %i\n", total_size, AvMAX(thing), av_len(thing)); */
+      dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", total_size, AvMAX(thing), av_len((AV*)thing)));
     }
     /* Add in the bits on the other side of the beginning */
 
-      /* printf ("total_size %li, sizeof(SV *) %li, AvARRAY(thing) %li, AvALLOC(thing)%li , sizeof(ptr) %li \n", 
-	total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )); */
+    dbg_printf(("total_size %li, sizeof(SV *) %li, AvARRAY(thing) %li, AvALLOC(thing)%li , sizeof(ptr) %li \n", 
+	total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )));
 
     /* under Perl 5.8.8 64bit threading, AvARRAY(thing) was a pointer while AvALLOC was 0,
        resulting in grossly overstated sized for arrays. Technically, this shouldn't happen... */
@@ -637,13 +674,18 @@ CODE:
     go_yell = SvIV(warn_flag);
   }
   
-
   /* If they passed us a reference then dereference it. This is the
      only way we can check the sizes of arrays and hashes */
+#if (PERL_VERSION < 11)
   if (SvOK(thing) && SvROK(thing)) {
     thing = SvRV(thing);
   }
-  
+#else
+  if (SvROK(thing)) {
+    thing = SvRV(thing);
+  }
+#endif
+
   RETVAL = thing_size(thing, tracking_hash);
   /* Clean up after ourselves */
   SvREFCNT_dec(tracking_hash);
@@ -659,8 +701,9 @@ CODE:
 {
   SV *thing = orig_thing;
   /* Hash to track our seen pointers */
-  HV *tracking_hash = newHV();
-  AV *pending_array = newAV();
+  HV *tracking_hash;
+  /* Array with things we still need to do */
+  AV *pending_array;
   IV size = 0;
   SV *warn_flag;
 
@@ -675,13 +718,18 @@ CODE:
   if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
     go_yell = SvIV(warn_flag);
   }
-  
 
-  /* If they passed us a reference then dereference it. This is the
-     only way we can check the sizes of arrays and hashes */
-  if (SvOK(thing) && SvROK(thing)) {
-    thing = SvRV(thing);
-  }
+  /* init these after the go_yell above */
+  tracking_hash = newHV();
+  pending_array = newAV();
+
+  /* We cannot push HV/AV directly, only the RV. So deref it
+     later (see below for "*** dereference later") and adjust here for
+     the miscalculation.
+     This is the only way we can check the sizes of arrays and hashes. */
+  if (SvROK(thing)) {
+      RETVAL -= thing_size(thing, NULL);
+  } 
 
   /* Put it on the pending array */
   av_push(pending_array, thing);
@@ -691,16 +739,11 @@ CODE:
     thing = av_pop(pending_array);
     /* Process it if we've not seen it */
     if (check_new(tracking_hash, thing)) {
+      dbg_printf(("# Found type %i at %p\n", SvTYPE(thing), thing));
       /* Is it valid? */
       if (thing) {
-	/* printf ("Found type %i at %p\n", SvTYPE(thing), thing); */
-
 	/* Yes, it is. So let's check the type */
 	switch (SvTYPE(thing)) {
-	case SVt_RV:
-	  av_push(pending_array, SvRV(thing));
-	  break;
-
 	/* fix for bug #24846 (Does not correctly recurse into references in a PVNV-type scalar) */
 	case SVt_PVNV:
 	  if (SvROK(thing))
@@ -709,8 +752,22 @@ CODE:
 	    } 
 	  break;
 
+	/* this is the "*** dereference later" part - see above */
+#if (PERL_VERSION < 11)
+        case SVt_RV:
+#else
+        case SVt_IV:
+#endif
+             dbg_printf(("# Found RV\n"));
+          if (SvROK(thing)) {
+             dbg_printf(("# Found RV\n"));
+             av_push(pending_array, SvRV(thing));
+          }
+          break;
+
 	case SVt_PVAV:
 	  {
+	    dbg_printf(("# Found type AV\n"));
 	    /* Quick alias to cut down on casting */
 	    AV *tempAV = (AV *)thing;
 	    SV **tempSV;
@@ -734,6 +791,7 @@ CODE:
 	  break;
 
 	case SVt_PVHV:
+	  dbg_printf(("# Found type HV\n"));
 	  /* Is there anything in here? */
 	  if (hv_iterinit((HV *)thing)) {
 	    HE *temp_he;
@@ -744,6 +802,7 @@ CODE:
 	  break;
 	 
 	case SVt_PVGV:
+	  dbg_printf(("# Found type GV\n"));
 	  /* Run through all the pieces and push the ones with bits */
 	  if (GvSV(thing)) {
 	    av_push(pending_array, (SV *)GvSV(thing));
@@ -769,8 +828,14 @@ CODE:
       
       size = thing_size(thing, tracking_hash);
       RETVAL += size;
+    } else {
+    /* check_new() returned false: */
+#ifdef DEVEL_SIZE_DEBUGGING
+       if (SvOK(sv)) printf("# Ignore ref copy 0x%x\n", sv);
+       else printf("# Ignore non-sv 0x%x\n", sv);
+#endif
     }
-  }
+  } /* end while */
   
   /* Clean up after ourselves */
   SvREFCNT_dec(tracking_hash);
