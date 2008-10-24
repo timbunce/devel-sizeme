@@ -12,7 +12,7 @@ Devel::Size - Perl extension for finding the memory usage of Perl variables
   my $other_size = size(\@foo);
 
   my $foo = {a => [1, 2, 3],
-	  b => {a => [1, 3, 4]}
+      b => {a => [1, 3, 4]}
          };
   my $total_size = total_size($foo);
 
@@ -25,31 +25,38 @@ accurately as possible.
 
 To build and install this module, you need:
 
-	 Perl
-	 a working C or C++ compiler
-	 a make (or namke on Windows) utility
+     Perl
+     a working C or C++ compiler
+     a make (or namke on Windows) utility
 
 Follow these steps:
 
 On Linux, Cygwin, or Unix:
 
-	perl Makefile.PL
-	make
-	make test
-	sudo make install
+    perl Makefile.PL
+    make
+    make test
+    sudo make install
+    
+On most systems, it is necessary to link to libstdc++. On such systems,
+libstdc++ should be found automatically (by default).
+If libstdc++ is *not* being found automatically (in which case you'll get
+link errors),then instead of running 'perl Makefile.PL', you'll need to run:
+
+    perl Makefile.pl LIBS="-L/path/to/libstdc++ -lstdc++"
 
 On Windows:
 
-	perl Makefile.PL
-	nmake
-	nmake test
-	nmake install
+    perl Makefile.PL
+    nmake
+    nmake test
+    nmake install
 
 =head1 BUGREPORTS
 
 Please report bugs to:
 
-	http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-Size
+    http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-Size
 
 =head1 COPYRIGHT
 

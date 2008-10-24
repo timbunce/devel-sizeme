@@ -2,13 +2,13 @@
 
 use Test::More;
 use strict;
-   
+
 my $tests;
 
 BEGIN
    {
    chdir 't' if -d 't';
-   plan tests => 12;
+   plan tests => 13;
 
    use lib '../lib';
    use lib '../blib/arch';
@@ -23,7 +23,7 @@ can_ok ('Devel::Size', qw/
 Devel::Size->import( qw(size total_size) );
 
 die ("Uhoh, test uses an outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.71', 'VERSION MATCHES');
+  unless is ($Devel::Size::VERSION, '0.72', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:
@@ -34,7 +34,7 @@ $foo = "12";
 %foo = (a => 1, b => 2);
 
 my $x = "A string";
-my $y = "A much much longer string";		# need to be at least 7 bytes longer for 64 bit
+my $y = "A much much longer string";        # need to be at least 7 bytes longer for 64 bit
 ok (size($x) < size($y), 'size() of strings');
 ok (total_size($x) < total_size($y), 'total_size() of strings');
 
@@ -71,7 +71,7 @@ my @ary1 = (\$a, \$a);
 my @ary2 = (\$a, \$b);
 
 isnt ( total_size(\@ary2) - total_size(\@ary1), 0,
-	'total_size(\@ary1) < total_size(\@ary2)');
+    'total_size(\@ary1) < total_size(\@ary2)');
 
 #############################################################################
 # check that circular references don't mess things up
@@ -91,3 +91,7 @@ isnt (total_size(*foo), 0, 'total_size(*foo) > 0');
 my $code = sub { '1' };
 
 isnt (total_size($code), 0, 'total_size($code) > 0');
+
+##########################################################
+# RT#14849 (& RT#26781 and possibly RT#29238?)
+isnt( total_size( sub{ do{ my $t=0 }; } ), 0, 'total_size( sub{ my $t=0 } ) > 0' );

@@ -8,7 +8,7 @@
 
 use Test::More;
 use strict;
-   
+
 my $tests;
 
 BEGIN
@@ -29,7 +29,7 @@ can_ok ('Devel::Size', qw/
 Devel::Size->import( qw(size total_size) );
 
 die ("Uhoh, test uses an outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.71', 'VERSION MATCHES');
+  unless is ($Devel::Size::VERSION, '0.72', 'VERSION MATCHES');
 
 #############################################################################
 # verify that pointer sizes in array slots are sensible:
@@ -50,9 +50,9 @@ $ptr_size /= 4;
 
 my $hash = {};
 $hash->{a} = 1;
-is (total_size($hash), 
-	total_size( { a => undef } ) + total_size(1) - total_size(undef),
-	'assert hash and hash key size');
+is (total_size($hash),
+    total_size( { a => undef } ) + total_size(1) - total_size(undef),
+    'assert hash and hash key size');
 
 #############################################################################
 # #24846 (Does not correctly recurse into references in a PVNV-type scalar)

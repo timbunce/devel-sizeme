@@ -1,27 +1,28 @@
 package Devel::Size;
 
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $warn);
+use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
-require 5.006;
+require 5.008;
 require Exporter;
 require DynaLoader;
 
 @ISA = qw(Exporter DynaLoader);
 
-# This allows declaration	use Devel::Size ':all';
+# This allows declaration   use Devel::Size ':all';
 %EXPORT_TAGS = ( 'all' => [ qw(
-	size total_size
+    size total_size
 ) ] );
 
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 @EXPORT = qw( );
-$VERSION = '0.71';
+$VERSION = '0.72';
 
 bootstrap Devel::Size $VERSION;
 
 $warn = 1;
+$dangle = 0; ## Set true to enable warnings about dangling pointers
 
 1;
 __END__
@@ -42,7 +43,7 @@ Devel::Size - Perl extension for finding the memory usage of Perl variables
   my $other_size = size(\@foo);
 
   my $foo = {a => [1, 2, 3],
-	  b => {a => [1, 3, 4]}
+      b => {a => [1, 3, 4]}
          };
   my $total_size = total_size($foo);
 
@@ -89,14 +90,15 @@ the constant values we'll talk about, not their existence)
 
 =head2 The C library
 
-It's important firtst to understand how your OS and libraries handle
+It's important first to understand how your OS and libraries handle
 memory. When the perl interpreter needs some memory, it asks the C
 runtime library for it, using the C<malloc()> call. C<malloc> has one
 parameter, the size of the memory allocation you want, and returns a
 pointer to that memory. C<malloc> also makes sure that the pointer it
 returns to you is properly aligned. When you're done with the memory
 you hand it back to the library with the C<free()> call. C<free> has
-one parameter, the pointer that C<malloc> returned. There are a couple of interesting ramifications to this.
+one parameter, the pointer that C<malloc> returned.
+There are a couple of interesting ramifications to this.
 
 Because malloc has to return an aligned pointer, it will round up the
 memory allocation to make sure that the memory it returns is aligned
@@ -183,18 +185,22 @@ bytes. If the key is 7 characters then the allocation is 24 bytes on
 a 32 bit system. If you're on a 64 bit system the numbers get even
 larger.
 
-This does mean that hashes eat up a I<lot> of memory, both in memory
-Devel::Size can track (the memory actually in the structures and
-strings) and that it can't (the malloc alignment and length overhead).
-
 =head1 DANGERS
 
-Devel::Size, because of the way it works, can consume a
-considerable amount of memory as it runs. It will use five
-pointers, two integers, and two bytes worth of storage, plus
-potential alignment and bucket overhead, per thing it looks at. This
-memory is released at the end, but it may fragment your free pool,
-and will definitely expand your process' memory footprint.
+Since version 7.2, Devel::Size uses a new pointer tracking mechanism
+that consumes far less memory than was previously the case. It does this
+by using a bit vector where 1 bit represents each 4- or 8-byte aligned pointer
+(32- or 64-bit platform dependant) that could exist. Further, it segments
+that bit vector and only allocates each chunk when an address is seen within
+that chunk. By default, the module builds a static table of 8,192 slots of
+16k chunks which is sufficient to cover the full 4GB virtual address space on
+32-bit platforms. Or the first 8GB on 64-bit platforms.
+
+Besides saving a lot of memory, this change means that Devel::Size
+runs significantly faster than previous versions.
+
+One caveat of this new mechanism is that on 64-bit platforms with more than 8GB
+of memory a new fatal error may be seen. See the next section.
 
 =head1 Messages: texts originating from this module.
 
@@ -202,28 +208,70 @@ and will definitely expand your process' memory footprint.
 
 =over 4
 
-=item	"Devel::Size: Unknown variable type"
+=item   "Devel::Size: Please rebuild D::S with TRACKING_SLOTS > 8192"
 
-The thing (or something contained within it) that you gave to 
+This fatal error may be produced when using Devel::Size on 64-bit platforms
+with more than 8GB of virtual memory. It indicates that a pointer has been
+encountered that is to high for the internal pointer tracking mechanism.
+
+The solution is to rebuild Devel::Size having edited Size.XS to increase
+the value of
+
+    #define TRACKING_SLOTS 8192
+
+On 64-bit platforms, Devel::Size requires 1 slot for each 1MB of virtual
+address space.  So, for a system with 12GB of memory, this should be set to
+12GB / 1MB = 12884901888 / 1048576 = 12288 ( 12 * 1024 ).
+
+=item   "Devel::Size: Unknown variable type"
+
+The thing (or something contained within it) that you gave to
 total_size() was unrecognisable as a Perl entity.
 
 =back
 
 =head2 warnings
 
-These messages warn you that for some types, the sizes calculated may not include 
-everything that could be associated with those types. The differences are usually 
+These messages warn you that for some types, the sizes calculated may not include
+everything that could be associated with those types. The differences are usually
 insignificant for most uses of this module.
 
 These may be disabled by setting
 
-	$Devel::Size::warn = 0
+    $Devel::Size::warn = 0
 
 =over 4
 
-=item	"Devel::Size: Calculated sizes for CVs are incomplete"
+=item   "Devel::Size: Calculated sizes for CVs are incomplete"
 
-=item	"Devel::Size: Calculated sizes for FMs are incomplete"
+=item   "Devel::Size: Calculated sizes for FMs are incomplete"
+
+=item   "Devel::Size: Calculated sizes for compiled regexes are incompatible, and probably always will be"
+
+=back
+
+=head2 New warnings since 7.2
+
+Devel::Size has always been vulnerable to trapping when traversing Perl's
+internal data structures, if it encounters uninitialised (dangling) pointers.
+
+Exception handling has been added to deal with this possibility, and Devel::Size
+will now attempt to ignore (or log) them and continue. These messages are mainly
+of interest to Devel::Size and core developers, and so are disabled by default.
+
+They may be enabled by setting
+
+    $Devel::Size::dangle = 0
+
+=over 4
+
+=item       "Devel::Size: Can't determine class of operator OPx_XXXX, assuming BASEOP\n"
+
+=item       "Devel::Size: Encountered bad magic at: 0xXXXXXXXX"
+
+=item       "Devel::Size: Encountered dangling pointer in opcode at: 0xXXXXXXXX"
+
+=item       "Devel::Size: Encountered invalid pointer: 0xXXXXXXXX"
 
 =back
 
@@ -241,6 +289,8 @@ allocation alignments, or C library overhead.
 Dan Sugalski dan@sidhe.org
 
 Small portion taken from the B module as shipped with perl 5.6.2.
+
+New pointer tracking & exception handling by BrowserUK
 
 Maintained now by Tels <http://bloodgate.com>
 

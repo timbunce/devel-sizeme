@@ -1,31 +1,11 @@
+use ExtUtils::MakeMaker;
+use Config;
 
-use strict;
-# require at least 5.006, it doesn't even compile under 5.005
-require 5.006;
+my %options = (       
+  NAME => 'Devel::Size',
+  LIBS => $Config{cc} eq 'gcc' || $Config{cc} eq 'cc' ? ['-lstdc++'] : '',
+  VERSION_FROM => 'lib/Devel/Size.pm',
+  CC => $Config{cc} eq 'cl' ? 'cl' : 'g++',
+);
 
-# Load the Module::Install bundled in ./inc/
-use inc::Module::Install;
-
-name		'Devel-Size';
-
-# Get most of the details from the primary module
-all_from	'lib/Devel/Size.pm';
-
-requires	'DynaLoader'	=> 0;
-requires	'perl'		=> 5.006;
-
-recommends	'Devel::Size::Report'	=> 0.11;
-
-test_requires	'Test::More'	=> 0.42;
-
-license		'perl';		# from 5.8.8
-
-# It seems not to be possible to specifiy two authors here :/
-# Nor does a "maintainer" property exist
-author		'Tels <nospam-abuse@bloodgate.com>';
-
-# Do not index these
-no_index	directory	=> 'examples';
-
-# Generate the Makefile
-WriteAll;
+WriteMakefile(%options);

@@ -1,5 +1,17 @@
 Revision history for Perl extension Devel::Size.
 
+0.71 2008-10-14 BrowserUk 70 tests
+ * Added bit-vector pointer tracking mechanism.
+   - new fatal error (64-bit platforms only)
+ * Added exception handling
+    - 4 new warnings (disabled by default)
+ * Updated POD to reflect above
+ * Added basic.t test 13 
+ * replaced Module::Install with hand crafted EU::MM Makefile.pl
+   (With many thanks to Sisyphus)
+   because we couldn't work out how to add C++ options to allow 
+   exception handling.
+
 0.71 2008-08-24 Tels 69 tests
   * adapt patch from Reini Urban to fix failing RV under 5.10 and 5.11. AV
     and HV were pushed directly onto the pending_array, and not the RV,
@@ -54,23 +66,23 @@ Revision history for Perl extension Devel::Size.
 
 0.64  Mon Dec 19 18:46:00 2005
         - Patch to make Devel::Size compile on bleadperl (Courtesy of
-	  Nick Clark)
- 	- Fix up the PVIV string size calcs (Courtesy of Andrew Shirrayev)
+      Nick Clark)
+    - Fix up the PVIV string size calcs (Courtesy of Andrew Shirrayev)
 
 0.63  Thu Jun 30 14:29:43 2005
         - Turns out that OP_TRANS is a basic op, not a loop op. This
-	  is a bug in versions of perl 5.8.x before 5.8.7. Work around
-	  it.
+      is a bug in versions of perl 5.8.x before 5.8.7. Work around
+      it.
 
 0.62  Tue Jun 28 11:59:00 2005
         - Took out // comments
-  	- Added in copyright notice
-	- Some small amount of regex parsing
-	- Suppress multiple copies of each warning on each call
+    - Added in copyright notice
+    - Some small amount of regex parsing
+    - Suppress multiple copies of each warning on each call
 
 0.61  Mon Jun 27 16:19:00 2005
         - Added more checks for formats
-  	- Got CVs sizing right
+    - Got CVs sizing right
 
 0.59  Sat Nov 27 16:42:42 2004
         - Applied documentation and sane warning patch from Nigel Sandever
@@ -78,8 +90,8 @@ Revision history for Perl extension Devel::Size.
 
 0.58  Fri Jul 18 11:42:32 2003
         - Fix for problems triggered by perl 5.8.0 and up, more tests, and
-	  removal of an "our" for better backwards compatibility. (Courtesy
-	  of Marcus Holland-Moritz <mhx-perl@gmx.net>)
+      removal of an "our" for better backwards compatibility. (Courtesy
+      of Marcus Holland-Moritz <mhx-perl@gmx.net>)
 
 0.57  Thu Mar 20 13:21:14 2003
         - setting $Devel::Size::warn to 0 disables not complete warnings
@@ -89,19 +101,19 @@ Revision history for Perl extension Devel::Size.
 
 0.55  Sat Feb 22 17:21:00 2003
         - Fixed a bad size calculation (we were overestimating by one byte)
-	- Updated the docs to show some of the places that there might be 'dark'
-	  memory that Devel::Size can't see.
-	- Added in tests from Ken Williams
+    - Updated the docs to show some of the places that there might be 'dark'
+      memory that Devel::Size can't see.
+    - Added in tests from Ken Williams
 
 0.54  Sat Oct 12 14:11:00 2002
-	- Applied a patch to get it working on 5.8.0 under Tru64
+    - Applied a patch to get it working on 5.8.0 under Tru64
 
 0.53  Thu Oct 10 12:30:00 2002
         - Finally started updating Changes file
-	- Applied doc patch from Ann Barcomb
-	- Got globs sizing right
+    - Applied doc patch from Ann Barcomb
+    - Got globs sizing right
 
 0.01  Mon Oct  7 01:05:32 2002
-	- original version; created by h2xs 1.2 with options
-		-A -n Devel::Size
+    - original version; created by h2xs 1.2 with options
+        -A -n Devel::Size
 
