@@ -6,6 +6,7 @@ Revision history for Perl extension Devel::Size.
  * Rework bit-vector tracking mechanism to use a 256-way tree. This avoids
    making assumptions about 64-bit platforms' memory layouts, and eliminates
    the fatal error introduced in 0.72 when the assumption was violated.
+ * Convert to XSLoader
  * Resolve CPAN #49437 (Devel::Size adds magic in Perl 5.10)
 
 0.72 2008-10-14 BrowserUk 70 tests

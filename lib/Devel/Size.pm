@@ -5,9 +5,9 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
 require 5.008;
 require Exporter;
-require DynaLoader;
+require XSLoader;
 
-@ISA = qw(Exporter DynaLoader);
+@ISA = qw(Exporter);
 
 # This allows declaration   use Devel::Size ':all';
 %EXPORT_TAGS = ( 'all' => [ qw(
@@ -19,7 +19,7 @@ require DynaLoader;
 @EXPORT = qw( );
 $VERSION = '0.72_50';
 
-bootstrap Devel::Size $VERSION;
+XSLoader::load( __PACKAGE__);
 
 $warn = 1;
 $dangle = 0; ## Set true to enable warnings about dangling pointers
