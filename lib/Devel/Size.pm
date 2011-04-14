@@ -276,9 +276,11 @@ Dan Sugalski dan@sidhe.org
 
 Small portion taken from the B module as shipped with perl 5.6.2.
 
-New pointer tracking & exception handling by BrowserUK
+Previously maintained by Tels <http://bloodgate.com>
 
-Maintained now by Tels <http://bloodgate.com>
+New pointer tracking & exception handling for 0.72 by BrowserUK
+
+Currently maintained by Nicholas Clark
 
 =head1 COPYRIGHT
 
