@@ -187,7 +187,7 @@ larger.
 
 =head1 DANGERS
 
-Since version 7.2, Devel::Size uses a new pointer tracking mechanism
+Since version 0.72, Devel::Size uses a new pointer tracking mechanism
 that consumes far less memory than was previously the case. It does this
 by using a bit vector where 1 bit represents each 4- or 8-byte aligned pointer
 (32- or 64-bit platform dependant) that could exist. Further, it segments
@@ -250,7 +250,7 @@ These may be disabled by setting
 
 =back
 
-=head2 New warnings since 7.2
+=head2 New warnings since 0.72
 
 Devel::Size has always been vulnerable to trapping when traversing Perl's
 internal data structures, if it encounters uninitialised (dangling) pointers.
