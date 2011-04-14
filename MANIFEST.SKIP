@@ -14,3 +14,4 @@
 ^blib.*
 tmon.out
 \.txt\z
+^\.git
