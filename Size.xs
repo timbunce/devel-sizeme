@@ -1,6 +1,7 @@
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+#include "ppport.h"
 
 #ifdef _MSC_VER 
 /* "structured exception" handling is a Microsoft extension to C and C++.
@@ -46,7 +47,8 @@ typedef char* TRACKING[ TRACKING_SLOTS ];
     Returns true or false, and
     notes thing in the segmented bitstring.
  */
-IV check_new( TRACKING *tv, void *p ) {
+static bool
+check_new(TRACKING *tv, const void *const p) {
     unsigned long slot =  (unsigned long)p >> (SLOT_BITS + BIT_BITS + ALIGN_BITS);
     unsigned int  byte = ((unsigned long)p >> (ALIGN_BITS + BIT_BITS)) & 0x00003fffU;
     unsigned int  bit  = ((unsigned long)p >> ALIGN_BITS) & 0x00000007U;
@@ -54,7 +56,7 @@ IV check_new( TRACKING *tv, void *p ) {
     
     if (NULL == p || NULL == tv) return FALSE;
     TRY_TO_CATCH_SEGV { 
-        char c = *(char *)p;
+        const char c = *(const char *)p;
     }
     CAUGHT_EXCEPTION {
         if( dangle_whine ) 
@@ -676,7 +678,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PVIO: TAG;
     total_size += sizeof(XPVIO);
     total_size += magic_size(thing, tv);
-    if (check_new(tv, (SvPVX(thing)))) {
+    if (check_new(tv, (SvPVX_const(thing)))) {
       total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
     }
     /* Some embedded char pointers */
