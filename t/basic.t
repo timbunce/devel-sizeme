@@ -23,7 +23,7 @@ can_ok ('Devel::Size', qw/
 Devel::Size->import( qw(size total_size) );
 
 die ("Uhoh, test uses an outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.72', 'VERSION MATCHES');
+  unless is ($Devel::Size::VERSION, '0.72_50', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:

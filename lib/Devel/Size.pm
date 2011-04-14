@@ -17,7 +17,7 @@ require DynaLoader;
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 @EXPORT = qw( );
-$VERSION = '0.72';
+$VERSION = '0.72_50';
 
 bootstrap Devel::Size $VERSION;
 
