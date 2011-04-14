@@ -54,7 +54,8 @@ check_new(TRACKING *tv, const void *const p) {
     unsigned int  bit  = ((unsigned long)p >> ALIGN_BITS) & 0x00000007U;
     unsigned int  nop  =  (unsigned long)p & 0x3U;
     
-    if (NULL == p || NULL == tv) return FALSE;
+    assert(tv);
+    if (NULL == p) return FALSE;
     TRY_TO_CATCH_SEGV { 
         const char c = *(const char *)p;
     }
