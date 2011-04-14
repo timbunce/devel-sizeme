@@ -548,12 +548,17 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
     if (AvALLOC(thing) != 0) {
       total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
       }
-    /* Is there something hanging off the arylen element? */
+#if (PERL_VERSION < 9)
+    /* Is there something hanging off the arylen element?
+       Post 5.9.something this is stored in magic, so will be found there,
+       and Perl_av_arylen_p() takes a non-const AV*, hence compilers rightly
+       complain about AvARYLEN() passing thing to it.  */
     if (AvARYLEN(thing)) {
       if (check_new(tv, AvARYLEN(thing))) {
     total_size += thing_size(AvARYLEN(thing), tv);
       }
     }
+#endif
     total_size += magic_size(thing, tv);
     TAG;break;
   case SVt_PVHV: TAG;

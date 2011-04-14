@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.72_50 2011-04-14 nicholas
+ * Resolve CPAN #49437 (Devel::Size adds magic in Perl 5.10)
+
 0.72 2008-10-14 BrowserUk 70 tests
  * Added bit-vector pointer tracking mechanism.
    - new fatal error (64-bit platforms only)
