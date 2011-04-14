@@ -3,8 +3,6 @@
 use Test::More;
 use strict;
 
-my $tests;
-
 BEGIN
    {
    chdir 't' if -d 't';
@@ -35,8 +33,8 @@ $foo = "12";
 
 my $x = "A string";
 my $y = "A much much longer string";        # need to be at least 7 bytes longer for 64 bit
-ok (size($x) < size($y), 'size() of strings');
-ok (total_size($x) < total_size($y), 'total_size() of strings');
+cmp_ok(size($x), '<', size($y), 'size() of strings');
+cmp_ok(total_size($x), '<', total_size($y), 'total_size() of strings');
 
 my @x = (1..4);
 my @y = (1..200);
@@ -44,7 +42,7 @@ my @y = (1..200);
 my $size_1 = total_size(\@x);
 my $size_2 = total_size(\@y);
 
-ok ( $size_1 < $size_2, 'size() of array refs');
+cmp_ok($size_1, '<', $size_2, 'size() of array refs');
 
 # the arrays alone shouldn't be the same size
 $size_1 = size(\@x);
@@ -61,7 +59,7 @@ $y = 12; $y .= '';
 $size_1 = size($x);
 $size_2 = size($y);
 
-ok ($size_1 < $size_2, ' ."" makes string longer');
+cmp_ok($size_1, '<', $size_2, ' ."" makes string longer');
 
 #############################################################################
 # check that the tracking_hash is working

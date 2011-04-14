@@ -9,8 +9,6 @@
 use Test::More;
 use strict;
 
-my $tests;
-
 BEGIN
    {
    chdir 't' if -d 't';
@@ -112,8 +110,8 @@ for my $size (2, 3, 7, 100)
   # Get the size of the PVNV and the contained array
   my $element_size = total_size(\$hash->{a});
 
-  ok ($element_size < total_size($hash), "element < hash with one element");
-  ok ($element_size > total_size(\[]), "PVNV + [] > [] alone");
+  cmp_ok($element_size, '<', total_size($hash), "element < hash with one element");
+  cmp_ok($element_size, '>', total_size(\[]), "PVNV + [] > [] alone");
 
   # Dereferencing the PVNV (the argument to total_size) leaves us with
   # just the array, and this should be equal to a dereferenced array:
@@ -138,7 +136,7 @@ for my $size (2, 3, 7, 100)
   # is a PVNV, so they shouldn't be the same:
   isnt (total_size(\[0..$size]), total_size( \$hash->{a} ), "[0..size] vs PVNV");
   # and the plain ref should be smaller
-  ok (total_size(\[0..$size]) < total_size( \$hash->{a} ), "[0..size] vs. PVNV");
+  cmp_ok(total_size(\[0..$size]), '<', total_size( \$hash->{a} ), "[0..size] vs. PVNV");
 
   $full_hash = total_size($hash);
   $element_size = total_size(\$hash->{a});
