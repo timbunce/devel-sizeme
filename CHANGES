@@ -1,6 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
 0.72_50 2011-04-14 nicholas
+ * Exception handling is totally MSVC specific, so only use it there
+   - this means that we don't need to use a C++ compiler anywhere
  * Resolve CPAN #49437 (Devel::Size adds magic in Perl 5.10)
 
 0.72 2008-10-14 BrowserUk 70 tests

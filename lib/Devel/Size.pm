@@ -255,9 +255,10 @@ These may be disabled by setting
 Devel::Size has always been vulnerable to trapping when traversing Perl's
 internal data structures, if it encounters uninitialised (dangling) pointers.
 
-Exception handling has been added to deal with this possibility, and Devel::Size
-will now attempt to ignore (or log) them and continue. These messages are mainly
-of interest to Devel::Size and core developers, and so are disabled by default.
+MSVC provides exception handling able to deal with this possibility, and when
+built with MSVC Devel::Size will now attempt to ignore (or log) them and
+continue. These messages are mainly of interest to Devel::Size and core
+developers, and so are disabled by default.
 
 They may be enabled by setting
 

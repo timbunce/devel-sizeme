@@ -38,13 +38,6 @@ On Linux, Cygwin, or Unix:
     make test
     sudo make install
     
-On most systems, it is necessary to link to libstdc++. On such systems,
-libstdc++ should be found automatically (by default).
-If libstdc++ is *not* being found automatically (in which case you'll get
-link errors),then instead of running 'perl Makefile.PL', you'll need to run:
-
-    perl Makefile.pl LIBS="-L/path/to/libstdc++ -lstdc++"
-
 On Windows:
 
     perl Makefile.PL

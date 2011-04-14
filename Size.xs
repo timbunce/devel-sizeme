@@ -2,14 +2,17 @@
 #include "perl.h"
 #include "XSUB.h"
 
-
 #ifdef _MSC_VER 
-#   include <excpt.h>
-#   define try __try
-#   define catch __except
-#   define EXCEPTION EXCEPTION_EXECUTE_HANDLER
+/* "structured exception" handling is a Microsoft extension to C and C++.
+   It's *not* C++ exception handling - C++ exception handling can't capture
+   SEGVs and suchlike, whereas this can. There's no known analagous
+    functionality on other platforms.  */
+#  include <excpt.h>
+#  define TRY_TO_CATCH_SEGV __try
+#  define CAUGHT_EXCEPTION __except(EXCEPTION EXCEPTION_EXECUTE_HANDLER)
 #else
-#   define EXCEPTION ...
+#  define TRY_TO_CATCH_SEGV if(1)
+#  define CAUGHT_EXCEPTION else
 #endif
 
 #ifdef __GNUC__
@@ -50,10 +53,10 @@ IV check_new( TRACKING *tv, void *p ) {
     unsigned int  nop  =  (unsigned long)p & 0x3U;
     
     if (NULL == p || NULL == tv) return FALSE;
-    try { 
+    TRY_TO_CATCH_SEGV { 
         char c = *(char *)p;
     }
-    catch ( EXCEPTION ) {
+    CAUGHT_EXCEPTION {
         if( dangle_whine ) 
             warn( "Devel::Size: Encountered invalid pointer: %p\n", p );
         return FALSE;
@@ -101,7 +104,7 @@ cc_opclass(const OP * const o)
 {
     if (!o)
     return OPc_NULL;
-    try {
+    TRY_TO_CATCH_SEGV {
         if (o->op_type == 0)
         return (o->op_flags & OPf_KIDS) ? OPc_UNOP : OPc_BASEOP;
 
@@ -205,7 +208,7 @@ cc_opclass(const OP * const o)
         warn("Devel::Size: Can't determine class of operator %s, assuming BASEOP\n",
          PL_op_name[o->op_type]);
     }
-    catch( EXCEPTION ) { }
+    CAUGHT_EXCEPTION { }
     return OPc_BASEOP;
 }
 
@@ -235,7 +238,7 @@ IV magic_size(const SV * const thing, TRACKING *tv) {
   while (magic_pointer && check_new(tv, magic_pointer)) {
     total_size += sizeof(MAGIC);
 
-    try {
+    TRY_TO_CATCH_SEGV {
         /* Have we seen the magic vtable? */
         if (magic_pointer->mg_virtual &&
         check_new(tv, magic_pointer->mg_virtual)) {
@@ -245,7 +248,7 @@ IV magic_size(const SV * const thing, TRACKING *tv) {
         /* Get the next in the chain */ // ?try
         magic_pointer = magic_pointer->mg_moremagic;
     }
-    catch( EXCEPTION ) { 
+    CAUGHT_EXCEPTION { 
         if( dangle_whine ) 
             warn( "Devel::Size: Encountered bad magic at: %p\n", magic_pointer );
     }
@@ -276,7 +279,7 @@ UV regex_size(const REGEXP * const baseregex, TRACKING *tv) {
 
 UV op_size(const OP * const baseop, TRACKING *tv) {
   UV total_size = 0;
-  try {
+  TRY_TO_CATCH_SEGV {
       TAG;
       if (check_new(tv, baseop->op_next)) {
            total_size += op_size(baseop->op_next, tv);
@@ -422,7 +425,7 @@ UV op_size(const OP * const baseop, TRACKING *tv) {
         TAG;break;
       }
   }
-  catch( EXCEPTION ) {
+  CAUGHT_EXCEPTION {
       if( dangle_whine ) 
           warn( "Devel::Size: Encountered dangling pointer in opcode at: %p\n", baseop );
   }
