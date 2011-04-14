@@ -1,6 +1,6 @@
 Revision history for Perl extension Devel::Size.
 
-0.71 2008-10-14 BrowserUk 70 tests
+0.72 2008-10-14 BrowserUk 70 tests
  * Added bit-vector pointer tracking mechanism.
    - new fatal error (64-bit platforms only)
  * Added exception handling
