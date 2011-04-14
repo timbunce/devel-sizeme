@@ -672,7 +672,12 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
     if (check_new(tv, CvOUTSIDE(thing))) {
       total_size += thing_size((SV *)CvOUTSIDE(thing), tv);
     }
-    if (!CvISXSUB(thing)) {
+    if (CvISXSUB(thing)) {
+	SV *sv = cv_const_sv((CV *)thing);
+	if (sv) {
+	    total_size += thing_size(sv, tv);
+	}
+    } else {
 	if (check_new(tv, CvSTART(thing))) {
 	    total_size += op_size(CvSTART(thing), tv);
 	}

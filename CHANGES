@@ -8,7 +8,7 @@ Revision history for Perl extension Devel::Size.
    the fatal error introduced in 0.72 when the assumption was violated.
  * Convert to XSLoader
  * Resolve CPAN #49437 (Devel::Size adds magic in Perl 5.10)
- * Resolve CPAN #58484
+ * Resolve CPAN #58484 and #58485 (related to CVs that are XSUBs)
 
 0.72 2008-10-14 BrowserUk 70 tests
  * Added bit-vector pointer tracking mechanism.

@@ -97,6 +97,7 @@ isnt( total_size( sub{ do{ my $t=0 }; } ), 0, 'total_size( sub{ my $t=0 } ) > 0'
 # CPAN RT #58484 and #58485
 isnt (total_size(\&total_size), 0, 'total_size(\&total_size) > 0');
 
-use constant LARGE => 'N' x 4096;
+use constant LARGE => 'N' x 8192;
 
-isnt (total_size(\&LARGE), 0, 'total_size for a constant > 0');
+cmp_ok (total_size(\&LARGE), '>', 8192,
+        'total_size for a constant includes the constant');
