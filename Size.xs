@@ -797,8 +797,6 @@ size(orig_thing)
 CODE:
 {
   SV *thing = orig_thing;
-  /* Hash to track our seen pointers */
-  //HV *tracking_hash = newHV();
   SV *warn_flag;
   TRACKING *tv;
   Newz( 0xfc0ff, tv, 1, TRACKING );
@@ -840,8 +838,6 @@ total_size(orig_thing)
 CODE:
 {
   SV *thing = orig_thing;
-  /* Hash to track our seen pointers */
-  //HV *tracking_hash;
   TRACKING *tv;
   /* Array with things we still need to do */
   AV *pending_array;
@@ -864,7 +860,6 @@ CODE:
   }
 
   /* init these after the go_yell above */
-  //tracking_hash = newHV();
   Newz( 0xfc0ff, tv, 1, TRACKING );
   pending_array = newAV();
 
