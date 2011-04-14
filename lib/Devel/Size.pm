@@ -17,7 +17,7 @@ require XSLoader;
 @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 @EXPORT = qw( );
-$VERSION = '0.72_50';
+$VERSION = '0.72_51';
 
 XSLoader::load( __PACKAGE__);
 
