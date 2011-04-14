@@ -33,14 +33,19 @@ static int dangle_whine = 0;
 #define TAG //printf( "# %s(%d)\n", __FILE__, __LINE__ )
 #define carp puts
 
-#define ALIGN_BITS  ( sizeof(void*) >> 1 )
-#define BIT_BITS    3
-#define BYTE_BITS   14
-#define SLOT_BITS   ( sizeof( void*) * 8 ) - ( ALIGN_BITS + BIT_BITS + BYTE_BITS )
-#define BYTES_PER_SLOT  1 << BYTE_BITS
-#define TRACKING_SLOTS  8192 // max. 8192 for 4GB/32-bit machine
+/* The idea is to have a tree structure to store 1 bit per possible pointer
+   address. The lowest 16 bits are stored in a block of 8092 bytes.
+   The blocks are in a 256-way tree, indexed by the reset of the pointer.
+   This can cope with 32 and 64 bit pointers, and any address space layout,
+   without excessive memory needs. The assumption is that your CPU cache
+   works :-) (And that we're not going to bust it)  */
 
-typedef char* TRACKING[ TRACKING_SLOTS ];
+#define ALIGN_BITS  ( sizeof(void*) >> 1 )
+#define BYTE_BITS    3
+#define LEAF_BITS   (16 - BYTE_BITS)
+#define LEAF_MASK   0x1FFF
+
+typedef void * TRACKING[256];
 
 /* 
     Checks to see if thing is in the bitstring. 
@@ -49,11 +54,21 @@ typedef char* TRACKING[ TRACKING_SLOTS ];
  */
 static bool
 check_new(TRACKING *tv, const void *const p) {
-    unsigned long slot =  (unsigned long)p >> (SLOT_BITS + BIT_BITS + ALIGN_BITS);
-    unsigned int  byte = ((unsigned long)p >> (ALIGN_BITS + BIT_BITS)) & 0x00003fffU;
-    unsigned int  bit  = ((unsigned long)p >> ALIGN_BITS) & 0x00000007U;
-    unsigned int  nop  =  (unsigned long)p & 0x3U;
-    
+    unsigned int bits = 8 * sizeof(void*);
+    const size_t raw_p = PTR2nat(p);
+    /* This effectively rotates the value right by the number of low always-0
+       bits in an aligned pointer. The assmption is that most (if not all)
+       pointers are aligned, and these will be in the same chain of nodes
+       (and hence hot in the cache) but we can still deal with any unaligned
+       pointers.  */
+    const size_t cooked_p
+	= (raw_p >> ALIGN_BITS) | (raw_p << (bits - BYTE_BITS));
+    const U8 this_bit = 1 << (cooked_p & 0x7);
+    U8 **leaf_p;
+    U8 *leaf;
+    unsigned int i;
+    void **tv_p = (void **) tv;
+
     assert(tv);
     if (NULL == p) return FALSE;
     TRY_TO_CATCH_SEGV { 
@@ -64,38 +79,66 @@ check_new(TRACKING *tv, const void *const p) {
             warn( "Devel::Size: Encountered invalid pointer: %p\n", p );
         return FALSE;
     }
-    dbg_printf((
-        "address: %p slot: %p byte: %4x bit: %4x nop:%x\n",
-        p, slot, byte, bit, nop
-    ));
     TAG;    
-    if( slot >= TRACKING_SLOTS ) {
-        die( "Devel::Size: Please rebuild D::S with TRACKING_SLOTS > %u\n", slot );
-    }
+
+    bits -= 8;
+    /* bits now 24 (32 bit pointers) or 56 (64 bit pointers) */
+
+    /* First level is always present.  */
+    do {
+	i = (unsigned int)((cooked_p >> bits) & 0xFF);
+	if (!tv_p[i])
+	    Newxz(tv_p[i], 256, void *);
+	tv_p = (void **)(tv_p[i]);
+	bits -= 8;
+    } while (bits > LEAF_BITS + BYTE_BITS);
+    /* bits now 16 always */
+    assert(bits == 16);
+    leaf_p = (U8 **)tv_p;
+    i = (unsigned int)((cooked_p >> bits) & 0xFF);
+    if (!leaf_p[i])
+	Newxz(leaf_p[i], 1 << LEAF_BITS, U8);
+    leaf = leaf_p[i];
+
     TAG;    
-    if( (*tv)[ slot ] == NULL ) {
-        Newz( 0xfc0ff, (*tv)[ slot ], BYTES_PER_SLOT, char );
-    }
-    TAG;    
-    if( (*tv)[ slot ][ byte ] & ( 1 << bit ) ) {
-        return FALSE;
-    }
-    TAG;    
-    (*tv)[ slot ][ byte ] |= ( 1 << bit );
-    TAG;    
+
+    i = (unsigned int)((cooked_p >> BYTE_BITS) & LEAF_MASK);
+
+    if(leaf[i] & this_bit)
+	return FALSE;
+
+    leaf[i] |= this_bit;
     return TRUE;
+}
+
+static void
+free_tracking_at(void **tv, int level)
+{
+    int i = 255;
+
+    if (--level) {
+	/* Nodes */
+	do {
+	    if (tv[i]) {
+		free_tracking_at(tv[i], level);
+		Safefree(tv[i]);
+	    }
+	} while (i--);
+    } else {
+	/* Leaves */
+	do {
+	    if (tv[i])
+		Safefree(tv[i]);
+	} while (i--);
+    }
 }
 
 static void
 free_tracking(TRACKING *tv)
 {
-  int i;
-  /* Clean up after ourselves */
-  for( i = 0; i < TRACKING_SLOTS; ++i ) {
-    if( (*tv)[ i ] )
-        Safefree( (*tv)[ i ] );
-  }
-  Safefree( tv );    
+    const int top_level = (sizeof(void *) * 8 - LEAF_BITS - BYTE_BITS) / 8;
+    free_tracking_at((void **)tv, top_level);
+    Safefree(tv);
 }
 
 UV thing_size(const SV *const, TRACKING *);

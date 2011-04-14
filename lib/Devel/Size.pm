@@ -192,36 +192,21 @@ that consumes far less memory than was previously the case. It does this
 by using a bit vector where 1 bit represents each 4- or 8-byte aligned pointer
 (32- or 64-bit platform dependant) that could exist. Further, it segments
 that bit vector and only allocates each chunk when an address is seen within
-that chunk. By default, the module builds a static table of 8,192 slots of
-16k chunks which is sufficient to cover the full 4GB virtual address space on
-32-bit platforms. Or the first 8GB on 64-bit platforms.
+that chunk. Since version 0.73, chunks are allocated in blocks of 2**16 bits
+(ie 8K), accessed via a 256-way tree. The tree is 2 levels deep on a 32 bit
+system, 6 levels deep on a 64 bit system. This avoids having make any
+assumptions about address layout on 64 bit systems or trade offs about sizes
+to allocate. It assumes that the addresses of allocated pointers are reasonably
+contiguous, so that relevant parts of the tree stay in the CPU cache.
 
 Besides saving a lot of memory, this change means that Devel::Size
 runs significantly faster than previous versions.
-
-One caveat of this new mechanism is that on 64-bit platforms with more than 8GB
-of memory a new fatal error may be seen. See the next section.
 
 =head1 Messages: texts originating from this module.
 
 =head2 Errors
 
 =over 4
-
-=item   "Devel::Size: Please rebuild D::S with TRACKING_SLOTS > 8192"
-
-This fatal error may be produced when using Devel::Size on 64-bit platforms
-with more than 8GB of virtual memory. It indicates that a pointer has been
-encountered that is to high for the internal pointer tracking mechanism.
-
-The solution is to rebuild Devel::Size having edited Size.XS to increase
-the value of
-
-    #define TRACKING_SLOTS 8192
-
-On 64-bit platforms, Devel::Size requires 1 slot for each 1MB of virtual
-address space.  So, for a system with 12GB of memory, this should be set to
-12GB / 1MB = 12884901888 / 1048576 = 12288 ( 12 * 1024 ).
 
 =item   "Devel::Size: Unknown variable type"
 
