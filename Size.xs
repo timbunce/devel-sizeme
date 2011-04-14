@@ -35,7 +35,7 @@ static int dangle_whine = 0;
 #define dbg_printf(x)
 #endif
 
-#define TAG //printf( "# %s(%d)\n", __FILE__, __LINE__ )
+#define TAG /* printf( "# %s(%d)\n", __FILE__, __LINE__ ) */
 #define carp puts
 
 /* The idea is to have a tree structure to store 1 bit per possible pointer
@@ -308,7 +308,7 @@ IV magic_size(const SV * const thing, TRACKING *tv) {
           total_size += sizeof(MGVTBL);
         }
 
-        /* Get the next in the chain */ // ?try
+        /* Get the next in the chain */
         magic_pointer = magic_pointer->mg_moremagic;
     }
     CAUGHT_EXCEPTION { 
