@@ -6,7 +6,7 @@ use strict;
 BEGIN
    {
    chdir 't' if -d 't';
-   plan tests => 13;
+   plan tests => 15;
 
    use lib '../lib';
    use lib '../blib/arch';
@@ -93,3 +93,10 @@ isnt (total_size($code), 0, 'total_size($code) > 0');
 ##########################################################
 # RT#14849 (& RT#26781 and possibly RT#29238?)
 isnt( total_size( sub{ do{ my $t=0 }; } ), 0, 'total_size( sub{ my $t=0 } ) > 0' );
+
+# CPAN RT #58484 and #58485
+isnt (total_size(\&total_size), 0, 'total_size(\&total_size) > 0');
+
+use constant LARGE => 'N' x 4096;
+
+isnt (total_size(\&LARGE), 0, 'total_size for a constant > 0');

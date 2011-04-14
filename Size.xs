@@ -3,6 +3,11 @@
 #include "XSUB.h"
 #include "ppport.h"
 
+/* Not yet in ppport.h */
+#ifndef CvISXSUB
+#  define CvISXSUB(cv)  (CvXSUB(cv) ? TRUE : FALSE)
+#endif
+
 #ifdef _MSC_VER 
 /* "structured exception" handling is a Microsoft extension to C and C++.
    It's *not* C++ exception handling - C++ exception handling can't capture
@@ -667,11 +672,13 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
     if (check_new(tv, CvOUTSIDE(thing))) {
       total_size += thing_size((SV *)CvOUTSIDE(thing), tv);
     }
-    if (check_new(tv, CvSTART(thing))) {
-      total_size += op_size(CvSTART(thing), tv);
-    }
-    if (check_new(tv, CvROOT(thing))) {
-      total_size += op_size(CvROOT(thing), tv);
+    if (!CvISXSUB(thing)) {
+	if (check_new(tv, CvSTART(thing))) {
+	    total_size += op_size(CvSTART(thing), tv);
+	}
+	if (check_new(tv, CvROOT(thing))) {
+	    total_size += op_size(CvROOT(thing), tv);
+	}
     }
 
     TAG;break;
