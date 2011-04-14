@@ -86,6 +86,18 @@ check_new(TRACKING *tv, const void *const p) {
     return TRUE;
 }
 
+static void
+free_tracking(TRACKING *tv)
+{
+  int i;
+  /* Clean up after ourselves */
+  for( i = 0; i < TRACKING_SLOTS; ++i ) {
+    if( (*tv)[ i ] )
+        Safefree( (*tv)[ i ] );
+  }
+  Safefree( tv );    
+}
+
 UV thing_size(const SV *const, TRACKING *);
 typedef enum {
     OPc_NULL,   /* 0 */
@@ -729,7 +741,6 @@ size(orig_thing)
      SV *orig_thing
 CODE:
 {
-  int i;
   SV *thing = orig_thing;
   /* Hash to track our seen pointers */
   //HV *tracking_hash = newHV();
@@ -762,13 +773,7 @@ CODE:
 #endif
 
   RETVAL = thing_size(thing, tv);
-  /* Clean up after ourselves */
-  //SvREFCNT_dec(tracking_hash);
-  for( i = 0; i < TRACKING_SLOTS; ++i ) {
-    if( (*tv)[ i ] )
-        Safefree( (*tv)[ i ] );
-  }
-  Safefree( tv );    
+  free_tracking(tv);
 }
 OUTPUT:
   RETVAL
@@ -779,7 +784,6 @@ total_size(orig_thing)
        SV *orig_thing
 CODE:
 {
-  int i;
   SV *thing = orig_thing;
   /* Hash to track our seen pointers */
   //HV *tracking_hash;
@@ -922,14 +926,8 @@ CODE:
 #endif
     }
   } /* end while */
-  
-  /* Clean up after ourselves */
-  //SvREFCNT_dec(tracking_hash);
-  for( i = 0; i < TRACKING_SLOTS; ++i ) {
-    if( (*tv)[ i ] )
-        Safefree( (*tv)[ i ] );
-  }
-  Safefree( tv );    
+
+  free_tracking(tv);
   SvREFCNT_dec(pending_array);
 }
 OUTPUT:
