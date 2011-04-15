@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.72_52 2111-04-15 nicholas
+ * Add a test for the non-exceptional warnings.
+
 0.72_51 2111-04-15 nicholas
  * Add PERL_NO_GET_CONTEXT to improve performance under multiplicity
 
