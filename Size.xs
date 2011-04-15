@@ -1,3 +1,5 @@
+#define PERL_NO_GET_CONTEXT
+
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -146,7 +148,7 @@ free_tracking(TRACKING *tv)
     Safefree(tv);
 }
 
-UV thing_size(const SV *const, TRACKING *);
+static UV thing_size(pTHX_ const SV *const, TRACKING *);
 typedef enum {
     OPc_NULL,   /* 0 */
     OPc_BASEOP, /* 1 */
@@ -340,12 +342,13 @@ UV regex_size(const REGEXP * const baseregex, TRACKING *tv) {
   return total_size;
 }
 
-UV op_size(const OP * const baseop, TRACKING *tv) {
+static UV
+op_size(pTHX_ const OP * const baseop, TRACKING *tv) {
   UV total_size = 0;
   TRY_TO_CATCH_SEGV {
       TAG;
       if (check_new(tv, baseop->op_next)) {
-           total_size += op_size(baseop->op_next, tv);
+           total_size += op_size(aTHX_ baseop->op_next, tv);
       }
       TAG;
       switch (cc_opclass(baseop)) {
@@ -355,53 +358,53 @@ UV op_size(const OP * const baseop, TRACKING *tv) {
       case OPc_UNOP: TAG;
         total_size += sizeof(struct unop);
         if (check_new(tv, cUNOPx(baseop)->op_first)) {
-          total_size += op_size(cUNOPx(baseop)->op_first, tv);
+          total_size += op_size(aTHX_ cUNOPx(baseop)->op_first, tv);
         }
         TAG;break;
       case OPc_BINOP: TAG;
         total_size += sizeof(struct binop);
         if (check_new(tv, cBINOPx(baseop)->op_first)) {
-          total_size += op_size(cBINOPx(baseop)->op_first, tv);
+          total_size += op_size(aTHX_ cBINOPx(baseop)->op_first, tv);
         }  
         if (check_new(tv, cBINOPx(baseop)->op_last)) {
-          total_size += op_size(cBINOPx(baseop)->op_last, tv);
+          total_size += op_size(aTHX_ cBINOPx(baseop)->op_last, tv);
         }
         TAG;break;
       case OPc_LOGOP: TAG;
         total_size += sizeof(struct logop);
         if (check_new(tv, cLOGOPx(baseop)->op_first)) {
-          total_size += op_size(cBINOPx(baseop)->op_first, tv);
+          total_size += op_size(aTHX_ cBINOPx(baseop)->op_first, tv);
         }  
         if (check_new(tv, cLOGOPx(baseop)->op_other)) {
-          total_size += op_size(cLOGOPx(baseop)->op_other, tv);
+          total_size += op_size(aTHX_ cLOGOPx(baseop)->op_other, tv);
         }
         TAG;break;
       case OPc_LISTOP: TAG;
         total_size += sizeof(struct listop);
         if (check_new(tv, cLISTOPx(baseop)->op_first)) {
-          total_size += op_size(cLISTOPx(baseop)->op_first, tv);
+          total_size += op_size(aTHX_ cLISTOPx(baseop)->op_first, tv);
         }  
         if (check_new(tv, cLISTOPx(baseop)->op_last)) {
-          total_size += op_size(cLISTOPx(baseop)->op_last, tv);
+          total_size += op_size(aTHX_ cLISTOPx(baseop)->op_last, tv);
         }
         TAG;break;
       case OPc_PMOP: TAG;
         total_size += sizeof(struct pmop);
         if (check_new(tv, cPMOPx(baseop)->op_first)) {
-          total_size += op_size(cPMOPx(baseop)->op_first, tv);
+          total_size += op_size(aTHX_ cPMOPx(baseop)->op_first, tv);
         }  
         if (check_new(tv, cPMOPx(baseop)->op_last)) {
-          total_size += op_size(cPMOPx(baseop)->op_last, tv);
+          total_size += op_size(aTHX_ cPMOPx(baseop)->op_last, tv);
         }
 #if PERL_VERSION < 9 || (PERL_VERSION == 9 && PERL_SUBVERSION < 5)
         if (check_new(tv, cPMOPx(baseop)->op_pmreplroot)) {
-          total_size += op_size(cPMOPx(baseop)->op_pmreplroot, tv);
+          total_size += op_size(aTHX_ cPMOPx(baseop)->op_pmreplroot, tv);
         }
         if (check_new(tv, cPMOPx(baseop)->op_pmreplstart)) {
-          total_size += op_size(cPMOPx(baseop)->op_pmreplstart, tv);
+          total_size += op_size(aTHX_ cPMOPx(baseop)->op_pmreplstart, tv);
         }
         if (check_new(tv, cPMOPx(baseop)->op_pmnext)) {
-          total_size += op_size((OP *)cPMOPx(baseop)->op_pmnext, tv);
+          total_size += op_size(aTHX_ (OP *)cPMOPx(baseop)->op_pmnext, tv);
         }
 #endif
         /* This is defined away in perl 5.8.x, but it is in there for
@@ -419,7 +422,7 @@ UV op_size(const OP * const baseop, TRACKING *tv) {
       case OPc_SVOP: TAG;
         total_size += sizeof(struct pmop);
         if (check_new(tv, cSVOPx(baseop)->op_sv)) {
-          total_size += thing_size(cSVOPx(baseop)->op_sv, tv);
+          total_size += thing_size(aTHX_ cSVOPx(baseop)->op_sv, tv);
         }
         TAG;break;
       case OPc_PADOP: TAG;
@@ -432,19 +435,19 @@ UV op_size(const OP * const baseop, TRACKING *tv) {
       case OPc_LOOP: TAG;
         total_size += sizeof(struct loop);
         if (check_new(tv, cLOOPx(baseop)->op_first)) {
-          total_size += op_size(cLOOPx(baseop)->op_first, tv);
+          total_size += op_size(aTHX_ cLOOPx(baseop)->op_first, tv);
         }  
         if (check_new(tv, cLOOPx(baseop)->op_last)) {
-          total_size += op_size(cLOOPx(baseop)->op_last, tv);
+          total_size += op_size(aTHX_ cLOOPx(baseop)->op_last, tv);
         }
         if (check_new(tv, cLOOPx(baseop)->op_redoop)) {
-          total_size += op_size(cLOOPx(baseop)->op_redoop, tv);
+          total_size += op_size(aTHX_ cLOOPx(baseop)->op_redoop, tv);
         }  
         if (check_new(tv, cLOOPx(baseop)->op_nextop)) {
-          total_size += op_size(cLOOPx(baseop)->op_nextop, tv);
+          total_size += op_size(aTHX_ cLOOPx(baseop)->op_nextop, tv);
         }
         if (check_new(tv, cLOOPx(baseop)->op_lastop)) {
-          total_size += op_size(cLOOPx(baseop)->op_lastop, tv);
+          total_size += op_size(aTHX_ cLOOPx(baseop)->op_lastop, tv);
         }  
 
         TAG;break;
@@ -475,10 +478,10 @@ UV op_size(const OP * const baseop, TRACKING *tv) {
           }
 #else
           if (check_new(tv, basecop->cop_stash)) {
-        total_size += thing_size((SV *)basecop->cop_stash, tv);
+        total_size += thing_size(aTHX_ (SV *)basecop->cop_stash, tv);
           }
           if (check_new(tv, basecop->cop_filegv)) {
-        total_size += thing_size((SV *)basecop->cop_filegv, tv);
+        total_size += thing_size(aTHX_ (SV *)basecop->cop_filegv, tv);
           }
 #endif
 
@@ -499,7 +502,8 @@ UV op_size(const OP * const baseop, TRACKING *tv) {
 #  define NEW_HEAD_LAYOUT
 #endif
 
-UV thing_size(const SV * const orig_thing, TRACKING *tv) {
+static UV
+thing_size(pTHX_ const SV * const orig_thing, TRACKING *tv) {
   const SV *thing = orig_thing;
   UV total_size = sizeof(SV);
 
@@ -539,7 +543,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PV: TAG;
     total_size += sizeof(XPV);
 #if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size( SvRV(thing), tv) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), tv) : SvLEN(thing);
 #else
     total_size += SvLEN(thing);
 #endif
@@ -548,7 +552,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PVIV: TAG;
     total_size += sizeof(XPVIV);
 #if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size( SvRV(thing), tv) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), tv) : SvLEN(thing);
 #else
     total_size += SvLEN(thing);
 #endif
@@ -560,7 +564,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PVNV: TAG;
     total_size += sizeof(XPVNV);
 #if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size( SvRV(thing), tv) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), tv) : SvLEN(thing);
 #else
     total_size += SvLEN(thing);
 #endif
@@ -568,7 +572,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PVMG: TAG;
     total_size += sizeof(XPVMG);
 #if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size( SvRV(thing), tv) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), tv) : SvLEN(thing);
 #else
     total_size += SvLEN(thing);
 #endif
@@ -578,7 +582,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PVBM: TAG;
     total_size += sizeof(XPVBM);
 #if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size( SvRV(thing), tv) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), tv) : SvLEN(thing);
 #else
     total_size += SvLEN(thing);
 #endif
@@ -588,7 +592,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
   case SVt_PVLV: TAG;
     total_size += sizeof(XPVLV);
 #if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size( SvRV(thing), tv) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), tv) : SvLEN(thing);
 #else
     total_size += SvLEN(thing);
 #endif
@@ -621,7 +625,7 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
        complain about AvARYLEN() passing thing to it.  */
     if (AvARYLEN(thing)) {
       if (check_new(tv, AvARYLEN(thing))) {
-    total_size += thing_size(AvARYLEN(thing), tv);
+    total_size += thing_size(aTHX_ AvARYLEN(thing), tv);
       }
     }
 #endif
@@ -658,31 +662,31 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
 
     total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     if (check_new(tv, CvSTASH(thing))) {
-      total_size += thing_size((SV *)CvSTASH(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)CvSTASH(thing), tv);
     }
     if (check_new(tv, SvSTASH(thing))) {
-      total_size += thing_size( (SV *)SvSTASH(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)SvSTASH(thing), tv);
     }
     if (check_new(tv, CvGV(thing))) {
-      total_size += thing_size((SV *)CvGV(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)CvGV(thing), tv);
     }
     if (check_new(tv, CvPADLIST(thing))) {
-      total_size += thing_size((SV *)CvPADLIST(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)CvPADLIST(thing), tv);
     }
     if (check_new(tv, CvOUTSIDE(thing))) {
-      total_size += thing_size((SV *)CvOUTSIDE(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)CvOUTSIDE(thing), tv);
     }
     if (CvISXSUB(thing)) {
 	SV *sv = cv_const_sv((CV *)thing);
 	if (sv) {
-	    total_size += thing_size(sv, tv);
+	    total_size += thing_size(aTHX_ sv, tv);
 	}
     } else {
 	if (check_new(tv, CvSTART(thing))) {
-	    total_size += op_size(CvSTART(thing), tv);
+	    total_size += op_size(aTHX_ CvSTART(thing), tv);
 	}
 	if (check_new(tv, CvROOT(thing))) {
-	    total_size += op_size(CvROOT(thing), tv);
+	    total_size += op_size(aTHX_ CvROOT(thing), tv);
 	}
     }
 
@@ -706,22 +710,22 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
     {
       SV *generic_thing;
       if ((generic_thing = (SV *)(GvGP(thing)->gp_sv))) {
-        total_size += thing_size(generic_thing, tv);
+        total_size += thing_size(aTHX_ generic_thing, tv);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_form))) {
-        total_size += thing_size(generic_thing, tv);
+        total_size += thing_size(aTHX_ generic_thing, tv);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_av))) {
-        total_size += thing_size(generic_thing, tv);
+        total_size += thing_size(aTHX_ generic_thing, tv);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_hv))) {
-        total_size += thing_size(generic_thing, tv);
+        total_size += thing_size(aTHX_ generic_thing, tv);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_egv))) {
-        total_size += thing_size(generic_thing, tv);
+        total_size += thing_size(aTHX_ generic_thing, tv);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_cv))) {
-        total_size += thing_size(generic_thing, tv);
+        total_size += thing_size(aTHX_ generic_thing, tv);
       }
     }
       }
@@ -732,10 +736,10 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
     total_size += magic_size(thing, tv);
     total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     if (check_new(tv, CvPADLIST(thing))) {
-      total_size += thing_size((SV *)CvPADLIST(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)CvPADLIST(thing), tv);
     }
     if (check_new(tv, CvOUTSIDE(thing))) {
-      total_size += thing_size((SV *)CvOUTSIDE(thing), tv);
+      total_size += thing_size(aTHX_ (SV *)CvOUTSIDE(thing), tv);
     }
 
     if (go_yell && !fm_whine) {
@@ -761,15 +765,15 @@ UV thing_size(const SV * const orig_thing, TRACKING *tv) {
     }
     /* Throw the GVs on the list to be walked if they're not-null */
     if (((XPVIO *) SvANY(thing))->xio_top_gv) {
-      total_size += thing_size((SV *)((XPVIO *) SvANY(thing))->xio_top_gv, 
+      total_size += thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, 
                    tv);
     }
     if (((XPVIO *) SvANY(thing))->xio_bottom_gv) {
-      total_size += thing_size((SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, 
+      total_size += thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, 
                    tv);
     }
     if (((XPVIO *) SvANY(thing))->xio_fmt_gv) {
-      total_size += thing_size((SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, 
+      total_size += thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, 
                    tv);
     }
 
@@ -825,7 +829,7 @@ CODE:
   }
 #endif
 
-  RETVAL = thing_size(thing, tv);
+  RETVAL = thing_size(aTHX_ thing, tv);
   free_tracking(tv);
 }
 OUTPUT:
@@ -868,7 +872,7 @@ CODE:
      the miscalculation.
      This is the only way we can check the sizes of arrays and hashes. */
   if (SvROK(thing)) {
-      RETVAL -= thing_size(thing, NULL);
+      RETVAL -= thing_size(aTHX_ thing, NULL);
   } 
 
   /* Put it on the pending array */
@@ -966,7 +970,7 @@ CODE:
     }
       }
       
-      size = thing_size(thing, tv);
+      size = thing_size(aTHX_ thing, tv);
       RETVAL += size;
     } else {
     /* check_new() returned false: */
