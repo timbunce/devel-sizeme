@@ -27,10 +27,6 @@
 # define __attribute__(x)
 #endif
 
-static int regex_whine;
-static int fm_whine;
-static int dangle_whine = 0;
-
 #if 0 && defined(DEBUGGING)
 #define dbg_printf(x) printf x
 #else
@@ -52,7 +48,18 @@ static int dangle_whine = 0;
 #define LEAF_BITS   (16 - BYTE_BITS)
 #define LEAF_MASK   0x1FFF
 
-typedef void * TRACKING[256];
+struct state {
+    bool regex_whine;
+    bool fm_whine;
+    bool dangle_whine;
+    bool go_yell;
+    /* My hunch (not measured) is that for most architectures pointers will
+       start with 0 bits, hence the start of this array will be hot, and the
+       end unused. So put the flags next to the hot end.  */
+    void *tracking[256];
+};
+
+typedef struct state TRACKING;
 
 /* 
     Checks to see if thing is in the bitstring. 
@@ -74,7 +81,7 @@ check_new(TRACKING *tv, const void *const p) {
     U8 **leaf_p;
     U8 *leaf;
     unsigned int i;
-    void **tv_p = (void **) tv;
+    void **tv_p = (void **) (tv->tracking);
 
     assert(tv);
     if (NULL == p) return FALSE;
@@ -82,7 +89,7 @@ check_new(TRACKING *tv, const void *const p) {
         const char c = *(const char *)p;
     }
     CAUGHT_EXCEPTION {
-        if( dangle_whine ) 
+        if (tv->dangle_whine) 
             warn( "Devel::Size: Encountered invalid pointer: %p\n", p );
         return FALSE;
     }
@@ -144,7 +151,7 @@ static void
 free_tracking(TRACKING *tv)
 {
     const int top_level = (sizeof(void *) * 8 - LEAF_BITS - BYTE_BITS) / 8;
-    free_tracking_at((void **)tv, top_level);
+    free_tracking_at((void **)tv->tracking, top_level);
     Safefree(tv);
 }
 
@@ -282,8 +289,6 @@ cc_opclass(const OP * const o)
 #define NV double
 #endif
 
-static int go_yell = 1;
-
 /* Figure out how much magic is attached to the SV and return the
    size */
 IV magic_size(const SV * const thing, TRACKING *tv) {
@@ -314,7 +319,7 @@ IV magic_size(const SV * const thing, TRACKING *tv) {
         magic_pointer = magic_pointer->mg_moremagic;
     }
     CAUGHT_EXCEPTION { 
-        if( dangle_whine ) 
+        if (tv->dangle_whine) 
             warn( "Devel::Size: Encountered bad magic at: %p\n", magic_pointer );
     }
   }
@@ -334,9 +339,9 @@ UV regex_size(const REGEXP * const baseregex, TRACKING *tv) {
   total_size += sizeof(I32) * SvANY(baseregex)->nparens * 2;
   /*total_size += strlen(SvANY(baseregex)->subbeg);*/
 #endif
-  if (go_yell && !regex_whine) {
+  if (tv->go_yell && !tv->regex_whine) {
     carp("Devel::Size: Calculated sizes for compiled regexes are incompatible, and probably always will be");
-    regex_whine = 1;
+    tv->regex_whine = 1;
   }
 
   return total_size;
@@ -492,7 +497,7 @@ op_size(pTHX_ const OP * const baseop, TRACKING *tv) {
       }
   }
   CAUGHT_EXCEPTION {
-      if( dangle_whine ) 
+      if (tv->dangle_whine) 
           warn( "Devel::Size: Encountered dangling pointer in opcode at: %p\n", baseop );
   }
   return total_size;
@@ -742,9 +747,9 @@ thing_size(pTHX_ const SV * const orig_thing, TRACKING *tv) {
       total_size += thing_size(aTHX_ (SV *)CvOUTSIDE(thing), tv);
     }
 
-    if (go_yell && !fm_whine) {
+    if (tv->go_yell && !tv->fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
-      fm_whine = 1;
+      tv->fm_whine = 1;
     }
     TAG;break;
   case SVt_PVIO: TAG;
@@ -791,6 +796,22 @@ thing_size(pTHX_ const SV * const orig_thing, TRACKING *tv) {
   return total_size;
 }
 
+static TRACKING *
+new_tracking(pTHX)
+{
+    SV *warn_flag;
+    TRACKING *tv;
+    Newxz(tv, 1, TRACKING);
+    tv->go_yell = TRUE;
+    if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
+	tv->dangle_whine = tv->go_yell = SvIV(warn_flag) ? TRUE : FALSE;
+    }
+    if (NULL != (warn_flag = perl_get_sv("Devel::Size::dangle", FALSE))) {
+	tv->dangle_whine = SvIV(warn_flag) ? TRUE : FALSE;
+    }
+    return tv;
+}
+
 MODULE = Devel::Size        PACKAGE = Devel::Size       
 
 PROTOTYPES: DISABLE
@@ -801,21 +822,7 @@ size(orig_thing)
 CODE:
 {
   SV *thing = orig_thing;
-  SV *warn_flag;
-  TRACKING *tv;
-  Newz( 0xfc0ff, tv, 1, TRACKING );
-
-  /* Check warning status */
-  go_yell = 0;
-  regex_whine = 0;
-  fm_whine = 0;
-
-  if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
-    dangle_whine = go_yell = SvIV(warn_flag);
-  }
-  if (NULL != (warn_flag = perl_get_sv("Devel::Size::dangle", FALSE))) {
-    dangle_whine = SvIV(warn_flag);
-  }
+  TRACKING *tv = new_tracking(aTHX);
   
   /* If they passed us a reference then dereference it. This is the
      only way we can check the sizes of arrays and hashes */
@@ -842,29 +849,14 @@ total_size(orig_thing)
 CODE:
 {
   SV *thing = orig_thing;
-  TRACKING *tv;
   /* Array with things we still need to do */
   AV *pending_array;
   IV size = 0;
-  SV *warn_flag;
+  TRACKING *tv = new_tracking(aTHX);
 
   /* Size starts at zero */
   RETVAL = 0;
 
-  /* Check warning status */
-  go_yell = 0;
-  regex_whine = 0;
-  fm_whine = 0;
-
-  if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
-    dangle_whine = go_yell = SvIV(warn_flag);
-  }
-  if (NULL != (warn_flag = perl_get_sv("Devel::Size::dangle", FALSE))) {
-    dangle_whine = SvIV(warn_flag);
-  }
-
-  /* init these after the go_yell above */
-  Newz( 0xfc0ff, tv, 1, TRACKING );
   pending_array = newAV();
 
   /* We cannot push HV/AV directly, only the RV. So deref it
