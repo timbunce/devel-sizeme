@@ -1,24 +1,13 @@
 #!/usr/bin/perl -w
 
-use Test::More;
+use Test::More tests => 14;
 use strict;
-
-BEGIN
-   {
-   chdir 't' if -d 't';
-   plan tests => 15;
-
-   use lib '../lib';
-   use lib '../blib/arch';
-   use_ok('Devel::Size');
-   }
+use Devel::Size qw(size total_size);
 
 can_ok ('Devel::Size', qw/
   size
   total_size
   /);
-
-Devel::Size->import( qw(size total_size) );
 
 die ("Uhoh, test uses an outdated version of Devel::Size")
   unless is ($Devel::Size::VERSION, '0.72_52', 'VERSION MATCHES');

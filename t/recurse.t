@@ -6,28 +6,10 @@
 # total_size([]) will NOT return the size of the ref + the array, it will only
 # return the size of the array alone!
 
-use Test::More;
+use Test::More tests => 3 + 4 *12;
 use strict;
+use Devel::Size ':all';
 
-BEGIN
-   {
-   chdir 't' if -d 't';
-   plan tests => 6 + 4 * 12;
-
-   use lib '../lib';
-   use lib '../blib/arch';
-   use_ok('Devel::Size');
-   }
-
-can_ok ('Devel::Size', qw/
-  size
-  total_size
-  /);
-
-Devel::Size->import( qw(size total_size) );
-
-die ("Uhoh, test uses an outdated version of Devel::Size")
-  unless is ($Devel::Size::VERSION, '0.72_52', 'VERSION MATCHES');
 
 #############################################################################
 # verify that pointer sizes in array slots are sensible:
