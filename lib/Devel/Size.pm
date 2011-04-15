@@ -1,7 +1,7 @@
 package Devel::Size;
 
 use strict;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $warn $dangle);
+use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
 require 5.008;
 require Exporter;
@@ -9,14 +9,11 @@ require XSLoader;
 
 @ISA = qw(Exporter);
 
+@EXPORT_OK = qw(size total_size);
+
 # This allows declaration   use Devel::Size ':all';
-%EXPORT_TAGS = ( 'all' => [ qw(
-    size total_size
-) ] );
+%EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
 
-@EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-@EXPORT = qw( );
 $VERSION = '0.72_52';
 
 XSLoader::load( __PACKAGE__);
