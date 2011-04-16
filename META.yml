@@ -1,9 +1,9 @@
 --- #YAML:1.0
 name:               Devel-Size
-version:            0.72_50
+version:            0.72_51
 abstract:           ~
 author:  []
-license:            unknown
+license:            perl
 distribution_type:  module
 configure_requires:
     ExtUtils::MakeMaker:  0
