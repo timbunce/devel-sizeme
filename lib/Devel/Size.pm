@@ -3,6 +3,7 @@ package Devel::Size;
 use strict;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK %EXPORT_TAGS $warn);
 
+require 5.006;
 require Exporter;
 require DynaLoader;
 
@@ -24,6 +25,8 @@ $warn = 1;
 
 1;
 __END__
+
+=pod
 
 =head1 NAME
 
@@ -243,7 +246,7 @@ Maintained now by Tels <http://bloodgate.com>
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005 Dan Sugalski, Copyright (C) 2007 Tels
+Copyright (C) 2005 Dan Sugalski, Copyright (C) 2007-2008 Tels
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl v5.8.8.

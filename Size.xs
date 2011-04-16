@@ -198,12 +198,17 @@ UV regex_size(REGEXP *baseregex, HV *tracking_hash) {
   UV total_size = 0;
 
   total_size += sizeof(REGEXP);
-  /* Note hte size of the paren offset thing */
+#if (PERL_VERSION < 11) 	
+  /* Note the size of the paren offset thing */
   total_size += sizeof(I32) * baseregex->nparens * 2;
   total_size += strlen(baseregex->precomp);
-
+#else
+  total_size += sizeof(struct regexp);
+  total_size += sizeof(I32) * SvANY(baseregex)->nparens * 2;
+  /*total_size += strlen(SvANY(baseregex)->subbeg);*/
+#endif
   if (go_yell && !regex_whine) {
-    carp("Devel::Size: Calculated sizes for compiled regexes are incomple, and probably always will be");
+    carp("Devel::Size: Calculated sizes for compiled regexes are incompatible, and probably always will be");
     regex_whine = 1;
   }
 
@@ -383,12 +388,14 @@ UV thing_size(SV *orig_thing, HV *tracking_hash) {
     total_size += sizeof(NV);
 #endif
     break;
+#if (PERL_VERSION < 11) 	
     /* Is it a reference? */
   case SVt_RV:
 #ifndef NEW_HEAD_LAYOUT
     total_size += sizeof(XRV);
 #endif
     break;
+#endif
     /* How about a plain string? In which case we need to add in how
        much has been allocated */
   case SVt_PV:
