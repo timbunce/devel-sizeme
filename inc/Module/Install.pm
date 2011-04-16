@@ -30,7 +30,11 @@ BEGIN {
 	# This is not enforced yet, but will be some time in the next few
 	# releases once we can make sure it won't clash with custom
 	# Module::Install extensions.
-	$VERSION = '0.71';
+	$VERSION = '0.77';
+
+	*inc::Module::Install::VERSION = *VERSION;
+	@inc::Module::Install::ISA     = __PACKAGE__;
+
 }
 
 
@@ -81,7 +85,7 @@ END_DIE
 
 # Build.PL was formerly supported, but no longer is due to excessive
 # difficulty in implementing every single feature twice.
-if ( $0 =~ /Build.PL$/i or -f 'Build.PL' ) { die <<"END_DIE" }
+if ( $0 =~ /Build.PL$/i ) { die <<"END_DIE" }
 
 Module::Install no longer supports Build.PL.
 
@@ -95,13 +99,19 @@ END_DIE
 
 
 
+# To save some more typing in Module::Install installers, every...
+# use inc::Module::Install
+# ...also acts as an implicit use strict.
+$^H |= strict::bits(qw(refs subs vars));
+
+
+
+
+
 use Cwd        ();
 use File::Find ();
 use File::Path ();
 use FindBin;
-
-*inc::Module::Install::VERSION = *VERSION;
-@inc::Module::Install::ISA     = __PACKAGE__;
 
 sub autoload {
 	my $self = shift;
@@ -115,8 +125,10 @@ sub autoload {
 			goto &$code unless $cwd eq $pwd;
 		}
 		$$sym =~ /([^:]+)$/ or die "Cannot autoload $who - $sym";
-		unshift @_, ( $self, $1 );
-		goto &{$self->can('call')} unless uc($1) eq $1;
+		unless ( uc($1) eq $1 ) {
+			unshift @_, ( $self, $1 );
+			goto &{$self->can('call')};
+		}
 	};
 }
 
@@ -329,13 +341,27 @@ sub _write {
 	close FH or die "close($_[0]): $!";
 }
 
-sub _version {
+# _version is for processing module versions (eg, 1.03_05) not
+# Perl versions (eg, 5.8.1).
+
+sub _version ($) {
 	my $s = shift || 0;
 	   $s =~ s/^(\d+)\.?//;
 	my $l = $1 || 0;
 	my @v = map { $_ . '0' x (3 - length $_) } $s =~ /(\d{1,3})\D?/g;
 	   $l = $l . '.' . join '', @v if @v;
 	return $l + 0;
+}
+
+# Cloned from Params::Util::_CLASS
+sub _CLASS ($) {
+	(
+		defined $_[0]
+		and
+		! ref $_[0]
+		and
+		$_[0] =~ m/^[^\W\d]\w*(?:::\w+)*$/s
+	) ? $_[0] : undef;
 }
 
 1;

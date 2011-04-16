@@ -14,21 +14,21 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 72c048477b518b904272a671e1788782c9ef595a CHANGES
+SHA1 b23dfc6cbcbc3169764e89224857923e58991a32 CHANGES
 SHA1 e4296437ed0ab5559b250f6016d52c3b547d672e MANIFEST
 SHA1 6883c1a98abd5b1c049e389f831e939b79c13ba5 MANIFEST.SKIP
-SHA1 0da014103e9b00b59688688e60cfc79a533fc75a META.yml
+SHA1 0d8ddd17f26d90db4dc9f1ef004a7ce8a4df4a06 META.yml
 SHA1 6c9a869815fa984597e1e2e2d8404bda9cac8c56 Makefile.PL
 SHA1 e73e2ea830b69aefd7525f73b1fc06df4bf607f5 README
 SHA1 c8500a5602417e1714f1f4e388fa24e83e9d357d Size.xs
-SHA1 d8f6d2df4e75cb9e6e77a8377457f0ececd00e31 inc/Module/Install.pm
-SHA1 03590cde5c3de0d0d8a84d2b96917ed1a2cf9a30 inc/Module/Install/Base.pm
-SHA1 8ef3c70e905be7d1007b446f21d4eb3ff6ae24cb inc/Module/Install/Can.pm
-SHA1 79054604a1cd4e99443b05cbb62832568a204a33 inc/Module/Install/Fetch.pm
-SHA1 dfa433f2f41d990946f1b3d68a29299539f2dea6 inc/Module/Install/Makefile.pm
-SHA1 72cab336b6be5716aae0a1cb6d9add6c98a7a1f5 inc/Module/Install/Metadata.pm
-SHA1 35a62725a7eade0fa617ef2ba4cf2f4d4a69a3fe inc/Module/Install/Win32.pm
-SHA1 19dcc6d1e9f02c56d3f6d184642f4cd68aa371e6 inc/Module/Install/WriteAll.pm
+SHA1 5c9e093b0facca46d50e3c69d5569aa7a98db0b8 inc/Module/Install.pm
+SHA1 465acb50b9006ce61f58a7bd02d0bb029ddceaa6 inc/Module/Install/Base.pm
+SHA1 8356d82167fc00550b4a3ceea8bd852a374d7509 inc/Module/Install/Can.pm
+SHA1 b47ce07fa6d6e38e3daa6cfc752b23f59a64754c inc/Module/Install/Fetch.pm
+SHA1 37ed4ccd7aba10119e6f2993b8082674ce2e5961 inc/Module/Install/Makefile.pm
+SHA1 4aa1c578faad51f31e62bed7b28d3d42b88219c3 inc/Module/Install/Metadata.pm
+SHA1 d7529d795a1304c88253b26a9089913edf31ae5e inc/Module/Install/Win32.pm
+SHA1 2a74aba5a78e7ab2776382e42106ebe941c2ac28 inc/Module/Install/WriteAll.pm
 SHA1 44bade83bb938b5ec9adeb68dcf343482ea5ccde lib/Devel/Size.pm
 SHA1 362d6cb703b599a483563c84062e23b786c25d65 t/basic.t
 SHA1 dc638392e64661dd07deeba11f67e35650a6384a t/pod.t
@@ -37,11 +37,11 @@ SHA1 214b335fb4c2f01f164cae6a49ad738ba3b5dfbd t/recurse.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.6 (GNU/Linux)
 
-iQEVAwUBR+9H8HcLPEOTuEwVAQKfqgf/Vc3uKJIPtZlBbAKH3lSF5ciaV7W+TWYD
-dWOxME+nWAGZWXviZ74oHyIw1t5v8kh7Hjb+/afg5zyOHATzPS0GEY3cCMUmS5bD
-AKnijm3p9Ti8f/hDESlfRxDq9FVDMdx3Bq2LtYqwW9P2PMEX82XWvrtB6FuWu9iW
-cDTvs059YdxX8WJRpNGaPUZZTEMaXflzP61RR8fhu5Hsa900EOflCQvZMXEj3SVy
-zmG5QY/pZ5lG8Bpx8m3zt72/6CB35DnsJBUSfo2sCmlu7c2q/biF4IdCxozw6PKI
-Jf4myGKngIxSADpMAAZXN89nrq3AAteh10dJfLLP3hIzYqFaEr2t+A==
-=YqJj
+iQEVAwUBSK+5XXcLPEOTuEwVAQKRiQf+K3kgIRCgzfqJ34f2i2x8+S2jcvrlfGVH
+0GfRNHGo1+7ZOPcrlTp/aS8lNp2ct+A4++oOf5xSKcOPdZ23nzosQXZzWoqXsZox
+JMsG46EKnDtA53mNT8pdaDTBRAH4UWeMl1biZ+59XcjItENMujbVvWC/mnrLsZnD
+/E+16wsaeJo0nCviPq8fsjzA17CiNXLy6Lzi+Ei9/V9nXMzg75J9ogaUVqT44oli
+aqO05T5B7FJRCMjoB3k9l3s9Wk10YBxuc0XxBLrYqomgogf4sLRR5yx7S2otJfnF
+TWO6WYiMuH820TdkGMeMXypzFlWuobt1LIMlkd1s8/QqbLAU/cJtzQ==
+=gpOu
 -----END PGP SIGNATURE-----

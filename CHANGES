@@ -1,9 +1,11 @@
 Revision history for Perl extension Devel::Size.
 
-0.70 2008-03-30 Tels 69 tests
+0.70 2008-08-23 Tels 69 tests
+  * fix SEGFAULTS under v5.10 (Thanx Reini Urban!)
   * fix compilation under blead (Thanx Reini Urban!)
   * require Perl 5.006 (to stop CPANTESTERS sending bogus reports
     about failed compiling on ancient Perls)
+  * update the bundles Module::Install to v0.77
 
 0.69 2007-08-11 Tels 69 tests
   * fix compilation under Perl v5.9.5 and v5.10 (Thanx Steve Peters!)
