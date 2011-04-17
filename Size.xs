@@ -83,11 +83,9 @@ check_new(struct state *st, const void *const p) {
     U8 **leaf_p;
     U8 *leaf;
     unsigned int i;
-    void **tv_p;
+    void **tv_p = (void **) (st->tracking);
 
-
-    if (NULL == p || NULL == st) return FALSE;
-    tv_p = (void **) (st->tracking);
+    if (NULL == p) return FALSE;
     TRY_TO_CATCH_SEGV { 
         const char c = *(const char *)p;
     }
