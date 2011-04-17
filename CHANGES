@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.74 2011-04-18 nicholas
+ * Correct the Makefile.PL - LICENSE was added to ExtUtils::MakeMaker in 6.31
+
 0.73_51 2011-04-17 nicholas
  * Refactor the C code to accumulate the size inside the tracking structure
    - this means that the C *_size() functions now return void
