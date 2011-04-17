@@ -52,6 +52,7 @@
 #define LEAF_MASK   0x1FFF
 
 struct state {
+    UV total_size;
     bool regex_whine;
     bool fm_whine;
     bool dangle_whine;
@@ -161,7 +162,7 @@ free_state(struct state *st)
     Safefree(st);
 }
 
-static UV thing_size(pTHX_ const SV *const, struct state *);
+static void thing_size(pTHX_ const SV *const, struct state *);
 typedef enum {
     OPc_NULL,   /* 0 */
     OPc_BASEOP, /* 1 */
@@ -297,14 +298,14 @@ cc_opclass(const OP * const o)
 
 /* Figure out how much magic is attached to the SV and return the
    size */
-IV magic_size(const SV * const thing, struct state *st) {
-  IV total_size = 0;
+static void
+magic_size(const SV * const thing, struct state *st) {
   MAGIC *magic_pointer;
 
   /* Is there any? */
   if (!SvMAGIC(thing)) {
     /* No, bail */
-    return 0;
+    return;
   }
 
   /* Get the base magic pointer */
@@ -312,13 +313,13 @@ IV magic_size(const SV * const thing, struct state *st) {
 
   /* Have we seen the magic pointer? */
   while (magic_pointer && check_new(st, magic_pointer)) {
-    total_size += sizeof(MAGIC);
+    st->total_size += sizeof(MAGIC);
 
     TRY_TO_CATCH_SEGV {
         /* Have we seen the magic vtable? */
         if (magic_pointer->mg_virtual &&
         check_new(st, magic_pointer->mg_virtual)) {
-          total_size += sizeof(MGVTBL);
+          st->total_size += sizeof(MGVTBL);
         }
 
         /* Get the next in the chain */
@@ -329,136 +330,131 @@ IV magic_size(const SV * const thing, struct state *st) {
             warn( "Devel::Size: Encountered bad magic at: %p\n", magic_pointer );
     }
   }
-  return total_size;
 }
 
-UV regex_size(const REGEXP * const baseregex, struct state *st) {
-  UV total_size = 0;
-
-  total_size += sizeof(REGEXP);
+static void
+regex_size(const REGEXP * const baseregex, struct state *st) {
+  st->total_size += sizeof(REGEXP);
 #if (PERL_VERSION < 11)     
   /* Note the size of the paren offset thing */
-  total_size += sizeof(I32) * baseregex->nparens * 2;
-  total_size += strlen(baseregex->precomp);
+  st->total_size += sizeof(I32) * baseregex->nparens * 2;
+  st->total_size += strlen(baseregex->precomp);
 #else
-  total_size += sizeof(struct regexp);
-  total_size += sizeof(I32) * SvANY(baseregex)->nparens * 2;
-  /*total_size += strlen(SvANY(baseregex)->subbeg);*/
+  st->total_size += sizeof(struct regexp);
+  st->total_size += sizeof(I32) * SvANY(baseregex)->nparens * 2;
+  /*st->total_size += strlen(SvANY(baseregex)->subbeg);*/
 #endif
   if (st->go_yell && !st->regex_whine) {
     carp("Devel::Size: Calculated sizes for compiled regexes are incompatible, and probably always will be");
     st->regex_whine = 1;
   }
-
-  return total_size;
 }
 
-static UV
+static void
 op_size(pTHX_ const OP * const baseop, struct state *st) {
-  UV total_size = 0;
   TRY_TO_CATCH_SEGV {
       TAG;
       if (check_new(st, baseop->op_next)) {
-           total_size += op_size(aTHX_ baseop->op_next, st);
+           op_size(aTHX_ baseop->op_next, st);
       }
       TAG;
       switch (cc_opclass(baseop)) {
       case OPc_BASEOP: TAG;
-        total_size += sizeof(struct op);
+        st->total_size += sizeof(struct op);
         TAG;break;
       case OPc_UNOP: TAG;
-        total_size += sizeof(struct unop);
+        st->total_size += sizeof(struct unop);
         if (check_new(st, cUNOPx(baseop)->op_first)) {
-          total_size += op_size(aTHX_ cUNOPx(baseop)->op_first, st);
+          op_size(aTHX_ cUNOPx(baseop)->op_first, st);
         }
         TAG;break;
       case OPc_BINOP: TAG;
-        total_size += sizeof(struct binop);
+        st->total_size += sizeof(struct binop);
         if (check_new(st, cBINOPx(baseop)->op_first)) {
-          total_size += op_size(aTHX_ cBINOPx(baseop)->op_first, st);
+          op_size(aTHX_ cBINOPx(baseop)->op_first, st);
         }  
         if (check_new(st, cBINOPx(baseop)->op_last)) {
-          total_size += op_size(aTHX_ cBINOPx(baseop)->op_last, st);
+          op_size(aTHX_ cBINOPx(baseop)->op_last, st);
         }
         TAG;break;
       case OPc_LOGOP: TAG;
-        total_size += sizeof(struct logop);
+        st->total_size += sizeof(struct logop);
         if (check_new(st, cLOGOPx(baseop)->op_first)) {
-          total_size += op_size(aTHX_ cBINOPx(baseop)->op_first, st);
+          op_size(aTHX_ cBINOPx(baseop)->op_first, st);
         }  
         if (check_new(st, cLOGOPx(baseop)->op_other)) {
-          total_size += op_size(aTHX_ cLOGOPx(baseop)->op_other, st);
+          op_size(aTHX_ cLOGOPx(baseop)->op_other, st);
         }
         TAG;break;
       case OPc_LISTOP: TAG;
-        total_size += sizeof(struct listop);
+        st->total_size += sizeof(struct listop);
         if (check_new(st, cLISTOPx(baseop)->op_first)) {
-          total_size += op_size(aTHX_ cLISTOPx(baseop)->op_first, st);
+          op_size(aTHX_ cLISTOPx(baseop)->op_first, st);
         }  
         if (check_new(st, cLISTOPx(baseop)->op_last)) {
-          total_size += op_size(aTHX_ cLISTOPx(baseop)->op_last, st);
+          op_size(aTHX_ cLISTOPx(baseop)->op_last, st);
         }
         TAG;break;
       case OPc_PMOP: TAG;
-        total_size += sizeof(struct pmop);
+        st->total_size += sizeof(struct pmop);
         if (check_new(st, cPMOPx(baseop)->op_first)) {
-          total_size += op_size(aTHX_ cPMOPx(baseop)->op_first, st);
+          op_size(aTHX_ cPMOPx(baseop)->op_first, st);
         }  
         if (check_new(st, cPMOPx(baseop)->op_last)) {
-          total_size += op_size(aTHX_ cPMOPx(baseop)->op_last, st);
+          op_size(aTHX_ cPMOPx(baseop)->op_last, st);
         }
 #if PERL_VERSION < 9 || (PERL_VERSION == 9 && PERL_SUBVERSION < 5)
         if (check_new(st, cPMOPx(baseop)->op_pmreplroot)) {
-          total_size += op_size(aTHX_ cPMOPx(baseop)->op_pmreplroot, st);
+          op_size(aTHX_ cPMOPx(baseop)->op_pmreplroot, st);
         }
         if (check_new(st, cPMOPx(baseop)->op_pmreplstart)) {
-          total_size += op_size(aTHX_ cPMOPx(baseop)->op_pmreplstart, st);
+          op_size(aTHX_ cPMOPx(baseop)->op_pmreplstart, st);
         }
         if (check_new(st, cPMOPx(baseop)->op_pmnext)) {
-          total_size += op_size(aTHX_ (OP *)cPMOPx(baseop)->op_pmnext, st);
+          op_size(aTHX_ (OP *)cPMOPx(baseop)->op_pmnext, st);
         }
 #endif
         /* This is defined away in perl 5.8.x, but it is in there for
            5.6.x */
 #ifdef PM_GETRE
         if (check_new(st, PM_GETRE((cPMOPx(baseop))))) {
-          total_size += regex_size(PM_GETRE(cPMOPx(baseop)), st);
+          regex_size(PM_GETRE(cPMOPx(baseop)), st);
         }
 #else
         if (check_new(st, cPMOPx(baseop)->op_pmregexp)) {
-          total_size += regex_size(cPMOPx(baseop)->op_pmregexp, st);
+          regex_size(cPMOPx(baseop)->op_pmregexp, st);
         }
 #endif
         TAG;break;
       case OPc_SVOP: TAG;
-        total_size += sizeof(struct pmop);
+        st->total_size += sizeof(struct pmop);
         if (check_new(st, cSVOPx(baseop)->op_sv)) {
-          total_size += thing_size(aTHX_ cSVOPx(baseop)->op_sv, st);
+          thing_size(aTHX_ cSVOPx(baseop)->op_sv, st);
         }
         TAG;break;
       case OPc_PADOP: TAG;
-        total_size += sizeof(struct padop);
+	  st->total_size += sizeof(struct padop);
         TAG;break;
       case OPc_PVOP: TAG;
         if (check_new(st, cPVOPx(baseop)->op_pv)) {
-          total_size += strlen(cPVOPx(baseop)->op_pv);
+          st->total_size += strlen(cPVOPx(baseop)->op_pv);
         }
       case OPc_LOOP: TAG;
-        total_size += sizeof(struct loop);
+        st->total_size += sizeof(struct loop);
         if (check_new(st, cLOOPx(baseop)->op_first)) {
-          total_size += op_size(aTHX_ cLOOPx(baseop)->op_first, st);
+          op_size(aTHX_ cLOOPx(baseop)->op_first, st);
         }  
         if (check_new(st, cLOOPx(baseop)->op_last)) {
-          total_size += op_size(aTHX_ cLOOPx(baseop)->op_last, st);
+          op_size(aTHX_ cLOOPx(baseop)->op_last, st);
         }
         if (check_new(st, cLOOPx(baseop)->op_redoop)) {
-          total_size += op_size(aTHX_ cLOOPx(baseop)->op_redoop, st);
+          op_size(aTHX_ cLOOPx(baseop)->op_redoop, st);
         }  
         if (check_new(st, cLOOPx(baseop)->op_nextop)) {
-          total_size += op_size(aTHX_ cLOOPx(baseop)->op_nextop, st);
+          op_size(aTHX_ cLOOPx(baseop)->op_nextop, st);
         }
         if (check_new(st, cLOOPx(baseop)->op_lastop)) {
-          total_size += op_size(aTHX_ cLOOPx(baseop)->op_lastop, st);
+          op_size(aTHX_ cLOOPx(baseop)->op_lastop, st);
         }  
 
         TAG;break;
@@ -466,7 +462,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st) {
         {
           COP *basecop;
           basecop = (COP *)baseop;
-          total_size += sizeof(struct cop);
+          st->total_size += sizeof(struct cop);
 
           /* Change 33656 by nicholas@mouse-mill on 2008/04/07 11:29:51
           Eliminate cop_label from struct cop by storing a label as the first
@@ -477,22 +473,22 @@ op_size(pTHX_ const OP * const baseop, struct state *st) {
           small memory sizes on these Perls. */
 #if (PERL_VERSION < 11)
           if (check_new(st, basecop->cop_label)) {
-        total_size += strlen(basecop->cop_label);
+        st->total_size += strlen(basecop->cop_label);
           }
 #endif
 #ifdef USE_ITHREADS
           if (check_new(st, basecop->cop_file)) {
-        total_size += strlen(basecop->cop_file);
+        st->total_size += strlen(basecop->cop_file);
           }
           if (check_new(st, basecop->cop_stashpv)) {
-        total_size += strlen(basecop->cop_stashpv);
+        st->total_size += strlen(basecop->cop_stashpv);
           }
 #else
           if (check_new(st, basecop->cop_stash)) {
-        total_size += thing_size(aTHX_ (SV *)basecop->cop_stash, st);
+	      thing_size(aTHX_ (SV *)basecop->cop_stash, st);
           }
           if (check_new(st, basecop->cop_filegv)) {
-        total_size += thing_size(aTHX_ (SV *)basecop->cop_filegv, st);
+	      thing_size(aTHX_ (SV *)basecop->cop_filegv, st);
           }
 #endif
 
@@ -506,17 +502,17 @@ op_size(pTHX_ const OP * const baseop, struct state *st) {
       if (st->dangle_whine) 
           warn( "Devel::Size: Encountered dangling pointer in opcode at: %p\n", baseop );
   }
-  return total_size;
 }
 
 #if PERL_VERSION > 9 || (PERL_VERSION == 9 && PERL_SUBVERSION > 2)
 #  define NEW_HEAD_LAYOUT
 #endif
 
-static UV
+static void
 thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
   const SV *thing = orig_thing;
-  UV total_size = sizeof(SV);
+
+  st->total_size += sizeof(SV);
 
   switch (SvTYPE(thing)) {
     /* Is it undef? */
@@ -527,83 +523,101 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
   case SVt_IV: TAG;
 #ifndef NEW_HEAD_LAYOUT
 #  ifdef PURIFY
-    total_size += sizeof(sizeof(XPVIV));
+    st->total_size += sizeof(sizeof(XPVIV));
 #  else
-    total_size += sizeof(IV);
+    st->total_size += sizeof(IV);
 #  endif
 #endif
     TAG;break;
     /* Is it a float? Like the int, it depends on purify */
   case SVt_NV: TAG;
 #ifdef PURIFY
-    total_size += sizeof(sizeof(XPVNV));
+    st->total_size += sizeof(sizeof(XPVNV));
 #else
-    total_size += sizeof(NV);
+    st->total_size += sizeof(NV);
 #endif
     TAG;break;
 #if (PERL_VERSION < 11)     
     /* Is it a reference? */
   case SVt_RV: TAG;
 #ifndef NEW_HEAD_LAYOUT
-    total_size += sizeof(XRV);
+    st->total_size += sizeof(XRV);
 #endif
     TAG;break;
 #endif
     /* How about a plain string? In which case we need to add in how
        much has been allocated */
   case SVt_PV: TAG;
-    total_size += sizeof(XPV);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
+    st->total_size += sizeof(XPV);
+    if(SvROK(thing))
+	thing_size(aTHX_ SvRV_const(thing), st);
+    else
+	st->total_size += SvLEN(thing);
     TAG;break;
     /* A string with an integer part? */
   case SVt_PVIV: TAG;
-    total_size += sizeof(XPVIV);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
+    st->total_size += sizeof(XPVIV);
+    if(SvROK(thing))
+	thing_size(aTHX_ SvRV_const(thing), st);
+    else
+	st->total_size += SvLEN(thing);
     if(SvOOK(thing)) {
-        total_size += SvIVX(thing);
+        st->total_size += SvIVX(thing);
     }
     TAG;break;
     /* A scalar/string/reference with a float part? */
   case SVt_PVNV: TAG;
-    total_size += sizeof(XPVNV);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
+    st->total_size += sizeof(XPVNV);
+    if(SvROK(thing))
+	thing_size(aTHX_ SvRV_const(thing), st);
+    else
+	st->total_size += SvLEN(thing);
     TAG;break;
   case SVt_PVMG: TAG;
-    total_size += sizeof(XPVMG);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
-    total_size += magic_size(thing, st);
+    st->total_size += sizeof(XPVMG);
+    if(SvROK(thing))
+	thing_size(aTHX_ SvRV_const(thing), st);
+    else
+	st->total_size += SvLEN(thing);
+    magic_size(thing, st);
     TAG;break;
 #if PERL_VERSION <= 8
   case SVt_PVBM: TAG;
-    total_size += sizeof(XPVBM);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
-    total_size += magic_size(thing, st);
+    st->total_size += sizeof(XPVBM);
+    if(SvROK(thing))
+	thing_size(aTHX_ SvRV_const(thing), st);
+    else
+	st->total_size += SvLEN(thing);
+    magic_size(thing, st);
     TAG;break;
 #endif
   case SVt_PVLV: TAG;
-    total_size += sizeof(XPVLV);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
-    total_size += magic_size(thing, st);
+    st->total_size += sizeof(XPVLV);
+    if(SvROK(thing))
+	thing_size(aTHX_ SvRV_const(thing), st);
+    else
+	st->total_size += SvLEN(thing);
+    magic_size(thing, st);
     TAG;break;
     /* How much space is dedicated to the array? Not counting the
        elements in the array, mind, just the array itself */
   case SVt_PVAV: TAG;
-    total_size += sizeof(XPVAV);
+    st->total_size += sizeof(XPVAV);
     /* Is there anything in the array? */
     if (AvMAX(thing) != -1) {
       /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
-      total_size += sizeof(SV *) * (AvMAX(thing) + 1);
-      dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", total_size, AvMAX(thing), av_len((AV*)thing)));
+      st->total_size += sizeof(SV *) * (AvMAX(thing) + 1);
+      dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
     }
     /* Add in the bits on the other side of the beginning */
 
     dbg_printf(("total_size %li, sizeof(SV *) %li, AvARRAY(thing) %li, AvALLOC(thing)%li , sizeof(ptr) %li \n", 
-    total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )));
+    st->total_size, sizeof(SV*), AvARRAY(thing), AvALLOC(thing), sizeof( thing )));
 
     /* under Perl 5.8.8 64bit threading, AvARRAY(thing) was a pointer while AvALLOC was 0,
        resulting in grossly overstated sized for arrays. Technically, this shouldn't happen... */
     if (AvALLOC(thing) != 0) {
-      total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
+      st->total_size += (sizeof(SV *) * (AvARRAY(thing) - AvALLOC(thing)));
       }
 #if (PERL_VERSION < 9)
     /* Is there something hanging off the arylen element?
@@ -612,17 +626,17 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
        complain about AvARYLEN() passing thing to it.  */
     if (AvARYLEN(thing)) {
       if (check_new(st, AvARYLEN(thing))) {
-    total_size += thing_size(aTHX_ AvARYLEN(thing), st);
+	  thing_size(aTHX_ AvARYLEN(thing), st);
       }
     }
 #endif
-    total_size += magic_size(thing, st);
+    magic_size(thing, st);
     TAG;break;
   case SVt_PVHV: TAG;
     /* First the base struct */
-    total_size += sizeof(XPVHV);
+    st->total_size += sizeof(XPVHV);
     /* Now the array of buckets */
-    total_size += (sizeof(HE *) * (HvMAX(thing) + 1));
+    st->total_size += (sizeof(HE *) * (HvMAX(thing) + 1));
     /* Now walk the bucket chain */
     if (HvARRAY(thing)) {
       HE *cur_entry;
@@ -630,103 +644,103 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
-          total_size += sizeof(HE);
+          st->total_size += sizeof(HE);
           if (cur_entry->hent_hek) {
             /* Hash keys can be shared. Have we seen this before? */
             if (check_new(st, cur_entry->hent_hek)) {
-              total_size += HEK_BASESIZE + cur_entry->hent_hek->hek_len + 2;
+              st->total_size += HEK_BASESIZE + cur_entry->hent_hek->hek_len + 2;
             }
           }
           cur_entry = cur_entry->hent_next;
         }
       }
     }
-    total_size += magic_size(thing, st);
+    magic_size(thing, st);
     TAG;break;
   case SVt_PVCV: TAG;
-    total_size += sizeof(XPVCV);
-    total_size += magic_size(thing, st);
+    st->total_size += sizeof(XPVCV);
+    magic_size(thing, st);
 
-    total_size += ((XPVIO *) SvANY(thing))->xpv_len;
+    st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     if (check_new(st, CvSTASH(thing))) {
-      total_size += thing_size(aTHX_ (SV *)CvSTASH(thing), st);
+      thing_size(aTHX_ (SV *)CvSTASH(thing), st);
     }
     if (check_new(st, SvSTASH(thing))) {
-      total_size += thing_size(aTHX_ (SV *)SvSTASH(thing), st);
+      thing_size(aTHX_ (SV *)SvSTASH(thing), st);
     }
     if (check_new(st, CvGV(thing))) {
-      total_size += thing_size(aTHX_ (SV *)CvGV(thing), st);
+      thing_size(aTHX_ (SV *)CvGV(thing), st);
     }
     if (check_new(st, CvPADLIST(thing))) {
-      total_size += thing_size(aTHX_ (SV *)CvPADLIST(thing), st);
+      thing_size(aTHX_ (SV *)CvPADLIST(thing), st);
     }
     if (check_new(st, CvOUTSIDE(thing))) {
-      total_size += thing_size(aTHX_ (SV *)CvOUTSIDE(thing), st);
+      thing_size(aTHX_ (SV *)CvOUTSIDE(thing), st);
     }
     if (CvISXSUB(thing)) {
 	SV *sv = cv_const_sv((CV *)thing);
 	if (sv) {
-	    total_size += thing_size(aTHX_ sv, st);
+	    thing_size(aTHX_ sv, st);
 	}
     } else {
 	if (check_new(st, CvSTART(thing))) {
-	    total_size += op_size(aTHX_ CvSTART(thing), st);
+	    op_size(aTHX_ CvSTART(thing), st);
 	}
 	if (check_new(st, CvROOT(thing))) {
-	    total_size += op_size(aTHX_ CvROOT(thing), st);
+	    op_size(aTHX_ CvROOT(thing), st);
 	}
     }
 
     TAG;break;
   case SVt_PVGV: TAG;
-    total_size += magic_size(thing, st);
-    total_size += sizeof(XPVGV);
-    total_size += GvNAMELEN(thing);
+    magic_size(thing, st);
+    st->total_size += sizeof(XPVGV);
+    st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
     /* Is there a file? */
     if (GvFILE(thing)) {
       if (check_new(st, GvFILE(thing))) {
-    total_size += strlen(GvFILE(thing));
+    st->total_size += strlen(GvFILE(thing));
       }
     }
 #endif
     /* Is there something hanging off the glob? */
     if (GvGP(thing)) {
       if (check_new(st, GvGP(thing))) {
-    total_size += sizeof(GP);
+    st->total_size += sizeof(GP);
     {
       SV *generic_thing;
       if ((generic_thing = (SV *)(GvGP(thing)->gp_sv))) {
-        total_size += thing_size(aTHX_ generic_thing, st);
+        thing_size(aTHX_ generic_thing, st);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_form))) {
-        total_size += thing_size(aTHX_ generic_thing, st);
+        thing_size(aTHX_ generic_thing, st);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_av))) {
-        total_size += thing_size(aTHX_ generic_thing, st);
+        thing_size(aTHX_ generic_thing, st);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_hv))) {
-        total_size += thing_size(aTHX_ generic_thing, st);
+        thing_size(aTHX_ generic_thing, st);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_egv))) {
-        total_size += thing_size(aTHX_ generic_thing, st);
+        thing_size(aTHX_ generic_thing, st);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_cv))) {
-        total_size += thing_size(aTHX_ generic_thing, st);
+        thing_size(aTHX_ generic_thing, st);
       }
     }
       }
     }
     TAG;break;
   case SVt_PVFM: TAG;
-    total_size += sizeof(XPVFM);
-    total_size += magic_size(thing, st);
-    total_size += ((XPVIO *) SvANY(thing))->xpv_len;
+    st->total_size += sizeof(XPVFM);
+    magic_size(thing, st);
+    st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     if (check_new(st, CvPADLIST(thing))) {
-      total_size += thing_size(aTHX_ (SV *)CvPADLIST(thing), st);
+      thing_size(aTHX_ (SV *)CvPADLIST(thing), st);
     }
     if (check_new(st, CvOUTSIDE(thing))) {
-      total_size += thing_size(aTHX_ (SV *)CvOUTSIDE(thing), st);
+      thing_size(aTHX_ (SV *)CvOUTSIDE(thing), st);
     }
 
     if (st->go_yell && !st->fm_whine) {
@@ -735,33 +749,30 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     }
     TAG;break;
   case SVt_PVIO: TAG;
-    total_size += sizeof(XPVIO);
-    total_size += magic_size(thing, st);
+    st->total_size += sizeof(XPVIO);
+    magic_size(thing, st);
     if (check_new(st, (SvPVX_const(thing)))) {
-      total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
+      st->total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
     }
     /* Some embedded char pointers */
     if (check_new(st, ((XPVIO *) SvANY(thing))->xio_top_name)) {
-      total_size += strlen(((XPVIO *) SvANY(thing))->xio_top_name);
+      st->total_size += strlen(((XPVIO *) SvANY(thing))->xio_top_name);
     }
     if (check_new(st, ((XPVIO *) SvANY(thing))->xio_fmt_name)) {
-      total_size += strlen(((XPVIO *) SvANY(thing))->xio_fmt_name);
+      st->total_size += strlen(((XPVIO *) SvANY(thing))->xio_fmt_name);
     }
     if (check_new(st, ((XPVIO *) SvANY(thing))->xio_bottom_name)) {
-      total_size += strlen(((XPVIO *) SvANY(thing))->xio_bottom_name);
+      st->total_size += strlen(((XPVIO *) SvANY(thing))->xio_bottom_name);
     }
     /* Throw the GVs on the list to be walked if they're not-null */
     if (((XPVIO *) SvANY(thing))->xio_top_gv) {
-      total_size += thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, 
-                   st);
+      thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, st);
     }
     if (((XPVIO *) SvANY(thing))->xio_bottom_gv) {
-      total_size += thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, 
-                   st);
+      thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, st);
     }
     if (((XPVIO *) SvANY(thing))->xio_fmt_gv) {
-      total_size += thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, 
-                   st);
+      thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, st);
     }
 
     /* Only go trotting through the IO structures if they're really
@@ -775,7 +786,6 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
   default:
     warn("Devel::Size: Unknown variable type: %d encountered\n", SvTYPE(thing) );
   }
-  return total_size;
 }
 
 static struct state *
@@ -798,7 +808,7 @@ MODULE = Devel::Size        PACKAGE = Devel::Size
 
 PROTOTYPES: DISABLE
 
-IV
+UV
 size(orig_thing)
      SV *orig_thing
 CODE:
@@ -818,14 +828,15 @@ CODE:
   }
 #endif
 
-  RETVAL = thing_size(aTHX_ thing, st);
+  thing_size(aTHX_ thing, st);
+  RETVAL = st->total_size;
   free_state(st);
 }
 OUTPUT:
   RETVAL
 
 
-IV
+UV
 total_size(orig_thing)
        SV *orig_thing
 CODE:
@@ -940,8 +951,7 @@ CODE:
     }
       }
       
-      size = thing_size(aTHX_ thing, st);
-      RETVAL += size;
+      thing_size(aTHX_ thing, st);
     } else {
     /* check_new() returned false: */
 #ifdef DEVEL_SIZE_DEBUGGING
@@ -951,6 +961,7 @@ CODE:
     }
   } /* end while */
 
+  RETVAL = st->total_size;
   free_state(st);
   SvREFCNT_dec(pending_array);
 }
