@@ -589,11 +589,7 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
 #if PERL_VERSION <= 8
   case SVt_PVBM: TAG;
     total_size += sizeof(XPVBM);
-#if (PERL_VERSION < 11)
     total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
-#else
-    total_size += SvLEN(thing);
-#endif
     total_size += magic_size(thing, st);
     TAG;break;
 #endif
