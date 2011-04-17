@@ -332,6 +332,12 @@ magic_size(const SV * const thing, struct state *st) {
 }
 
 static void
+check_new_and_strlen(struct state *st, const char *const p) {
+    if(check_new(st, p))
+	st->total_size += strlen(p);
+}
+
+static void
 regex_size(const REGEXP * const baseregex, struct state *st) {
     if(!check_new(st, baseregex))
 	return;
@@ -409,11 +415,9 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
         TAG;break;
       case OPc_PADOP: TAG;
 	  st->total_size += sizeof(struct padop);
-        TAG;break;
-      case OPc_PVOP: TAG;
-        if (check_new(st, cPVOPx(baseop)->op_pv)) {
-          st->total_size += strlen(cPVOPx(baseop)->op_pv);
-        }
+	  TAG;break;
+	case OPc_PVOP: TAG;
+	    check_new_and_strlen(st, cPVOPx(baseop)->op_pv);
 	case OPc_LOOP: TAG;
 	    st->total_size += sizeof(struct loop);
 	    op_size(aTHX_ cLOOPx(baseop)->op_first, st);
@@ -436,17 +440,11 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
           before 5.11 @33656, but later than 5.10, producing slightly too
           small memory sizes on these Perls. */
 #if (PERL_VERSION < 11)
-          if (check_new(st, basecop->cop_label)) {
-        st->total_size += strlen(basecop->cop_label);
-          }
+          check_new_and_strlen(st, basecop->cop_label);
 #endif
 #ifdef USE_ITHREADS
-          if (check_new(st, basecop->cop_file)) {
-        st->total_size += strlen(basecop->cop_file);
-          }
-          if (check_new(st, basecop->cop_stashpv)) {
-        st->total_size += strlen(basecop->cop_stashpv);
-          }
+          check_new_and_strlen(st, basecop->cop_file);
+          check_new_and_strlen(st, basecop->cop_stashpv);
 #else
           if (check_new(st, basecop->cop_stash)) {
 	      thing_size(aTHX_ (SV *)basecop->cop_stash, st);
@@ -658,9 +656,7 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
     /* Is there a file? */
-    if (check_new(st, GvFILE(thing))) {
-	st->total_size += strlen(GvFILE(thing));
-    }
+    check_new_and_strlen(st, GvFILE(thing));
 #endif
     /* Is there something hanging off the glob? */
     if (GvGP(thing)) {
@@ -713,15 +709,9 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
       st->total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
     }
     /* Some embedded char pointers */
-    if (check_new(st, ((XPVIO *) SvANY(thing))->xio_top_name)) {
-      st->total_size += strlen(((XPVIO *) SvANY(thing))->xio_top_name);
-    }
-    if (check_new(st, ((XPVIO *) SvANY(thing))->xio_fmt_name)) {
-      st->total_size += strlen(((XPVIO *) SvANY(thing))->xio_fmt_name);
-    }
-    if (check_new(st, ((XPVIO *) SvANY(thing))->xio_bottom_name)) {
-      st->total_size += strlen(((XPVIO *) SvANY(thing))->xio_bottom_name);
-    }
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name);
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name);
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name);
     /* Throw the GVs on the list to be walked if they're not-null */
     if (((XPVIO *) SvANY(thing))->xio_top_gv) {
       thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, st);
