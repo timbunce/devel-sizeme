@@ -96,7 +96,7 @@ cmp_ok (total_size(\&LARGE), '>', 8192,
 {
     my $a = [];
     my $b = \$a;
-    weaken $b;
-    cmp_ok(total_size($a), '>', total_size([]),
-	   'making a weakref upgrades the target to PVMG and adds magic');
+    # making a weakref upgrades the target to PVMG and adds magic
+    is(total_size($a), total_size([]),
+       'Any intial reference is dereferenced and discarded');
 }

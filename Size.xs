@@ -862,12 +862,10 @@ CODE:
 
   pending_array = newAV();
 
-  /* We cannot push HV/AV directly, only the RV. So deref it
-     later (see below for "*** dereference later") and adjust here for
-     the miscalculation.
+  /* If they passed us a reference then dereference it.
      This is the only way we can check the sizes of arrays and hashes. */
   if (SvROK(thing)) {
-      RETVAL -= thing_size(aTHX_ thing, NULL);
+      thing = SvRV(thing);
   } 
 
   /* Put it on the pending array */
@@ -890,8 +888,6 @@ CODE:
         av_push(pending_array, SvRV(thing));
         } 
       TAG;break;
-
-    /* this is the "*** dereference later" part - see above */
 #if (PERL_VERSION < 11)
         case SVt_RV: TAG;
 #else
