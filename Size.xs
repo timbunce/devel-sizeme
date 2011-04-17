@@ -334,6 +334,8 @@ magic_size(const SV * const thing, struct state *st) {
 
 static void
 regex_size(const REGEXP * const baseregex, struct state *st) {
+    if(!check_new(st, baseregex))
+	return;
   st->total_size += sizeof(REGEXP);
 #if (PERL_VERSION < 11)     
   /* Note the size of the paren offset thing */
@@ -392,18 +394,14 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	    op_size(aTHX_ cPMOPx(baseop)->op_pmreplstart, st);
 	    op_size(aTHX_ (OP *)cPMOPx(baseop)->op_pmnext, st);
 #endif
-        /* This is defined away in perl 5.8.x, but it is in there for
-           5.6.x */
+	    /* This is defined away in perl 5.8.x, but it is in there for
+	       5.6.x */
 #ifdef PM_GETRE
-        if (check_new(st, PM_GETRE((cPMOPx(baseop))))) {
-          regex_size(PM_GETRE(cPMOPx(baseop)), st);
-        }
+	    regex_size(PM_GETRE(cPMOPx(baseop)), st);
 #else
-        if (check_new(st, cPMOPx(baseop)->op_pmregexp)) {
-          regex_size(cPMOPx(baseop)->op_pmregexp, st);
-        }
+	    regex_size(cPMOPx(baseop)->op_pmregexp, st);
 #endif
-        TAG;break;
+	    TAG;break;
       case OPc_SVOP: TAG;
         st->total_size += sizeof(struct pmop);
         if (check_new(st, cSVOPx(baseop)->op_sv)) {
