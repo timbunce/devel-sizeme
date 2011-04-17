@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Devel-Size
-version:            0.73
+version:            0.73_50
 abstract:           ~
 author:  []
 license:            perl
