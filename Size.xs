@@ -9,6 +9,9 @@
 #ifndef CvISXSUB
 #  define CvISXSUB(cv)  (CvXSUB(cv) ? TRUE : FALSE)
 #endif
+#ifndef SvRV_const
+#  define SvRV_const(rv) SvRV(rv)
+#endif
 
 #ifdef _MSC_VER 
 /* "structured exception" handling is a Microsoft extension to C and C++.
@@ -550,20 +553,12 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
        much has been allocated */
   case SVt_PV: TAG;
     total_size += sizeof(XPV);
-#if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
-#else
-    total_size += SvLEN(thing);
-#endif
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
     TAG;break;
     /* A string with an integer part? */
   case SVt_PVIV: TAG;
     total_size += sizeof(XPVIV);
-#if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
-#else
-    total_size += SvLEN(thing);
-#endif
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
     if(SvOOK(thing)) {
         total_size += SvIVX(thing);
     }
@@ -571,35 +566,23 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     /* A scalar/string/reference with a float part? */
   case SVt_PVNV: TAG;
     total_size += sizeof(XPVNV);
-#if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
-#else
-    total_size += SvLEN(thing);
-#endif
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
     TAG;break;
   case SVt_PVMG: TAG;
     total_size += sizeof(XPVMG);
-#if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
-#else
-    total_size += SvLEN(thing);
-#endif
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
     total_size += magic_size(thing, st);
     TAG;break;
 #if PERL_VERSION <= 8
   case SVt_PVBM: TAG;
     total_size += sizeof(XPVBM);
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
     total_size += magic_size(thing, st);
     TAG;break;
 #endif
   case SVt_PVLV: TAG;
     total_size += sizeof(XPVLV);
-#if (PERL_VERSION < 11)
-    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV(thing), st) : SvLEN(thing);
-#else
-    total_size += SvLEN(thing);
-#endif
+    total_size += SvROK(thing) ? thing_size(aTHX_ SvRV_const(thing), st) : SvLEN(thing);
     total_size += magic_size(thing, st);
     TAG;break;
     /* How much space is dedicated to the array? Not counting the
