@@ -312,13 +312,12 @@ magic_size(const SV * const thing, struct state *st) {
   magic_pointer = SvMAGIC(thing);
 
   /* Have we seen the magic pointer? */
-  while (magic_pointer && check_new(st, magic_pointer)) {
+  while (check_new(st, magic_pointer)) {
     st->total_size += sizeof(MAGIC);
 
     TRY_TO_CATCH_SEGV {
         /* Have we seen the magic vtable? */
-        if (magic_pointer->mg_virtual &&
-        check_new(st, magic_pointer->mg_virtual)) {
+        if (check_new(st, magic_pointer->mg_virtual)) {
           st->total_size += sizeof(MGVTBL);
         }
 
@@ -659,10 +658,8 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
     /* Is there a file? */
-    if (GvFILE(thing)) {
-      if (check_new(st, GvFILE(thing))) {
-    st->total_size += strlen(GvFILE(thing));
-      }
+    if (check_new(st, GvFILE(thing))) {
+	st->total_size += strlen(GvFILE(thing));
     }
 #endif
     /* Is there something hanging off the glob? */
