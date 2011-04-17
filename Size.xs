@@ -106,7 +106,11 @@ check_new(struct state *st, const void *const p) {
 	bits -= 8;
     } while (bits > LEAF_BITS + BYTE_BITS);
     /* bits now 16 always */
+#if !defined(MULTIPLICITY) || PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 8)
+    /* 5.8.8 and early have an assert() macro that uses Perl_croak, hence needs
+       a my_perl under multiplicity  */
     assert(bits == 16);
+#endif
     leaf_p = (U8 **)tv_p;
     i = (unsigned int)((cooked_p >> bits) & 0xFF);
     if (!leaf_p[i])

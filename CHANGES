@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.73_50 2011-04-17 nicholas
+ * Avoid using assert() on ithreaded 5.8.8 and earlier, as it needs my_perl
+
 0.73 2011-04-16 nicholas
  * Revert a bad assertion introduced in 0.72_50, which was logically wrong.
    - and a test to demonstrate one case that would trigger it
