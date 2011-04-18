@@ -749,6 +749,9 @@ new_state(pTHX)
     if (NULL != (warn_flag = perl_get_sv("Devel::Size::dangle", FALSE))) {
 	st->dangle_whine = SvIV(warn_flag) ? TRUE : FALSE;
     }
+    check_new(st, &PL_sv_undef);
+    check_new(st, &PL_sv_no);
+    check_new(st, &PL_sv_yes);
     return st;
 }
 

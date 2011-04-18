@@ -40,10 +40,18 @@ $ptr_size /= 4;
 #############################################################################
 # assert hash and hash key size
 
+# Note, undef puts PL_sv_undef on perl's stack. Assigning to a hash or array
+# value is always copying, so { a => undef } has a value which is a fresh
+# (allocated) SVt_NULL. Nowever, total_size(undef) isn't a copy, so total_size()
+# sees PL_sv_undef, which is a singleton, interpreter wide, so isn't counted as
+# part of the size. So we need to use an unassigned scalar to get the correct
+# size for a SVt_NULL:
+my $undef;
+
 my $hash = {};
 $hash->{a} = 1;
 is (total_size($hash),
-    total_size( { a => undef } ) + total_size(1) - total_size(undef),
+    total_size( { a => undef } ) + total_size(1) - total_size($undef),
     'assert hash and hash key size');
 
 #############################################################################
@@ -177,7 +185,7 @@ for my $size (2, 3, 7, 100)
   $array = [ 0..$size, undef, undef ]; pop @$array;
 
   $array_size = total_size($array);
-  my $scalar_size = total_size(1) * (1+$size) + total_size(undef) * 1 + $ptr_size
+  my $scalar_size = total_size(1) * (1+$size) + total_size($undef) * 1 + $ptr_size
     + $ptr_size * ($size + 2) + total_size([]);
   is ($scalar_size, $array_size, "computed right size if full array");
 

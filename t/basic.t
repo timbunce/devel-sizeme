@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More tests => 15;
+use Test::More tests => 18;
 use strict;
 use Devel::Size qw(size total_size);
 use Scalar::Util qw(weaken);
@@ -99,4 +99,14 @@ cmp_ok (total_size(\&LARGE), '>', 8192,
     # making a weakref upgrades the target to PVMG and adds magic
     is(total_size($a), total_size([]),
        'Any intial reference is dereferenced and discarded');
+}
+
+# Must call direct - avoid all copying:
+foreach(['undef', total_size(undef)],
+	['no', total_size(1 == 0)],
+	['yes', total_size(1 == 1)],
+       ) {
+    my ($name, $size) = @$_;
+    is($size, 0,
+       "PL_sv_$name is interpeter wide, so not counted as part of the structure's size");
 }
