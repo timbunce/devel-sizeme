@@ -6,9 +6,22 @@
 # total_size([]) will NOT return the size of the ref + the array, it will only
 # return the size of the array alone!
 
-use Test::More tests => 16 + 4 *12;
+use Test::More;
 use strict;
 use Devel::Size ':all';
+
+my %types = (
+    NULL => undef,
+    IV => 42,
+    RV => \1,
+    NV => 3.14,
+    PV => "Perl rocks",
+    PVIV => do { my $a = 1; $a = "One"; $a },
+    PVNV => do { my $a = 3.14; $a = "Mmm, pi"; $a },
+    PVMG => do { my $a = $!; $a = "Bang!"; $a },
+);
+
+plan(tests => 16 + 4 *12 + 2 * scalar keys %types);
 
 #############################################################################
 # verify that pointer sizes in array slots are sensible:
@@ -230,4 +243,34 @@ sub cmp_array_ro {
        "assigning undef to a gap in an array allocates a scalar");
 
     cmp_array_ro(\@array, \@copy, 'two arrays compare the same');
+}
+
+{
+    my %sizes;
+    # reverse sort ensures that PVIV, PVNV and RV are processed before
+    # IV, NULL, or NV :-)
+    foreach my $type (reverse sort keys %types) {
+	# Need to make sure this goes in a new scalar every time. Putting it
+	# directly in a lexical means that it's in the pad, and the pad recycles
+	# scalars, a side effect of which is that they get upgraded in ways we
+	# don't really want
+	my $a;
+	$a->[0] = $types{$type};
+	undef $a->[0];
+
+	my $expect = $sizes{$type} = size(\$a->[0]);
+
+	$a->[0] = \('x' x 1024);
+
+	$expect = $sizes{RV} if $type eq 'NULL';
+	$expect = $sizes{PVNV} if $type eq 'NV';
+	$expect = $sizes{PVIV} if $type eq 'IV' && $] < 5.012;
+
+	# Remember, size() removes a level of referencing if present. So add
+	# one, so that we get the size of our reference:
+	is(size(\$a->[0]), $expect,
+	   "Type $type containing a reference, size() does not recurse to the referent");
+	cmp_ok(total_size(\$a->[0]), '>', 1024,
+	       "Type $type, total_size() recurses to the referent");
+    }
 }

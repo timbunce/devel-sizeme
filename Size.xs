@@ -160,7 +160,8 @@ free_state(struct state *st)
     Safefree(st);
 }
 
-static void thing_size(pTHX_ const SV *const, struct state *);
+static void sv_size(pTHX_ struct state *, const SV *const, bool recurse);
+
 typedef enum {
     OPc_NULL,   /* 0 */
     OPc_BASEOP, /* 1 */
@@ -408,7 +409,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
       case OPc_SVOP: TAG;
         st->total_size += sizeof(struct pmop);
         if (check_new(st, cSVOPx(baseop)->op_sv)) {
-          thing_size(aTHX_ cSVOPx(baseop)->op_sv, st);
+	    sv_size(aTHX_ st, cSVOPx(baseop)->op_sv, TRUE);
         }
         TAG;break;
       case OPc_PADOP: TAG;
@@ -445,10 +446,10 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
           check_new_and_strlen(st, basecop->cop_stashpv);
 #else
           if (check_new(st, basecop->cop_stash)) {
-	      thing_size(aTHX_ (SV *)basecop->cop_stash, st);
+	      sv_size(aTHX_ st, (SV *)basecop->cop_stash, TRUE);
           }
           if (check_new(st, basecop->cop_filegv)) {
-	      thing_size(aTHX_ (SV *)basecop->cop_filegv, st);
+	      sv_size(aTHX_ st, (SV *)basecop->cop_filegv, TRUE);
           }
 #endif
 
@@ -469,7 +470,8 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 #endif
 
 static void
-thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
+sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
+	const bool recurse) {
   const SV *thing = orig_thing;
 
   st->total_size += sizeof(SV);
@@ -509,16 +511,16 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
        much has been allocated */
   case SVt_PV: TAG;
     st->total_size += sizeof(XPV);
-    if(SvROK(thing))
-	thing_size(aTHX_ SvRV_const(thing), st);
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     else
 	st->total_size += SvLEN(thing);
     TAG;break;
     /* A string with an integer part? */
   case SVt_PVIV: TAG;
     st->total_size += sizeof(XPVIV);
-    if(SvROK(thing))
-	thing_size(aTHX_ SvRV_const(thing), st);
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     else
 	st->total_size += SvLEN(thing);
     if(SvOOK(thing)) {
@@ -528,15 +530,15 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     /* A scalar/string/reference with a float part? */
   case SVt_PVNV: TAG;
     st->total_size += sizeof(XPVNV);
-    if(SvROK(thing))
-	thing_size(aTHX_ SvRV_const(thing), st);
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     else
 	st->total_size += SvLEN(thing);
     TAG;break;
   case SVt_PVMG: TAG;
     st->total_size += sizeof(XPVMG);
-    if(SvROK(thing))
-	thing_size(aTHX_ SvRV_const(thing), st);
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     else
 	st->total_size += SvLEN(thing);
     magic_size(thing, st);
@@ -544,8 +546,8 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
 #if PERL_VERSION <= 8
   case SVt_PVBM: TAG;
     st->total_size += sizeof(XPVBM);
-    if(SvROK(thing))
-	thing_size(aTHX_ SvRV_const(thing), st);
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     else
 	st->total_size += SvLEN(thing);
     magic_size(thing, st);
@@ -553,8 +555,8 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
 #endif
   case SVt_PVLV: TAG;
     st->total_size += sizeof(XPVLV);
-    if(SvROK(thing))
-	thing_size(aTHX_ SvRV_const(thing), st);
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     else
 	st->total_size += SvLEN(thing);
     magic_size(thing, st);
@@ -586,7 +588,7 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
        complain about AvARYLEN() passing thing to it.  */
     if (AvARYLEN(thing)) {
       if (check_new(st, AvARYLEN(thing))) {
-	  thing_size(aTHX_ AvARYLEN(thing), st);
+	  sv_size(aTHX_ st, AvARYLEN(thing), TRUE);
       }
     }
 #endif
@@ -623,24 +625,24 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
 
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     if (check_new(st, CvSTASH(thing))) {
-      thing_size(aTHX_ (SV *)CvSTASH(thing), st);
+	sv_size(aTHX_ st, (SV *)CvSTASH(thing), TRUE);
     }
     if (check_new(st, SvSTASH(thing))) {
-      thing_size(aTHX_ (SV *)SvSTASH(thing), st);
+	sv_size(aTHX_ st, (SV *)SvSTASH(thing), TRUE);
     }
     if (check_new(st, CvGV(thing))) {
-      thing_size(aTHX_ (SV *)CvGV(thing), st);
+	sv_size(aTHX_ st, (SV *)CvGV(thing), TRUE);
     }
     if (check_new(st, CvPADLIST(thing))) {
-      thing_size(aTHX_ (SV *)CvPADLIST(thing), st);
+	sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
     }
     if (check_new(st, CvOUTSIDE(thing))) {
-      thing_size(aTHX_ (SV *)CvOUTSIDE(thing), st);
+	sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
     }
     if (CvISXSUB(thing)) {
 	SV *sv = cv_const_sv((CV *)thing);
 	if (sv) {
-	    thing_size(aTHX_ sv, st);
+	    sv_size(aTHX_ st, sv, TRUE);
 	}
     } else {
 	op_size(aTHX_ CvSTART(thing), st);
@@ -663,22 +665,22 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     {
       SV *generic_thing;
       if ((generic_thing = (SV *)(GvGP(thing)->gp_sv))) {
-        thing_size(aTHX_ generic_thing, st);
+	  sv_size(aTHX_ st, generic_thing, TRUE);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_form))) {
-        thing_size(aTHX_ generic_thing, st);
+	  sv_size(aTHX_ st, generic_thing, TRUE);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_av))) {
-        thing_size(aTHX_ generic_thing, st);
+	  sv_size(aTHX_ st, generic_thing, TRUE);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_hv))) {
-        thing_size(aTHX_ generic_thing, st);
+	  sv_size(aTHX_ st, generic_thing, TRUE);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_egv))) {
-        thing_size(aTHX_ generic_thing, st);
+	  sv_size(aTHX_ st, generic_thing, TRUE);
       }
       if ((generic_thing = (SV *)(GvGP(thing)->gp_cv))) {
-        thing_size(aTHX_ generic_thing, st);
+	  sv_size(aTHX_ st, generic_thing, TRUE);
       }
     }
       }
@@ -689,10 +691,10 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     magic_size(thing, st);
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     if (check_new(st, CvPADLIST(thing))) {
-      thing_size(aTHX_ (SV *)CvPADLIST(thing), st);
+	sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
     }
     if (check_new(st, CvOUTSIDE(thing))) {
-      thing_size(aTHX_ (SV *)CvOUTSIDE(thing), st);
+	sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
     }
 
     if (st->go_yell && !st->fm_whine) {
@@ -712,13 +714,13 @@ thing_size(pTHX_ const SV * const orig_thing, struct state *st) {
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name);
     /* Throw the GVs on the list to be walked if they're not-null */
     if (((XPVIO *) SvANY(thing))->xio_top_gv) {
-      thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, st);
+	sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, TRUE);
     }
     if (((XPVIO *) SvANY(thing))->xio_bottom_gv) {
-      thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, st);
+	sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, TRUE);
     }
     if (((XPVIO *) SvANY(thing))->xio_fmt_gv) {
-      thing_size(aTHX_ (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, st);
+	sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, TRUE);
     }
 
     /* Only go trotting through the IO structures if they're really
@@ -774,7 +776,7 @@ CODE:
   }
 #endif
 
-  thing_size(aTHX_ thing, st);
+  sv_size(aTHX_ st, thing, FALSE);
   RETVAL = st->total_size;
   free_state(st);
 }
@@ -897,7 +899,7 @@ CODE:
     }
       }
       
-      thing_size(aTHX_ thing, st);
+      sv_size(aTHX_ st, thing, TRUE);
     } else {
     /* check_new() returned false: */
 #ifdef DEVEL_SIZE_DEBUGGING
