@@ -61,8 +61,6 @@ $SIG{__WARN__} = sub {
     my $copy_gv_size = total_size($copy);
     # GV copies point back to the real GV through GvEGV. They share the same GP
     # and GvFILE
-    local $TODO = 'EGV is double counted. GV - GP == '
-	. ($incremental_gv_size - $gp_size);
     is($copy_gv_size, $real_gv_size + $incremental_gv_size - $gp_size,
       'GV copies point back to the real GV');
 }
@@ -108,7 +106,6 @@ sub gv_grew {
 	    unless $Config{usemultiplicity};
 	is($io_now_size, $io_was_size, "IO doesn't grow as GV has SCALAR");
 	is($gv_now_size, $gv_was_size, 'GV size unchanged as GV has SCALAR');
-	local $TODO = 'total_size double counts GP entries';
 	is($gv_now_total_size, $gv_was_total_size,
 	   'GV total size unchanged as GV has SCALAR');
     } elsif ($type eq 'CODE' || $type eq 'FORMAT') {
@@ -130,7 +127,6 @@ sub gv_grew {
 	   "IO total_size grew by expected amount for $type");
 	is($gv_now_size, $gv_was_size + $new_thing_size,
 	   "GV size grew by expected amount for $type");
-	local $TODO = 'total_size double counts GP entries';
 	is($gv_now_total_size, $gv_was_total_size + $new_thing_size,
 	   "GV total_size grew by expected amount for $type");
     }

@@ -160,7 +160,7 @@ free_state(struct state *st)
     Safefree(st);
 }
 
-static void sv_size(pTHX_ struct state *, const SV *const, bool recurse);
+static bool sv_size(pTHX_ struct state *, const SV *const, bool recurse);
 
 typedef enum {
     OPc_NULL,   /* 0 */
@@ -406,12 +406,10 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	    regex_size(cPMOPx(baseop)->op_pmregexp, st);
 #endif
 	    TAG;break;
-      case OPc_SVOP: TAG;
-        st->total_size += sizeof(struct pmop);
-        if (check_new(st, cSVOPx(baseop)->op_sv)) {
+	case OPc_SVOP: TAG;
+	    st->total_size += sizeof(struct pmop);
 	    sv_size(aTHX_ st, cSVOPx(baseop)->op_sv, TRUE);
-        }
-        TAG;break;
+	    TAG;break;
       case OPc_PADOP: TAG;
 	  st->total_size += sizeof(struct padop);
 	  TAG;break;
@@ -445,12 +443,8 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
           check_new_and_strlen(st, basecop->cop_file);
           check_new_and_strlen(st, basecop->cop_stashpv);
 #else
-          if (check_new(st, basecop->cop_stash)) {
-	      sv_size(aTHX_ st, (SV *)basecop->cop_stash, TRUE);
-          }
-          if (check_new(st, basecop->cop_filegv)) {
-	      sv_size(aTHX_ st, (SV *)basecop->cop_filegv, TRUE);
-          }
+	  sv_size(aTHX_ st, (SV *)basecop->cop_stash, TRUE);
+	  sv_size(aTHX_ st, (SV *)basecop->cop_filegv, TRUE);
 #endif
 
         }
@@ -469,10 +463,13 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 #  define NEW_HEAD_LAYOUT
 #endif
 
-static void
+static bool
 sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	const bool recurse) {
   const SV *thing = orig_thing;
+
+  if(!check_new(st, thing))
+      return FALSE;
 
   st->total_size += sizeof(SV);
 
@@ -490,6 +487,8 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     st->total_size += sizeof(IV);
 #  endif
 #endif
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     TAG;break;
     /* Is it a float? Like the int, it depends on purify */
   case SVt_NV: TAG;
@@ -505,6 +504,8 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 #ifndef NEW_HEAD_LAYOUT
     st->total_size += sizeof(XRV);
 #endif
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
     TAG;break;
 #endif
     /* How about a plain string? In which case we need to add in how
@@ -586,11 +587,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
        Post 5.9.something this is stored in magic, so will be found there,
        and Perl_av_arylen_p() takes a non-const AV*, hence compilers rightly
        complain about AvARYLEN() passing thing to it.  */
-    if (AvARYLEN(thing)) {
-      if (check_new(st, AvARYLEN(thing))) {
-	  sv_size(aTHX_ st, AvARYLEN(thing), TRUE);
-      }
-    }
+    sv_size(aTHX_ st, AvARYLEN(thing), TRUE);
 #endif
     magic_size(thing, st);
     TAG;break;
@@ -624,26 +621,13 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     magic_size(thing, st);
 
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
-    if (check_new(st, CvSTASH(thing))) {
-	sv_size(aTHX_ st, (SV *)CvSTASH(thing), TRUE);
-    }
-    if (check_new(st, SvSTASH(thing))) {
-	sv_size(aTHX_ st, (SV *)SvSTASH(thing), TRUE);
-    }
-    if (check_new(st, CvGV(thing))) {
-	sv_size(aTHX_ st, (SV *)CvGV(thing), TRUE);
-    }
-    if (check_new(st, CvPADLIST(thing))) {
-	sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
-    }
-    if (check_new(st, CvOUTSIDE(thing))) {
-	sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
-    }
+    sv_size(aTHX_ st, (SV *)CvSTASH(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)SvSTASH(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)CvGV(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
     if (CvISXSUB(thing)) {
-	SV *sv = cv_const_sv((CV *)thing);
-	if (sv) {
-	    sv_size(aTHX_ st, sv, TRUE);
-	}
+	sv_size(aTHX_ st, cv_const_sv((CV *)thing), TRUE);
     } else {
 	op_size(aTHX_ CvSTART(thing), st);
 	op_size(aTHX_ CvROOT(thing), st);
@@ -661,28 +645,13 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     /* Is there something hanging off the glob? */
     if (GvGP(thing)) {
       if (check_new(st, GvGP(thing))) {
-    st->total_size += sizeof(GP);
-    {
-      SV *generic_thing;
-      if ((generic_thing = (SV *)(GvGP(thing)->gp_sv))) {
-	  sv_size(aTHX_ st, generic_thing, TRUE);
-      }
-      if ((generic_thing = (SV *)(GvGP(thing)->gp_form))) {
-	  sv_size(aTHX_ st, generic_thing, TRUE);
-      }
-      if ((generic_thing = (SV *)(GvGP(thing)->gp_av))) {
-	  sv_size(aTHX_ st, generic_thing, TRUE);
-      }
-      if ((generic_thing = (SV *)(GvGP(thing)->gp_hv))) {
-	  sv_size(aTHX_ st, generic_thing, TRUE);
-      }
-      if ((generic_thing = (SV *)(GvGP(thing)->gp_egv))) {
-	  sv_size(aTHX_ st, generic_thing, TRUE);
-      }
-      if ((generic_thing = (SV *)(GvGP(thing)->gp_cv))) {
-	  sv_size(aTHX_ st, generic_thing, TRUE);
-      }
-    }
+	  st->total_size += sizeof(GP);
+	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_sv), TRUE);
+	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_form), TRUE);
+	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_av), TRUE);
+	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_hv), TRUE);
+	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_egv), TRUE);
+	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_cv), TRUE);
       }
     }
     TAG;break;
@@ -690,12 +659,8 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     st->total_size += sizeof(XPVFM);
     magic_size(thing, st);
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
-    if (check_new(st, CvPADLIST(thing))) {
-	sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
-    }
-    if (check_new(st, CvOUTSIDE(thing))) {
-	sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
-    }
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
 
     if (st->go_yell && !st->fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
@@ -713,15 +678,9 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name);
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name);
     /* Throw the GVs on the list to be walked if they're not-null */
-    if (((XPVIO *) SvANY(thing))->xio_top_gv) {
-	sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, TRUE);
-    }
-    if (((XPVIO *) SvANY(thing))->xio_bottom_gv) {
-	sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, TRUE);
-    }
-    if (((XPVIO *) SvANY(thing))->xio_fmt_gv) {
-	sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, TRUE);
-    }
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, TRUE);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, TRUE);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, TRUE);
 
     /* Only go trotting through the IO structures if they're really
        trottable. If USE_PERLIO is defined we can do this. If
@@ -734,6 +693,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   default:
     warn("Devel::Size: Unknown variable type: %d encountered\n", SvTYPE(thing) );
   }
+  return TRUE;
 }
 
 static struct state *
@@ -816,11 +776,8 @@ CODE:
   while (av_len(pending_array) >= 0) {
     thing = av_pop(pending_array);
     /* Process it if we've not seen it */
-    if (check_new(st, thing)) {
+    if (sv_size(aTHX_ st, thing, TRUE)) {
       dbg_printf(("# Found type %i at %p\n", SvTYPE(thing), thing));
-      /* Is it valid? */
-      if (thing) {
-    /* Yes, it is. So let's check the type */
     switch (SvTYPE(thing)) {
     /* fix for bug #24846 (Does not correctly recurse into references in a PVNV-type scalar) */
     case SVt_PVNV: TAG;
@@ -899,10 +856,7 @@ CODE:
       TAG;break;
     default:
       TAG;break;
-    }
       }
-      
-      sv_size(aTHX_ st, thing, TRUE);
     } else {
     /* check_new() returned false: */
 #ifdef DEVEL_SIZE_DEBUGGING

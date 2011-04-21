@@ -2,6 +2,8 @@ Revision history for Perl extension Devel::Size.
 
 0.74_51 2011-04-20 nicholas
  * Don't count PL_sv_{undef,no,yes} in the size returned
+ * total_size() was double-counting entries in typeglobs
+ * sv_size() was double-counting the PVGV size if GvEGV() looped back
 
 0.74_50 2011-04-19 nicholas
  * Ensure that size() doesn't add the referent's size for non SVt_RV references
