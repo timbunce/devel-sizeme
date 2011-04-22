@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More tests => 18;
+use Test::More tests => 17;
 use strict;
 use Devel::Size qw(size total_size);
 use Scalar::Util qw(weaken);
@@ -67,11 +67,6 @@ cmp_ok(total_size(\@ary1), '<', total_size(\@ary2),
 my($c1,$c2); $c2 = \$c1; $c1 = \$c2;
 
 is (total_size($c1), total_size($c2), 'circular references');
-
-#############################################################################
-# GLOBS
-
-cmp_ok(total_size(*foo), '>', 0, 'total_size(*foo) > 0');
 
 #############################################################################
 # CODE ref

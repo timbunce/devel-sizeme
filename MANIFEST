@@ -8,6 +8,7 @@ README
 Size.xs
 ppport.h
 t/basic.t
+t/globs.t
 t/pod.t
 t/pod_cov.t
 t/recurse.t
