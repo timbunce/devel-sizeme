@@ -419,6 +419,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	  TAG;break;
 	case OPc_PVOP: TAG;
 	    check_new_and_strlen(st, cPVOPx(baseop)->op_pv);
+	    TAG;break;
 	case OPc_LOOP: TAG;
 	    st->total_size += sizeof(struct loop);
 	    op_size(aTHX_ cLOOPx(baseop)->op_first, st);

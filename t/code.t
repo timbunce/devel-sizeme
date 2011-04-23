@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 10;
+use Test::More tests => 12;
 use Devel::Size ':all';
 
 sub zwapp;
@@ -40,3 +40,8 @@ cmp_ok($anon_proto_size, '>', $anon_size + length prototype $anon_proto,
     cmp_ok($aelemfast, '>', $aelemfast_lex,
 	   'aelemfast for a package variable is larger');
 }
+
+my $short_pvop = total_size(sub {goto GLIT});
+my $long_pvop = total_size(sub {goto KREEK_KREEK_CLANK_CLANK});
+cmp_ok($short_pvop, '>', $anon_size, 'OPc_PVOP can be measured');
+is($long_pvop, $short_pvop + 19, 'the only size difference is the label length');
