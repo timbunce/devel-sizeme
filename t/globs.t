@@ -99,11 +99,11 @@ sub gv_grew {
     cmp_ok($new_thing_size, '>', 0, "For $type, new item has a size");
 
     is($cv_now_size, $cv_was_size,
-       "Under multiplicity, the optree doesn't directly close onto a GV, so CVs won't change size")
-	    if $Config{usemultiplicity};
+       "Under ithreads, the optree doesn't directly close onto a GV, so CVs won't change size")
+	    if $Config{useithreads};
     if ($] < 5.010 && $type eq 'SCALAR') {
 	is($cv_now_size, $cv_was_size, "CV doesn't grow as GV has SCALAR")
-	    unless $Config{usemultiplicity};
+	    unless $Config{useithreads};
 	is($io_now_size, $io_was_size, "IO doesn't grow as GV has SCALAR");
 	is($gv_now_size, $gv_was_size, 'GV size unchanged as GV has SCALAR');
 	is($gv_now_total_size, $gv_was_total_size,
@@ -112,7 +112,7 @@ sub gv_grew {
 	# CV like things (effectively) close back over their typeglob, so its
 	# hard to just get the size of the CV.
 	cmp_ok($cv_now_size, '>', $cv_was_size, "CV grew for $type")
-	    unless $Config{usemultiplicity};
+	    unless $Config{useithreads};
 	cmp_ok($io_now_size, '>', $io_was_size, "IO grew for $type");
 	# Assigning CVs and FORMATs to typeglobs causes the typeglob to get
 	# weak reference magic
@@ -122,7 +122,7 @@ sub gv_grew {
     } else {
 	is($cv_now_size, $cv_was_size + $new_thing_size,
 	   "CV grew by expected amount for $type")
-	    	    unless $Config{usemultiplicity};
+	    	    unless $Config{useithreads};
 	is($io_now_size, $io_was_size + $new_thing_size,
 	   "IO total_size grew by expected amount for $type");
 	is($gv_now_size, $gv_was_size + $new_thing_size,
