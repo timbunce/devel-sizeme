@@ -845,27 +845,6 @@ CODE:
       }
       TAG;break;
 
-    case SVt_PVGV: TAG;
-      dbg_printf(("# Found type GV\n"));
-      if(!isGV_with_GP(thing))
-	  break;
-      /* Run through all the pieces and push the ones with bits */
-      if (GvSV(thing)) {
-        av_push(pending_array, (SV *)GvSV(thing));
-      }
-      if (GvFORM(thing)) {
-        av_push(pending_array, (SV *)GvFORM(thing));
-      }
-      if (GvAV(thing)) {
-        av_push(pending_array, (SV *)GvAV(thing));
-      }
-      if (GvHV(thing)) {
-        av_push(pending_array, (SV *)GvHV(thing));
-      }
-      if (GvCV(thing)) {
-        av_push(pending_array, (SV *)GvCV(thing));
-      }
-      TAG;break;
     default:
       TAG;break;
       }
