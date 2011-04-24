@@ -590,6 +590,13 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
       /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
       st->total_size += sizeof(SV *) * (AvMAX(thing) + 1);
       dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
+
+      if (recurse >= TOTAL_SIZE_RECURSION) {
+	  SSize_t i = AvFILLp(thing) + 1;
+
+	  while (i--)
+	      sv_size(aTHX_ st, AvARRAY(thing)[i], recurse);
+      }
     }
     /* Add in the bits on the other side of the beginning */
 
@@ -645,7 +652,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     sv_size(aTHX_ st, (SV *)CvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvGV(thing), SOME_RECURSION);
-    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), recurse);
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
     if (CvISXSUB(thing)) {
 	sv_size(aTHX_ st, cv_const_sv((CV *)thing), recurse);
@@ -680,7 +687,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     st->total_size += sizeof(XPVFM);
     magic_size(thing, st);
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
-    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), recurse);
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
 
     if (st->go_yell && !st->fm_whine) {
@@ -818,32 +825,6 @@ CODE:
              av_push(pending_array, SvRV(thing));
           }
           TAG;break;
-
-    case SVt_PVAV: TAG;
-      {
-        AV *tempAV = (AV *)thing;
-        SV **tempSV;
-
-        dbg_printf(("# Found type AV\n"));
-        /* Quick alias to cut down on casting */
-        
-        /* Any elements? */
-        if (av_len(tempAV) != -1) {
-          IV index;
-          /* Run through them all */
-          for (index = 0; index <= av_len(tempAV); index++) {
-        /* Did we get something? */
-        if ((tempSV = av_fetch(tempAV, index, 0))) {
-          /* Was it undef? */
-          if (*tempSV != &PL_sv_undef) {
-            /* Apparently not. Save it for later */
-            av_push(pending_array, *tempSV);
-          }
-        }
-          }
-        }
-      }
-      TAG;break;
 
     default:
       TAG;break;
