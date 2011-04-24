@@ -642,22 +642,22 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PVGV: TAG;
     magic_size(thing, st);
     st->total_size += sizeof(XPVGV);
-    st->total_size += GvNAMELEN(thing);
+    if(isGV_with_GP(thing)) {
+	st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
-    /* Is there a file? */
-    check_new_and_strlen(st, GvFILE(thing));
+	/* Is there a file? */
+	check_new_and_strlen(st, GvFILE(thing));
 #endif
-    /* Is there something hanging off the glob? */
-    if (GvGP(thing)) {
-      if (check_new(st, GvGP(thing))) {
-	  st->total_size += sizeof(GP);
-	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_sv), TRUE);
-	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_form), TRUE);
-	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_av), TRUE);
-	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_hv), TRUE);
-	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_egv), TRUE);
-	  sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_cv), TRUE);
-      }
+	/* Is there something hanging off the glob? */
+	if (check_new(st, GvGP(thing))) {
+	    st->total_size += sizeof(GP);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_sv), TRUE);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_form), TRUE);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_av), TRUE);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_hv), TRUE);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_egv), TRUE);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_cv), TRUE);
+	}
     }
     TAG;break;
   case SVt_PVFM: TAG;
@@ -842,6 +842,8 @@ CODE:
      
     case SVt_PVGV: TAG;
       dbg_printf(("# Found type GV\n"));
+      if(!isGV_with_GP(thing))
+	  break;
       /* Run through all the pieces and push the ones with bits */
       if (GvSV(thing)) {
         av_push(pending_array, (SV *)GvSV(thing));

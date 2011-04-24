@@ -12,5 +12,6 @@ t/code.t
 t/globs.t
 t/pod.t
 t/pod_cov.t
+t/pvbm.t
 t/recurse.t
 t/warnings.t        A rather exhaustive test for the non-exceptional warnings

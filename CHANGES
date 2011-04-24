@@ -3,6 +3,7 @@ Revision history for Perl extension Devel::Size.
 0.74_52 2011-04-23 nicholas
  * Fix potential SEGVs for OP_AELEMFAST on a lexical (eg $foo[3])
  * Fix likely SEGVs for PVOPs (missing break)
+ * Fix potential SEGVs for PVBMs on 5.10 and later
 
 0.74_51 2011-04-22 nicholas
  * Don't count PL_sv_{undef,no,yes} in the size returned
