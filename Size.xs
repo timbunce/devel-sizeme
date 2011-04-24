@@ -750,6 +750,8 @@ PROTOTYPES: DISABLE
 UV
 size(orig_thing)
      SV *orig_thing
+ALIAS:
+    total_size = TOTAL_SIZE_RECURSION
 CODE:
 {
   SV *thing = orig_thing;
@@ -767,81 +769,9 @@ CODE:
   }
 #endif
 
-  sv_size(aTHX_ st, thing, NO_RECURSION);
+  sv_size(aTHX_ st, thing, ix);
   RETVAL = st->total_size;
   free_state(st);
 }
 OUTPUT:
   RETVAL
-
-
-UV
-total_size(orig_thing)
-       SV *orig_thing
-CODE:
-{
-  SV *thing = orig_thing;
-  /* Array with things we still need to do */
-  AV *pending_array;
-  IV size = 0;
-  struct state *st = new_state(aTHX);
-
-  /* Size starts at zero */
-  RETVAL = 0;
-
-  pending_array = newAV();
-
-  /* If they passed us a reference then dereference it.
-     This is the only way we can check the sizes of arrays and hashes. */
-  if (SvROK(thing)) {
-      thing = SvRV(thing);
-  } 
-
-  /* Put it on the pending array */
-  av_push(pending_array, thing);
-
-  /* Now just yank things off the end of the array until it's done */
-  while (av_len(pending_array) >= 0) {
-    thing = av_pop(pending_array);
-    /* Process it if we've not seen it */
-    if (sv_size(aTHX_ st, thing, TOTAL_SIZE_RECURSION)) {
-      dbg_printf(("# Found type %i at %p\n", SvTYPE(thing), thing));
-    switch (SvTYPE(thing)) {
-    /* fix for bug #24846 (Does not correctly recurse into references in a PVNV-type scalar) */
-    case SVt_PVNV: TAG;
-      if (SvROK(thing))
-        {
-        av_push(pending_array, SvRV(thing));
-        } 
-      TAG;break;
-#if (PERL_VERSION < 11)
-        case SVt_RV: TAG;
-#else
-        case SVt_IV: TAG;
-#endif
-             dbg_printf(("# Found RV\n"));
-          if (SvROK(thing)) {
-             dbg_printf(("# Found RV\n"));
-             av_push(pending_array, SvRV(thing));
-          }
-          TAG;break;
-
-    default:
-      TAG;break;
-      }
-    } else {
-    /* check_new() returned false: */
-#ifdef DEVEL_SIZE_DEBUGGING
-       if (SvOK(sv)) printf("# Ignore ref copy 0x%x\n", sv);
-       else printf("# Ignore non-sv 0x%x\n", sv);
-#endif
-    }
-  } /* end while */
-
-  RETVAL = st->total_size;
-  free_state(st);
-  SvREFCNT_dec(pending_array);
-}
-OUTPUT:
-  RETVAL
-
