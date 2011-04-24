@@ -21,7 +21,7 @@ my %types = (
     PVMG => do { my $a = $!; $a = "Bang!"; $a },
 );
 
-plan(tests => 16 + 4 *12 + 2 * scalar keys %types);
+plan(tests => 20 + 4 * 12 + 2 * scalar keys %types);
 
 #############################################################################
 # verify that pointer sizes in array slots are sensible:
@@ -282,3 +282,13 @@ sub cmp_array_ro {
 	       "Type $type, total_size() recurses to the referent");
     }
 }
+
+{
+    my $sub_size = total_size(\&cmp_array_ro);
+    cmp_ok($sub_size, '>=', 5120, 'subroutine is at least 5K');
+    cmp_ok($sub_size, '<=', 51200, 'subroutine is no more than 50K')
+	or diag 'Is total_size() dragging in the entire symbol table?';
+    cmp_ok(total_size(\%::), '>=', 10240, 'symbol table is at least 100K');
+}
+
+cmp_ok(total_size(\%Exporter::), '>', total_size(\%Exporter::Heavy::));

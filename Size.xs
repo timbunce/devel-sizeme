@@ -160,7 +160,21 @@ free_state(struct state *st)
     Safefree(st);
 }
 
-static bool sv_size(pTHX_ struct state *, const SV *const, bool recurse);
+/* For now, this is somewhat a compatibility bodge until the plan comes
+   together for fine grained recursion control. total_size() would recurse into
+   hash and array members, whereas sv_size() would not. However, sv_size() is
+   called with CvSTASH() of a CV, which means that if it (also) starts to
+   recurse fully, then the size of any CV now becomes the size of the entire
+   symbol table reachable from it, and potentially the entire symbol table, if
+   any subroutine makes a reference to a global (such as %SIG). The historical
+   implementation of total_size() didn't report "everything", and changing the
+   only available size to "everything" doesn't feel at all useful.  */
+
+#define NO_RECURSION 0
+#define SOME_RECURSION 1
+#define TOTAL_SIZE_RECURSION 2
+
+static bool sv_size(pTHX_ struct state *, const SV *const, const int recurse);
 
 typedef enum {
     OPc_NULL,   /* 0 */
@@ -411,7 +425,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	    if (!(baseop->op_type == OP_AELEMFAST
 		  && baseop->op_flags & OPf_SPECIAL)) {
 		/* not an OP_PADAV replacement */
-		sv_size(aTHX_ st, cSVOPx(baseop)->op_sv, TRUE);
+		sv_size(aTHX_ st, cSVOPx(baseop)->op_sv, SOME_RECURSION);
 	    }
 	    TAG;break;
       case OPc_PADOP: TAG;
@@ -448,8 +462,8 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
           check_new_and_strlen(st, basecop->cop_file);
           check_new_and_strlen(st, basecop->cop_stashpv);
 #else
-	  sv_size(aTHX_ st, (SV *)basecop->cop_stash, TRUE);
-	  sv_size(aTHX_ st, (SV *)basecop->cop_filegv, TRUE);
+	  sv_size(aTHX_ st, (SV *)basecop->cop_stash, SOME_RECURSION);
+	  sv_size(aTHX_ st, (SV *)basecop->cop_filegv, SOME_RECURSION);
 #endif
 
         }
@@ -470,7 +484,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 
 static bool
 sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
-	const bool recurse) {
+	const int recurse) {
   const SV *thing = orig_thing;
 
   if(!check_new(st, thing))
@@ -493,7 +507,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 #  endif
 #endif
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     TAG;break;
     /* Is it a float? Like the int, it depends on purify */
   case SVt_NV: TAG;
@@ -510,7 +524,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     st->total_size += sizeof(XRV);
 #endif
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     TAG;break;
 #endif
     /* How about a plain string? In which case we need to add in how
@@ -518,7 +532,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PV: TAG;
     st->total_size += sizeof(XPV);
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
     TAG;break;
@@ -526,7 +540,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PVIV: TAG;
     st->total_size += sizeof(XPVIV);
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
     if(SvOOK(thing)) {
@@ -537,14 +551,14 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PVNV: TAG;
     st->total_size += sizeof(XPVNV);
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
     TAG;break;
   case SVt_PVMG: TAG;
     st->total_size += sizeof(XPVMG);
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
     magic_size(thing, st);
@@ -553,7 +567,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PVBM: TAG;
     st->total_size += sizeof(XPVBM);
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
     magic_size(thing, st);
@@ -562,7 +576,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PVLV: TAG;
     st->total_size += sizeof(XPVLV);
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), TRUE);
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
     magic_size(thing, st);
@@ -592,7 +606,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
        Post 5.9.something this is stored in magic, so will be found there,
        and Perl_av_arylen_p() takes a non-const AV*, hence compilers rightly
        complain about AvARYLEN() passing thing to it.  */
-    sv_size(aTHX_ st, AvARYLEN(thing), TRUE);
+    sv_size(aTHX_ st, AvARYLEN(thing), recurse);
 #endif
     magic_size(thing, st);
     TAG;break;
@@ -615,6 +629,8 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
               st->total_size += HEK_BASESIZE + cur_entry->hent_hek->hek_len + 2;
             }
           }
+	  if (recurse >= TOTAL_SIZE_RECURSION)
+	      sv_size(aTHX_ st, HeVAL(cur_entry), recurse);
           cur_entry = cur_entry->hent_next;
         }
       }
@@ -626,13 +642,13 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     magic_size(thing, st);
 
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
-    sv_size(aTHX_ st, (SV *)CvSTASH(thing), TRUE);
-    sv_size(aTHX_ st, (SV *)SvSTASH(thing), TRUE);
-    sv_size(aTHX_ st, (SV *)CvGV(thing), TRUE);
-    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
-    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)CvSTASH(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, (SV *)SvSTASH(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, (SV *)CvGV(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), recurse);
+    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
     if (CvISXSUB(thing)) {
-	sv_size(aTHX_ st, cv_const_sv((CV *)thing), TRUE);
+	sv_size(aTHX_ st, cv_const_sv((CV *)thing), recurse);
     } else {
 	op_size(aTHX_ CvSTART(thing), st);
 	op_size(aTHX_ CvROOT(thing), st);
@@ -651,12 +667,12 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	/* Is there something hanging off the glob? */
 	if (check_new(st, GvGP(thing))) {
 	    st->total_size += sizeof(GP);
-	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_sv), TRUE);
-	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_form), TRUE);
-	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_av), TRUE);
-	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_hv), TRUE);
-	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_egv), TRUE);
-	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_cv), TRUE);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_sv), recurse);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_form), recurse);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_av), recurse);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_hv), recurse);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_egv), recurse);
+	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_cv), recurse);
 	}
     }
     TAG;break;
@@ -664,8 +680,8 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     st->total_size += sizeof(XPVFM);
     magic_size(thing, st);
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
-    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), TRUE);
-    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), TRUE);
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), recurse);
+    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
 
     if (st->go_yell && !st->fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
@@ -683,9 +699,9 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name);
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name);
     /* Throw the GVs on the list to be walked if they're not-null */
-    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, TRUE);
-    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, TRUE);
-    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, TRUE);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, recurse);
 
     /* Only go trotting through the IO structures if they're really
        trottable. If USE_PERLIO is defined we can do this. If
@@ -744,7 +760,7 @@ CODE:
   }
 #endif
 
-  sv_size(aTHX_ st, thing, FALSE);
+  sv_size(aTHX_ st, thing, NO_RECURSION);
   RETVAL = st->total_size;
   free_state(st);
 }
@@ -781,7 +797,7 @@ CODE:
   while (av_len(pending_array) >= 0) {
     thing = av_pop(pending_array);
     /* Process it if we've not seen it */
-    if (sv_size(aTHX_ st, thing, TRUE)) {
+    if (sv_size(aTHX_ st, thing, TOTAL_SIZE_RECURSION)) {
       dbg_printf(("# Found type %i at %p\n", SvTYPE(thing), thing));
     switch (SvTYPE(thing)) {
     /* fix for bug #24846 (Does not correctly recurse into references in a PVNV-type scalar) */
@@ -829,17 +845,6 @@ CODE:
       }
       TAG;break;
 
-    case SVt_PVHV: TAG;
-      dbg_printf(("# Found type HV\n"));
-      /* Is there anything in here? */
-      if (hv_iterinit((HV *)thing)) {
-        HE *temp_he;
-        while ((temp_he = hv_iternext((HV *)thing))) {
-          av_push(pending_array, hv_iterval((HV *)thing, temp_he));
-        }
-      }
-      TAG;break;
-     
     case SVt_PVGV: TAG;
       dbg_printf(("# Found type GV\n"));
       if(!isGV_with_GP(thing))
