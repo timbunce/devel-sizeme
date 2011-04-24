@@ -759,15 +759,9 @@ CODE:
   
   /* If they passed us a reference then dereference it. This is the
      only way we can check the sizes of arrays and hashes */
-#if (PERL_VERSION < 11)
-  if (SvOK(thing) && SvROK(thing)) {
-    thing = SvRV(thing);
-  }
-#else
   if (SvROK(thing)) {
     thing = SvRV(thing);
   }
-#endif
 
   sv_size(aTHX_ st, thing, ix);
   RETVAL = st->total_size;
