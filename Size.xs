@@ -667,8 +667,16 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     if(isGV_with_GP(thing)) {
 	st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
-	/* Is there a file? */
+#  if !defined(USE_ITHREADS) || (PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 8))
+	/* With itreads, before 5.8.9, this can end up pointing to freed memory
+	   if the GV was created in an eval, as GvFILE() points to CopFILE(),
+	   and the relevant COP has been freed on scope cleanup after the eval.
+	   5.8.9 adds a binary compatible fudge that catches the vast majority
+	   of cases. 5.9.something added a proper fix, by converting the GP to
+	   use a shared hash key (porperly reference counted), instead of a
+	   char * (owned by who knows? possibly no-one now) */
 	check_new_and_strlen(st, GvFILE(thing));
+#  endif
 #endif
 	/* Is there something hanging off the glob? */
 	if (check_new(st, GvGP(thing))) {
