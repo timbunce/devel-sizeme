@@ -30,13 +30,16 @@ cmp_ok(length prototype $anon_proto, '>', 0, 'prototype has a length');
 cmp_ok($anon_proto_size, '>', $anon_size + length prototype $anon_proto,
        'prototypes add to the size');
 
-{
+SKIP: {
     use vars '@b';
     my $aelemfast_lex = total_size(sub {my @a; $a[0]});
     my $aelemfast = total_size(sub {my @a; $b[0]});
 
+    # This one is sane even before Dave's lexical aelemfast changes:
     cmp_ok($aelemfast_lex, '>', $anon_size,
 	   'aelemfast for a lexical is handled correctly');
+    skip('alemfast was extended to lexicals after this perl was released', 1)
+      if $] < 5.008004;
     cmp_ok($aelemfast, '>', $aelemfast_lex,
 	   'aelemfast for a package variable is larger');
 }
