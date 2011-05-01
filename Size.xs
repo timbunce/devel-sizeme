@@ -78,7 +78,7 @@ check_new(struct state *st, const void *const p) {
        (and hence hot in the cache) but we can still deal with any unaligned
        pointers.  */
     const size_t cooked_p
-	= (raw_p >> ALIGN_BITS) | (raw_p << (bits - BYTE_BITS));
+	= (raw_p >> ALIGN_BITS) | (raw_p << (bits - ALIGN_BITS));
     const U8 this_bit = 1 << (cooked_p & 0x7);
     U8 **leaf_p;
     U8 *leaf;

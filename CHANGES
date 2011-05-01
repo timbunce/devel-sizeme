@@ -1,5 +1,11 @@
 Revision history for Perl extension Devel::Size.
 
+0.74_53 2011-05-01 nicholas
+ * Fix typo error in bit-vector tracking mechanism. On 64 bit platforms which
+   allocate on 8 byte alignment (rather than 16), a low pointer bit could get
+   lost, resulting in new pointers being considered already "seen".
+   "Found" by BinGOs' smoker, fixed on spectre.mongueurs.net. Thanks.
+
 0.74_52 2011-04-23 nicholas
  * Fix potential SEGVs for OP_AELEMFAST on a lexical (eg $foo[3])
  * Fix likely SEGVs for PVOPs (missing break)
