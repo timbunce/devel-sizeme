@@ -46,7 +46,6 @@
    without excessive memory needs. The assumption is that your CPU cache
    works :-) (And that we're not going to bust it)  */
 
-#define ALIGN_BITS  ( sizeof(void*) >> 1 )
 #define BYTE_BITS    3
 #define LEAF_BITS   (16 - BYTE_BITS)
 #define LEAF_MASK   0x1FFF
