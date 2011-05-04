@@ -5,7 +5,7 @@ use strict;
 
 use Config;
 (unpack "B*", pack "N", $Config{ptrsize}) =~ /^0+1(0+)$/
-  or die "Your pointer size of $Config{ptrsize} is very confusing";
+    or die "Your pointer size of $Config{ptrsize} is very confusing";
 my $ptr_bits = length $1;
 
 my $svh = "$Config{archlibexp}/CORE/perl.h";
@@ -43,10 +43,10 @@ EOT
 close FH or die "Error closing $vtable_file: $!";
 
 WriteMakefile(
-  NAME => 'Devel::Size',
-  VERSION_FROM => 'lib/Devel/Size.pm',
-  DEFINE => "-DALIGN_BITS=$ptr_bits",
-  ($ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.008') : ()),
-  ($ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
-  realclean => {FILES=> $vtable_file},
+	      NAME => 'Devel::Size',
+	      VERSION_FROM => 'lib/Devel/Size.pm',
+	      DEFINE => "-DALIGN_BITS=$ptr_bits",
+	      ($ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.008') : ()),
+	      ($ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
+	      realclean => {FILES=> $vtable_file},
 );
