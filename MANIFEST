@@ -10,6 +10,7 @@ ppport.h
 t/basic.t
 t/code.t
 t/globs.t
+t/magic.t
 t/pod.t
 t/pod_cov.t
 t/pvbm.t
