@@ -731,11 +731,18 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   return TRUE;
 }
 
+void *vtables[] = {
+#include "vtables.inc"
+    NULL
+};
+
 static struct state *
 new_state(pTHX)
 {
     SV *warn_flag;
     struct state *st;
+    void **vt_p = vtables;
+
     Newxz(st, 1, struct state);
     st->go_yell = TRUE;
     if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
@@ -747,6 +754,8 @@ new_state(pTHX)
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
+    while(*vt_p)
+	check_new(st, *vt_p++);
     return st;
 }
 
