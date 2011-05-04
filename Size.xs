@@ -312,18 +312,9 @@ cc_opclass(const OP * const o)
    size */
 static void
 magic_size(pTHX_ const SV * const thing, struct state *st) {
-  MAGIC *magic_pointer;
+  MAGIC *magic_pointer = SvMAGIC(thing);
 
-  /* Is there any? */
-  if (!SvMAGIC(thing)) {
-    /* No, bail */
-    return;
-  }
-
-  /* Get the base magic pointer */
-  magic_pointer = SvMAGIC(thing);
-
-  /* Have we seen the magic pointer? */
+  /* Have we seen the magic pointer?  (NULL has always been seen before)  */
   while (check_new(st, magic_pointer)) {
     st->total_size += sizeof(MAGIC);
 
