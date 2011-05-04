@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 18;
 use Devel::Size ':all';
 require Tie::Scalar;
 
@@ -49,4 +49,24 @@ require Tie::Scalar;
     ${tied $string} = 'X' x 1024;
     cmp_ok(total_size($string), '>', $after_size + 1024,
 	   'the magic object is counted');
+}
+
+SKIP: {
+    skip("v-strings didn't use magic before 5.8.1", 2) if $] < 5.008001;
+    my $v = eval 'v' . (0 x 1024);
+    is($v, "\0", 'v-string is \0');
+    cmp_ok(total_size($v), '>', 1024, 'total_size follows MG_PTR');
+}
+
+SKIP: {
+    skip("no UTF-8 caching before 5.8.1", 5) if $] < 5.008001;
+    my $string = "a\x{100}b";
+    my $before_size = total_size($string);
+    cmp_ok($before_size, '>', 0, 'Our string has a non-zero length');
+    is(length $string, 3, 'length is sane');
+    my $with_magic = total_size($string);
+    cmp_ok($with_magic, '>', $before_size, 'UTF-8 caching fired and counted');
+    is(index($string, "b"), 2, 'b is where we expect it');
+    cmp_ok(total_size($string), '>', $with_magic,
+	   'UTF-8 caching length table now present');
 }

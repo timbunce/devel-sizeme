@@ -2,7 +2,7 @@ Revision history for Perl extension Devel::Size.
 
 0.75_50 2011-05-04 nicholas
  * The core's magic vtables are global constants, so aren't part of the size.
- * Follow mg_obj
+ * Follow mg_obj and mg_ptr.
 
 0.75 2011-05-04 nicholas
  [no changes]

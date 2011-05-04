@@ -333,6 +333,21 @@ magic_size(pTHX_ const SV * const thing, struct state *st) {
           st->total_size += sizeof(MGVTBL);
         }
 	sv_size(aTHX_ st, magic_pointer->mg_obj, TOTAL_SIZE_RECURSION);
+	if (magic_pointer->mg_len == HEf_SVKEY) {
+	    sv_size(aTHX_ st, (SV *)magic_pointer->mg_ptr, TOTAL_SIZE_RECURSION);
+	}
+#if defined(PERL_MAGIC_utf8) && defined (PERL_MAGIC_UTF8_CACHESIZE)
+	else if (magic_pointer->mg_type == PERL_MAGIC_utf8) {
+	    if (check_new(st, magic_pointer->mg_ptr)) {
+		st->total_size += PERL_MAGIC_UTF8_CACHESIZE * 2 * sizeof(STRLEN);
+	    }
+	}
+#endif
+	else if (magic_pointer->mg_len > 0) {
+	    if (check_new(st, magic_pointer->mg_ptr)) {
+		st->total_size += magic_pointer->mg_len;
+	    }
+	}
 
         /* Get the next in the chain */
         magic_pointer = magic_pointer->mg_moremagic;
