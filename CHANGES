@@ -1,7 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
 0.75_50 2011-05-04 nicholas
- * The cores vtables are global and const, so don't count towards the size.
+ * The core's magic vtables are global constants, so aren't part of the size.
+ * Follow mg_obj
 
 0.75 2011-05-04 nicholas
  [no changes]
