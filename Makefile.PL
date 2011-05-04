@@ -46,7 +46,7 @@ WriteMakefile(
 	      NAME => 'Devel::Size',
 	      VERSION_FROM => 'lib/Devel/Size.pm',
 	      DEFINE => "-DALIGN_BITS=$ptr_bits",
-	      ($ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.008') : ()),
-	      ($ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
+	      (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.008') : ()),
+	      (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
 	      realclean => {FILES=> $vtable_file},
 );
