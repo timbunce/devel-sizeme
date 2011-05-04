@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.75 2011-05-04 nicholas
+ [no changes]
+
 0.74_53 2011-05-01 nicholas
  * Fix typo error in bit-vector tracking mechanism. On 64 bit platforms which
    allocate on 8 byte alignment (rather than 16), a low pointer bit could get
