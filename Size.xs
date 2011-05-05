@@ -498,6 +498,10 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 
   st->total_size += sizeof(SV);
 
+  if (SvTYPE(thing) >= SVt_PVMG) {
+      magic_size(aTHX_ thing, st);
+  }
+
   switch (SvTYPE(thing)) {
     /* Is it undef? */
   case SVt_NULL: TAG;
@@ -567,7 +571,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
-    magic_size(aTHX_ thing, st);
     TAG;break;
 #if PERL_VERSION <= 8
   case SVt_PVBM: TAG;
@@ -576,7 +579,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
-    magic_size(aTHX_ thing, st);
     TAG;break;
 #endif
   case SVt_PVLV: TAG;
@@ -585,7 +587,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     else
 	st->total_size += SvLEN(thing);
-    magic_size(aTHX_ thing, st);
     TAG;break;
     /* How much space is dedicated to the array? Not counting the
        elements in the array, mind, just the array itself */
@@ -621,7 +622,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
        complain about AvARYLEN() passing thing to it.  */
     sv_size(aTHX_ st, AvARYLEN(thing), recurse);
 #endif
-    magic_size(aTHX_ thing, st);
     TAG;break;
   case SVt_PVHV: TAG;
     /* First the base struct */
@@ -648,11 +648,9 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
         }
       }
     }
-    magic_size(aTHX_ thing, st);
     TAG;break;
   case SVt_PVCV: TAG;
     st->total_size += sizeof(XPVCV);
-    magic_size(aTHX_ thing, st);
 
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     sv_size(aTHX_ st, (SV *)CvSTASH(thing), SOME_RECURSION);
@@ -669,7 +667,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 
     TAG;break;
   case SVt_PVGV: TAG;
-    magic_size(aTHX_ thing, st);
     st->total_size += sizeof(XPVGV);
     if(isGV_with_GP(thing)) {
 	st->total_size += GvNAMELEN(thing);
@@ -699,7 +696,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     TAG;break;
   case SVt_PVFM: TAG;
     st->total_size += sizeof(XPVFM);
-    magic_size(aTHX_ thing, st);
     st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     sv_size(aTHX_ st, (SV *)CvPADLIST(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
@@ -711,7 +707,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     TAG;break;
   case SVt_PVIO: TAG;
     st->total_size += sizeof(XPVIO);
-    magic_size(aTHX_ thing, st);
     if (check_new(st, (SvPVX_const(thing)))) {
       st->total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
     }
