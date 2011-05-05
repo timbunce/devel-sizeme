@@ -537,59 +537,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     TAG;break;
 #endif
-    /* How about a plain string? In which case we need to add in how
-       much has been allocated */
-  case SVt_PV: TAG;
-    st->total_size += sizeof(XPV);
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    else
-	st->total_size += SvLEN(thing);
-    TAG;break;
-    /* A string with an integer part? */
-  case SVt_PVIV: TAG;
-    st->total_size += sizeof(XPVIV);
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    else
-	st->total_size += SvLEN(thing);
-    if(SvOOK(thing)) {
-        st->total_size += SvIVX(thing);
-    }
-    TAG;break;
-    /* A scalar/string/reference with a float part? */
-  case SVt_PVNV: TAG;
-    st->total_size += sizeof(XPVNV);
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    else
-	st->total_size += SvLEN(thing);
-    TAG;break;
-  case SVt_PVMG: TAG;
-    st->total_size += sizeof(XPVMG);
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    else
-	st->total_size += SvLEN(thing);
-    TAG;break;
-#if PERL_VERSION <= 8
-  case SVt_PVBM: TAG;
-    st->total_size += sizeof(XPVBM);
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    else
-	st->total_size += SvLEN(thing);
-    TAG;break;
-#endif
-  case SVt_PVLV: TAG;
-    st->total_size += sizeof(XPVLV);
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    else
-	st->total_size += SvLEN(thing);
-    TAG;break;
-    /* How much space is dedicated to the array? Not counting the
-       elements in the array, mind, just the array itself */
+
   case SVt_PVAV: TAG;
     st->total_size += sizeof(XPVAV);
     /* Is there anything in the array? */
@@ -649,10 +597,22 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
       }
     }
     TAG;break;
+
+
+  case SVt_PVFM: TAG;
+    st->total_size += sizeof(XPVFM);
+    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
+
+    if (st->go_yell && !st->fm_whine) {
+      carp("Devel::Size: Calculated sizes for FMs are incomplete");
+      st->fm_whine = 1;
+    }
+    goto freescalar;
+
   case SVt_PVCV: TAG;
     st->total_size += sizeof(XPVCV);
 
-    st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
     sv_size(aTHX_ st, (SV *)CvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvGV(thing), SOME_RECURSION);
@@ -664,10 +624,47 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	op_size(aTHX_ CvSTART(thing), st);
 	op_size(aTHX_ CvROOT(thing), st);
     }
+    goto freescalar;
 
-    TAG;break;
+  case SVt_PVIO: TAG;
+    st->total_size += sizeof(XPVIO);
+    /* Some embedded char pointers */
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name);
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name);
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name);
+    /* Throw the GVs on the list to be walked if they're not-null */
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
+    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, recurse);
+
+    /* Only go trotting through the IO structures if they're really
+       trottable. If USE_PERLIO is defined we can do this. If
+       not... we can't, so we don't even try */
+#ifdef USE_PERLIO
+    /* Dig into xio_ifp and xio_ofp here */
+    warn("Devel::Size: Can't size up perlio layers yet\n");
+#endif
+    goto freescalar;
+
+#if PERL_VERSION <= 8
+  case SVt_PVBM: TAG;
+    st->total_size += sizeof(XPVBM);
+    goto freescalar;
+#endif
+
+  case SVt_PVLV: TAG;
+    st->total_size += sizeof(XPVLV);
+#if (PERL_VERSION < 9)
+    goto freescalar;
+#else
+    goto donegv;
+#endif
+
   case SVt_PVGV: TAG;
     st->total_size += sizeof(XPVGV);
+#if (PERL_VERSION >= 9)
+  donegv:
+#endif
     if(isGV_with_GP(thing)) {
 	st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
@@ -692,41 +689,38 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_egv), recurse);
 	    sv_size(aTHX_ st, (SV *)(GvGP(thing)->gp_cv), recurse);
 	}
-    }
-    TAG;break;
-  case SVt_PVFM: TAG;
-    st->total_size += sizeof(XPVFM);
-    st->total_size += ((XPVIO *) SvANY(thing))->xpv_len;
-    sv_size(aTHX_ st, (SV *)CvPADLIST(thing), SOME_RECURSION);
-    sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
-
-    if (st->go_yell && !st->fm_whine) {
-      carp("Devel::Size: Calculated sizes for FMs are incomplete");
-      st->fm_whine = 1;
-    }
-    TAG;break;
-  case SVt_PVIO: TAG;
-    st->total_size += sizeof(XPVIO);
-    if (check_new(st, (SvPVX_const(thing)))) {
-      st->total_size += ((XPVIO *) SvANY(thing))->xpv_cur;
-    }
-    /* Some embedded char pointers */
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name);
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name);
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name);
-    /* Throw the GVs on the list to be walked if they're not-null */
-    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
-    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
-    sv_size(aTHX_ st, (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, recurse);
-
-    /* Only go trotting through the IO structures if they're really
-       trottable. If USE_PERLIO is defined we can do this. If
-       not... we can't, so we don't even try */
-#ifdef USE_PERLIO
-    /* Dig into xio_ifp and xio_ofp here */
-    warn("Devel::Size: Can't size up perlio layers yet\n");
+#if (PERL_VERSION >= 9)
+	TAG; break;
 #endif
+    }
+    goto freescalar;
+
+  case SVt_PVMG: TAG;
+    st->total_size += sizeof(XPVMG);
+    goto freescalar;
+
+  case SVt_PVNV: TAG;
+    st->total_size += sizeof(XPVNV);
+    goto freescalar;
+
+  case SVt_PVIV: TAG;
+    st->total_size += sizeof(XPVIV);
+    goto freescalar;
+
+  case SVt_PV: TAG;
+    st->total_size += sizeof(XPV);
+
+  freescalar:
+    if(recurse && SvROK(thing))
+	sv_size(aTHX_ st, SvRV_const(thing), recurse);
+    else
+	st->total_size += SvLEN(thing);
+
+    if(SvOOK(thing)) {
+        st->total_size += SvIVX(thing);
+    }
     TAG;break;
+
   default:
     warn("Devel::Size: Unknown variable type: %d encountered\n", SvTYPE(thing) );
   }

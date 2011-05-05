@@ -17,8 +17,6 @@ if($Config{useithreads}) {
 } else {
     cmp_ok(total_size(PVBM), '>', total_size(PVBM . ''),
 	   "PVBMs don't cause SEGVs");
-    local $TODO = 'PVBMs not yet handled properly in 5.10.0 and later'
-	if $] >= 5.010;
     cmp_ok(total_size(PVBM), '>', total_size(PVBM . '') + 256,
 	   "PVBMs use 256 bytes for a lookup table");
 }
