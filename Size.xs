@@ -738,17 +738,27 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   return TRUE;
 }
 
+/* Frustratingly, the vtables aren't const in perl.h
+   gcc is happy enough to have non-const initialisers in a static array.
+   VC seems not to be. (Is it actually treating the file as C++?)
+   So do the maximally portable thing, unless we know it's gcc, in which case
+   we can do the more space efficient version.  */
+
+#if __GNUC__
 void *vtables[] = {
 #include "vtables.inc"
     NULL
 };
+#endif
 
 static struct state *
 new_state(pTHX)
 {
     SV *warn_flag;
     struct state *st;
+#if __GNUC__
     void **vt_p = vtables;
+#endif
 
     Newxz(st, 1, struct state);
     st->go_yell = TRUE;
@@ -761,8 +771,12 @@ new_state(pTHX)
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
+#if __GNUC__
     while(*vt_p)
 	check_new(st, *vt_p++);
+#else
+#include "vtables.inc"
+#endif
     return st;
 }
 

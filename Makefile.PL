@@ -29,15 +29,13 @@ my %special = (
 
 open FH, ">$vtable_file" or die "Can't open $vtable_file: $!";
 foreach (sort keys %vtables) {
-    if ($special{$_}) {
-	print FH <<"EOT";
-#ifdef $special{$_}
-    &$_,
-#endif
-EOT
-    } else {
+    print FH "#ifdef $special{$_}\n" if ($special{$_});
+    if ($Config{gccversion}) {
 	print FH "    &$_,\n";
+    } else {
+	print FH "    check_new(st, &$_);\n";
     }
+    print FH "#endif\n" if ($special{$_});
 }
 
 close FH or die "Error closing $vtable_file: $!";
