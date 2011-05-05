@@ -484,62 +484,131 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
   }
 }
 
-#if PERL_VERSION > 9 || (PERL_VERSION == 9 && PERL_SUBVERSION > 2)
-#  define NEW_HEAD_LAYOUT
+#if PERL_VERSION < 8 || PERL_SUBVERSION < 9
+#  define SVt_LAST 16
 #endif
+
+const U8 body_sizes[SVt_LAST] = {
+#if PERL_VERSION < 9
+     0,                                               /* SVt_NULL */
+     sizeof(IV),                                      /* SVt_IV */
+     sizeof(NV),                                      /* SVt_NV */
+     sizeof(XRV),                                     /* SVt_RV */
+     sizeof(XPV),                                     /* SVt_PV */
+     sizeof(XPVIV),                                   /* SVt_PVIV */
+     sizeof(XPVNV),                                   /* SVt_PVNV */
+     sizeof(XPVMG),                                   /* SVt_PVMG */
+     sizeof(XPVBM),                                   /* SVt_PVBM */
+     sizeof(XPVLV),                                   /* SVt_PVLV */
+     sizeof(XPVAV),                                   /* SVt_PVAV */
+     sizeof(XPVHV),                                   /* SVt_PVHV */
+     sizeof(XPVCV),                                   /* SVt_PVCV */
+     sizeof(XPVGV),                                   /* SVt_PVGV */
+     sizeof(XPVFM),                                   /* SVt_PVFM */
+     sizeof(XPVIO)                                    /* SVt_PVIO */
+#elif PERL_VERSION == 10 && PERL_SUBVERSION == 0
+     0,                                               /* SVt_NULL */
+     0,                                               /* SVt_BIND */
+     0,                                               /* SVt_IV */
+     sizeof(NV),                                      /* SVt_NV */
+     0,                                               /* SVt_RV */
+     sizeof(xpv_allocated),                           /* SVt_PV */
+     sizeof(xpviv_allocated),                         /* SVt_PVIV */
+     sizeof(XPVNV),                                   /* SVt_PVNV */
+     sizeof(XPVMG),                                   /* SVt_PVMG */
+     sizeof(XPVGV),                                   /* SVt_PVGV */
+     sizeof(XPVLV),                                   /* SVt_PVLV */
+     sizeof(xpvav_allocated),                         /* SVt_PVAV */
+     sizeof(xpvhv_allocated),                         /* SVt_PVHV */
+     sizeof(xpvcv_allocated),                         /* SVt_PVCV */
+     sizeof(xpvfm_allocated),                         /* SVt_PVFM */
+     sizeof(XPVIO),                                   /* SVt_PVIO */
+#elif PERL_VERSION == 10 && PERL_SUBVERSION == 1
+     0,                                               /* SVt_NULL */
+     0,                                               /* SVt_BIND */
+     0,                                               /* SVt_IV */
+     sizeof(NV),                                      /* SVt_NV */
+     0,                                               /* SVt_RV */
+     sizeof(XPV) - STRUCT_OFFSET(XPV, xpv_cur),       /* SVt_PV */
+     sizeof(XPVIV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVIV */
+     sizeof(XPVNV),                                   /* SVt_PVNV */
+     sizeof(XPVMG),                                   /* SVt_PVMG */
+     sizeof(XPVGV),                                   /* SVt_PVGV */
+     sizeof(XPVLV),                                   /* SVt_PVLV */
+     sizeof(XPVAV) - STRUCT_OFFSET(XPVAV, xav_fill),  /* SVt_PVAV */
+     sizeof(XPVHV) - STRUCT_OFFSET(XPVHV, xhv_fill),  /* SVt_PVHV */
+     sizeof(XPVCV) - STRUCT_OFFSET(XPVCV, xpv_cur),   /* SVt_PVCV */
+     sizeof(XPVFM) - STRUCT_OFFSET(XPVFM, xpv_cur),   /* SVt_PVFM */
+     sizeof(XPVIO)                                    /* SVt_PVIO */
+#elif PERL_VERSION < 13
+     0,                                               /* SVt_NULL */
+     0,                                               /* SVt_BIND */
+     0,                                               /* SVt_IV */
+     sizeof(NV),                                      /* SVt_NV */
+     sizeof(XPV) - STRUCT_OFFSET(XPV, xpv_cur),       /* SVt_PV */
+     sizeof(XPVIV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVIV */
+     sizeof(XPVNV),                                   /* SVt_PVNV */
+     sizeof(XPVMG),                                   /* SVt_PVMG */
+     sizeof(regexp) - STRUCT_OFFSET(regexp, xpv_cur), /* SVt_REGEXP */
+     sizeof(XPVGV),                                   /* SVt_PVGV */
+     sizeof(XPVLV),                                   /* SVt_PVLV */
+     sizeof(XPVAV) - STRUCT_OFFSET(XPVAV, xav_fill),  /* SVt_PVAV */
+     sizeof(XPVHV) - STRUCT_OFFSET(XPVHV, xhv_fill),  /* SVt_PVHV */
+     sizeof(XPVCV) - STRUCT_OFFSET(XPVCV, xpv_cur),   /* SVt_PVCV */
+     sizeof(XPVFM) - STRUCT_OFFSET(XPVFM, xpv_cur),   /* SVt_PVFM */
+     sizeof(XPVIO)                                    /* SVt_PVIO */
+#else
+     0,                                               /* SVt_NULL */
+     0,                                               /* SVt_BIND */
+     0,                                               /* SVt_IV */
+     sizeof(NV),                                      /* SVt_NV */
+     sizeof(XPV) - STRUCT_OFFSET(XPV, xpv_cur),       /* SVt_PV */
+     sizeof(XPVIV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVIV */
+     sizeof(XPVNV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVNV */
+     sizeof(XPVMG),                                   /* SVt_PVMG */
+     sizeof(regexp),                                  /* SVt_REGEXP */
+     sizeof(XPVGV),                                   /* SVt_PVGV */
+     sizeof(XPVLV),                                   /* SVt_PVLV */
+     sizeof(XPVAV),                                   /* SVt_PVAV */
+     sizeof(XPVHV),                                   /* SVt_PVHV */
+     sizeof(XPVCV),                                   /* SVt_PVCV */
+     sizeof(XPVFM),                                   /* SVt_PVFM */
+     sizeof(XPVIO)                                    /* SVt_PVIO */
+#endif
+};
 
 static bool
 sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	const int recurse) {
   const SV *thing = orig_thing;
+  U32 type;
 
   if(!check_new(st, thing))
       return FALSE;
 
-  st->total_size += sizeof(SV);
+  type = SvTYPE(thing);
+  if (type > SVt_LAST) {
+      warn("Devel::Size: Unknown variable type: %d encountered\n", type);
+      return TRUE;
+  }
+  st->total_size += sizeof(SV) + body_sizes[type];
 
-  if (SvTYPE(thing) >= SVt_PVMG) {
+  if (type >= SVt_PVMG) {
       magic_size(aTHX_ thing, st);
   }
 
-  switch (SvTYPE(thing)) {
-    /* Is it undef? */
-  case SVt_NULL: TAG;
-    TAG;break;
-    /* Just a plain integer. This will be differently sized depending
-       on whether purify's been compiled in */
-  case SVt_IV: TAG;
-#ifndef NEW_HEAD_LAYOUT
-#  ifdef PURIFY
-    st->total_size += sizeof(sizeof(XPVIV));
-#  else
-    st->total_size += sizeof(IV);
-#  endif
-#endif
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, SvRV_const(thing), recurse);
-    TAG;break;
-    /* Is it a float? Like the int, it depends on purify */
-  case SVt_NV: TAG;
-#ifdef PURIFY
-    st->total_size += sizeof(sizeof(XPVNV));
-#else
-    st->total_size += sizeof(NV);
-#endif
-    TAG;break;
-#if (PERL_VERSION < 11)     
+  switch (type) {
+#if (PERL_VERSION < 11)
     /* Is it a reference? */
   case SVt_RV: TAG;
-#ifndef NEW_HEAD_LAYOUT
-    st->total_size += sizeof(XRV);
+#else
+  case SVt_IV: TAG;
 #endif
     if(recurse && SvROK(thing))
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
     TAG;break;
-#endif
 
   case SVt_PVAV: TAG;
-    st->total_size += sizeof(XPVAV);
     /* Is there anything in the array? */
     if (AvMAX(thing) != -1) {
       /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
@@ -572,8 +641,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 #endif
     TAG;break;
   case SVt_PVHV: TAG;
-    /* First the base struct */
-    st->total_size += sizeof(XPVHV);
     /* Now the array of buckets */
     st->total_size += (sizeof(HE *) * (HvMAX(thing) + 1));
     /* Now walk the bucket chain */
@@ -600,7 +667,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 
 
   case SVt_PVFM: TAG;
-    st->total_size += sizeof(XPVFM);
     sv_size(aTHX_ st, (SV *)CvPADLIST(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvOUTSIDE(thing), recurse);
 
@@ -611,8 +677,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     goto freescalar;
 
   case SVt_PVCV: TAG;
-    st->total_size += sizeof(XPVCV);
-
     sv_size(aTHX_ st, (SV *)CvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, (SV *)CvGV(thing), SOME_RECURSION);
@@ -627,7 +691,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     goto freescalar;
 
   case SVt_PVIO: TAG;
-    st->total_size += sizeof(XPVIO);
     /* Some embedded char pointers */
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name);
     check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name);
@@ -646,25 +709,12 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 #endif
     goto freescalar;
 
-#if PERL_VERSION <= 8
-  case SVt_PVBM: TAG;
-    st->total_size += sizeof(XPVBM);
-    goto freescalar;
-#endif
-
   case SVt_PVLV: TAG;
-    st->total_size += sizeof(XPVLV);
 #if (PERL_VERSION < 9)
     goto freescalar;
-#else
-    goto donegv;
 #endif
 
   case SVt_PVGV: TAG;
-    st->total_size += sizeof(XPVGV);
-#if (PERL_VERSION >= 9)
-  donegv:
-#endif
     if(isGV_with_GP(thing)) {
 	st->total_size += GvNAMELEN(thing);
 #ifdef GvFILE
@@ -693,23 +743,13 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	TAG; break;
 #endif
     }
-    goto freescalar;
-
+#if PERL_VERSION <= 8
+  case SVt_PVBM: TAG;
+#endif
   case SVt_PVMG: TAG;
-    st->total_size += sizeof(XPVMG);
-    goto freescalar;
-
   case SVt_PVNV: TAG;
-    st->total_size += sizeof(XPVNV);
-    goto freescalar;
-
   case SVt_PVIV: TAG;
-    st->total_size += sizeof(XPVIV);
-    goto freescalar;
-
   case SVt_PV: TAG;
-    st->total_size += sizeof(XPV);
-
   freescalar:
     if(recurse && SvROK(thing))
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
@@ -721,8 +761,6 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     }
     TAG;break;
 
-  default:
-    warn("Devel::Size: Unknown variable type: %d encountered\n", SvTYPE(thing) );
   }
   return TRUE;
 }
