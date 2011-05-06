@@ -488,92 +488,100 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 #  define SVt_LAST 16
 #endif
 
+#ifdef PURIFY
+#  define MAYBE_PURIFY(normal, pure) (pure)
+#  define MAYBE_OFFSET(struct_name, member) 0
+#else
+#  define MAYBE_PURIFY(normal, pure) (normal)
+#  define MAYBE_OFFSET(struct_name, member) STRUCT_OFFSET(struct_name, member)
+#endif
+
 const U8 body_sizes[SVt_LAST] = {
 #if PERL_VERSION < 9
-     0,                                               /* SVt_NULL */
-     sizeof(IV),                                      /* SVt_IV */
-     sizeof(NV),                                      /* SVt_NV */
-     sizeof(XRV),                                     /* SVt_RV */
-     sizeof(XPV),                                     /* SVt_PV */
-     sizeof(XPVIV),                                   /* SVt_PVIV */
-     sizeof(XPVNV),                                   /* SVt_PVNV */
-     sizeof(XPVMG),                                   /* SVt_PVMG */
-     sizeof(XPVBM),                                   /* SVt_PVBM */
-     sizeof(XPVLV),                                   /* SVt_PVLV */
-     sizeof(XPVAV),                                   /* SVt_PVAV */
-     sizeof(XPVHV),                                   /* SVt_PVHV */
-     sizeof(XPVCV),                                   /* SVt_PVCV */
-     sizeof(XPVGV),                                   /* SVt_PVGV */
-     sizeof(XPVFM),                                   /* SVt_PVFM */
-     sizeof(XPVIO)                                    /* SVt_PVIO */
+     0,                                                       /* SVt_NULL */
+     MAYBE_PURIFY(sizeof(IV), sizeof(XPVIV)),                 /* SVt_IV */
+     MAYBE_PURIFY(sizeof(NV), sizeof(XPVNV)),                 /* SVt_NV */
+     sizeof(XRV),                                             /* SVt_RV */
+     sizeof(XPV),                                             /* SVt_PV */
+     sizeof(XPVIV),                                           /* SVt_PVIV */
+     sizeof(XPVNV),                                           /* SVt_PVNV */
+     sizeof(XPVMG),                                           /* SVt_PVMG */
+     sizeof(XPVBM),                                           /* SVt_PVBM */
+     sizeof(XPVLV),                                           /* SVt_PVLV */
+     sizeof(XPVAV),                                           /* SVt_PVAV */
+     sizeof(XPVHV),                                           /* SVt_PVHV */
+     sizeof(XPVCV),                                           /* SVt_PVCV */
+     sizeof(XPVGV),                                           /* SVt_PVGV */
+     sizeof(XPVFM),                                           /* SVt_PVFM */
+     sizeof(XPVIO)                                            /* SVt_PVIO */
 #elif PERL_VERSION == 10 && PERL_SUBVERSION == 0
-     0,                                               /* SVt_NULL */
-     0,                                               /* SVt_BIND */
-     0,                                               /* SVt_IV */
-     sizeof(NV),                                      /* SVt_NV */
-     0,                                               /* SVt_RV */
-     sizeof(xpv_allocated),                           /* SVt_PV */
-     sizeof(xpviv_allocated),                         /* SVt_PVIV */
-     sizeof(XPVNV),                                   /* SVt_PVNV */
-     sizeof(XPVMG),                                   /* SVt_PVMG */
-     sizeof(XPVGV),                                   /* SVt_PVGV */
-     sizeof(XPVLV),                                   /* SVt_PVLV */
-     sizeof(xpvav_allocated),                         /* SVt_PVAV */
-     sizeof(xpvhv_allocated),                         /* SVt_PVHV */
-     sizeof(xpvcv_allocated),                         /* SVt_PVCV */
-     sizeof(xpvfm_allocated),                         /* SVt_PVFM */
-     sizeof(XPVIO),                                   /* SVt_PVIO */
+     0,                                                       /* SVt_NULL */
+     0,                                                       /* SVt_BIND */
+     0,                                                       /* SVt_IV */
+     MAYBE_PURIFY(sizeof(NV), sizeof(XPVNV)),                 /* SVt_NV */
+     0,                                                       /* SVt_RV */
+     MAYBE_PURIFY(sizeof(xpv_allocated), sizeof(XPV)),        /* SVt_PV */
+     MAYBE_PURIFY(sizeof(xpviv_allocated), sizeof(XPVIV)),/* SVt_PVIV */
+     sizeof(XPVNV),                                           /* SVt_PVNV */
+     sizeof(XPVMG),                                           /* SVt_PVMG */
+     sizeof(XPVGV),                                           /* SVt_PVGV */
+     sizeof(XPVLV),                                           /* SVt_PVLV */
+     MAYBE_PURIFY(sizeof(xpvav_allocated), sizeof(XPVAV)),/* SVt_PVAV */
+     MAYBE_PURIFY(sizeof(xpvhv_allocated), sizeof(XPVHV)),/* SVt_PVHV */
+     MAYBE_PURIFY(sizeof(xpvcv_allocated), sizeof(XPVCV)),/* SVt_PVCV */
+     MAYBE_PURIFY(sizeof(xpvfm_allocated), sizeof(XPVFM)),/* SVt_PVFM */
+     sizeof(XPVIO),                                           /* SVt_PVIO */
 #elif PERL_VERSION == 10 && PERL_SUBVERSION == 1
-     0,                                               /* SVt_NULL */
-     0,                                               /* SVt_BIND */
-     0,                                               /* SVt_IV */
-     sizeof(NV),                                      /* SVt_NV */
-     0,                                               /* SVt_RV */
-     sizeof(XPV) - STRUCT_OFFSET(XPV, xpv_cur),       /* SVt_PV */
-     sizeof(XPVIV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVIV */
-     sizeof(XPVNV),                                   /* SVt_PVNV */
-     sizeof(XPVMG),                                   /* SVt_PVMG */
-     sizeof(XPVGV),                                   /* SVt_PVGV */
-     sizeof(XPVLV),                                   /* SVt_PVLV */
-     sizeof(XPVAV) - STRUCT_OFFSET(XPVAV, xav_fill),  /* SVt_PVAV */
-     sizeof(XPVHV) - STRUCT_OFFSET(XPVHV, xhv_fill),  /* SVt_PVHV */
-     sizeof(XPVCV) - STRUCT_OFFSET(XPVCV, xpv_cur),   /* SVt_PVCV */
-     sizeof(XPVFM) - STRUCT_OFFSET(XPVFM, xpv_cur),   /* SVt_PVFM */
-     sizeof(XPVIO)                                    /* SVt_PVIO */
+     0,                                                       /* SVt_NULL */
+     0,                                                       /* SVt_BIND */
+     0,                                                       /* SVt_IV */
+     MAYBE_PURIFY(sizeof(NV), sizeof(XPVNV)),                 /* SVt_NV */
+     0,                                                       /* SVt_RV */
+     sizeof(XPV) - MAYBE_OFFSET(XPV, xpv_cur),                /* SVt_PV */
+     sizeof(XPVIV) - MAYBE_OFFSET(XPV, xpv_cur),              /* SVt_PVIV */
+     sizeof(XPVNV),                                           /* SVt_PVNV */
+     sizeof(XPVMG),                                           /* SVt_PVMG */
+     sizeof(XPVGV),                                           /* SVt_PVGV */
+     sizeof(XPVLV),                                           /* SVt_PVLV */
+     sizeof(XPVAV) - MAYBE_OFFSET(XPVAV, xav_fill),           /* SVt_PVAV */
+     sizeof(XPVHV) - MAYBE_OFFSET(XPVHV, xhv_fill),           /* SVt_PVHV */
+     sizeof(XPVCV) - MAYBE_OFFSET(XPVCV, xpv_cur),            /* SVt_PVCV */
+     sizeof(XPVFM) - MAYBE_OFFSET(XPVFM, xpv_cur),            /* SVt_PVFM */
+     sizeof(XPVIO)                                            /* SVt_PVIO */
 #elif PERL_VERSION < 13
-     0,                                               /* SVt_NULL */
-     0,                                               /* SVt_BIND */
-     0,                                               /* SVt_IV */
-     sizeof(NV),                                      /* SVt_NV */
-     sizeof(XPV) - STRUCT_OFFSET(XPV, xpv_cur),       /* SVt_PV */
-     sizeof(XPVIV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVIV */
-     sizeof(XPVNV),                                   /* SVt_PVNV */
-     sizeof(XPVMG),                                   /* SVt_PVMG */
-     sizeof(regexp) - STRUCT_OFFSET(regexp, xpv_cur), /* SVt_REGEXP */
-     sizeof(XPVGV),                                   /* SVt_PVGV */
-     sizeof(XPVLV),                                   /* SVt_PVLV */
-     sizeof(XPVAV) - STRUCT_OFFSET(XPVAV, xav_fill),  /* SVt_PVAV */
-     sizeof(XPVHV) - STRUCT_OFFSET(XPVHV, xhv_fill),  /* SVt_PVHV */
-     sizeof(XPVCV) - STRUCT_OFFSET(XPVCV, xpv_cur),   /* SVt_PVCV */
-     sizeof(XPVFM) - STRUCT_OFFSET(XPVFM, xpv_cur),   /* SVt_PVFM */
-     sizeof(XPVIO)                                    /* SVt_PVIO */
+     0,                                                       /* SVt_NULL */
+     0,                                                       /* SVt_BIND */
+     0,                                                       /* SVt_IV */
+     MAYBE_PURIFY(sizeof(NV), sizeof(XPVNV)),                 /* SVt_NV */
+     sizeof(XPV) - MAYBE_OFFSET(XPV, xpv_cur),                /* SVt_PV */
+     sizeof(XPVIV) - MAYBE_OFFSET(XPV, xpv_cur),              /* SVt_PVIV */
+     sizeof(XPVNV),                                           /* SVt_PVNV */
+     sizeof(XPVMG),                                           /* SVt_PVMG */
+     sizeof(regexp) - MAYBE_OFFSET(regexp, xpv_cur),          /* SVt_REGEXP */
+     sizeof(XPVGV),                                           /* SVt_PVGV */
+     sizeof(XPVLV),                                           /* SVt_PVLV */
+     sizeof(XPVAV) - MAYBE_OFFSET(XPVAV, xav_fill),           /* SVt_PVAV */
+     sizeof(XPVHV) - MAYBE_OFFSET(XPVHV, xhv_fill),           /* SVt_PVHV */
+     sizeof(XPVCV) - MAYBE_OFFSET(XPVCV, xpv_cur),            /* SVt_PVCV */
+     sizeof(XPVFM) - MAYBE_OFFSET(XPVFM, xpv_cur),            /* SVt_PVFM */
+     sizeof(XPVIO)                                            /* SVt_PVIO */
 #else
-     0,                                               /* SVt_NULL */
-     0,                                               /* SVt_BIND */
-     0,                                               /* SVt_IV */
-     sizeof(NV),                                      /* SVt_NV */
-     sizeof(XPV) - STRUCT_OFFSET(XPV, xpv_cur),       /* SVt_PV */
-     sizeof(XPVIV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVIV */
-     sizeof(XPVNV) - STRUCT_OFFSET(XPV, xpv_cur),     /* SVt_PVNV */
-     sizeof(XPVMG),                                   /* SVt_PVMG */
-     sizeof(regexp),                                  /* SVt_REGEXP */
-     sizeof(XPVGV),                                   /* SVt_PVGV */
-     sizeof(XPVLV),                                   /* SVt_PVLV */
-     sizeof(XPVAV),                                   /* SVt_PVAV */
-     sizeof(XPVHV),                                   /* SVt_PVHV */
-     sizeof(XPVCV),                                   /* SVt_PVCV */
-     sizeof(XPVFM),                                   /* SVt_PVFM */
-     sizeof(XPVIO)                                    /* SVt_PVIO */
+     0,                                                       /* SVt_NULL */
+     0,                                                       /* SVt_BIND */
+     0,                                                       /* SVt_IV */
+     MAYBE_PURIFY(sizeof(NV), sizeof(XPVNV)),                 /* SVt_NV */
+     sizeof(XPV) - MAYBE_OFFSET(XPV, xpv_cur),                /* SVt_PV */
+     sizeof(XPVIV) - MAYBE_OFFSET(XPV, xpv_cur),              /* SVt_PVIV */
+     sizeof(XPVNV) - MAYBE_OFFSET(XPV, xpv_cur),              /* SVt_PVNV */
+     sizeof(XPVMG),                                           /* SVt_PVMG */
+     sizeof(regexp),                                          /* SVt_REGEXP */
+     sizeof(XPVGV),                                           /* SVt_PVGV */
+     sizeof(XPVLV),                                           /* SVt_PVLV */
+     sizeof(XPVAV),                                           /* SVt_PVAV */
+     sizeof(XPVHV),                                           /* SVt_PVHV */
+     sizeof(XPVCV),                                           /* SVt_PVCV */
+     sizeof(XPVFM),                                           /* SVt_PVFM */
+     sizeof(XPVIO)                                            /* SVt_PVIO */
 #endif
 };
 
