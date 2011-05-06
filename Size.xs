@@ -12,6 +12,9 @@
 #ifndef SvRV_const
 #  define SvRV_const(rv) SvRV(rv)
 #endif
+#ifndef SvOOK_offset
+#  define SvOOK_offset(sv, len) STMT_START { len = SvIVX(sv); } STMT_END
+#endif
 
 #ifdef _MSC_VER 
 /* "structured exception" handling is a Microsoft extension to C and C++.
@@ -760,7 +763,9 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	st->total_size += SvLEN(thing);
 
     if(SvOOK(thing)) {
-        st->total_size += SvIVX(thing);
+	STRLEN len;
+	SvOOK_offset(thing, len);
+	st->total_size += len;
     }
     TAG;break;
 

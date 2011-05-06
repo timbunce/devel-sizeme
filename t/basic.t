@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More tests => 16;
+use Test::More tests => 19;
 use strict;
 use Devel::Size qw(size total_size);
 use Scalar::Util qw(weaken);
@@ -97,4 +97,19 @@ foreach(['undef', total_size(undef)],
     my ($name, $size) = @$_;
     is($size, 0,
        "PL_sv_$name is interpeter wide, so not counted as part of the structure's size");
+}
+
+{
+    # SvOOK stuff
+    my $uurk = "Perl Rules";
+    # This may upgrade the scalar:
+    $uurk =~ s/Perl//;
+    $uurk =~ s/^/Perl/;
+    my $before_size = total_size($uurk);
+    my $before_length = length $uurk;
+    cmp_ok($before_size, '>', $before_length, 'Size before is sane');
+    $uurk =~ s/Perl //;
+    is(total_size($uurk), $before_size,
+       "Size doesn't change because OOK is used");
+    cmp_ok(length $uurk, '<', $before_size, 'but string is shorter');
 }

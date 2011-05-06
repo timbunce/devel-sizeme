@@ -2,6 +2,7 @@ Revision history for Perl extension Devel::Size.
 
 0.72_52 2011-05-09 nicholas
  * Use a table for SV body sizes. These incorporate the space saving post 5.8.x
+ * Correctly handle SvOOK scalars. 5.12 and later don't use SvIVX().
 
 0.75_51 2011-05-05 nicholas
  * Only use a static array of vtables on gcc.
