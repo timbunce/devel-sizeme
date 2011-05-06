@@ -303,11 +303,6 @@ cc_opclass(const OP * const o)
     return OPc_BASEOP;
 }
 
-
-#if !defined(NV)
-#define NV double
-#endif
-
 /* Figure out how much magic is attached to the SV and return the
    size */
 static void
