@@ -414,7 +414,6 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 #if PERL_VERSION < 9 || (PERL_VERSION == 9 && PERL_SUBVERSION < 5)
 	    op_size(aTHX_ cPMOPx(baseop)->op_pmreplroot, st);
 	    op_size(aTHX_ cPMOPx(baseop)->op_pmreplstart, st);
-	    op_size(aTHX_ (OP *)cPMOPx(baseop)->op_pmnext, st);
 #endif
 	    /* This is defined away in perl 5.8.x, but it is in there for
 	       5.6.x */
