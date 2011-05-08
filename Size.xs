@@ -181,7 +181,7 @@ free_state(struct state *st)
 #define SOME_RECURSION 1
 #define TOTAL_SIZE_RECURSION 2
 
-static bool sv_size(pTHX_ struct state *, const SV *const, const int recurse);
+static void sv_size(pTHX_ struct state *, const SV *const, const int recurse);
 
 typedef enum {
     OPc_NULL,   /* 0 */
@@ -624,19 +624,19 @@ const U8 body_sizes[SVt_LAST] = {
 #endif
 };
 
-static bool
+static void
 sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 	const int recurse) {
   const SV *thing = orig_thing;
   U32 type;
 
   if(!check_new(st, thing))
-      return FALSE;
+      return;
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
       warn("Devel::Size: Unknown variable type: %d encountered\n", type);
-      return TRUE;
+      return;
   }
   st->total_size += sizeof(SV) + body_sizes[type];
 
@@ -811,7 +811,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     TAG;break;
 
   }
-  return TRUE;
+  return;
 }
 
 static struct state *
