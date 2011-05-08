@@ -390,37 +390,37 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	    TAG;break;
 	case OPc_UNOP: TAG;
 	    st->total_size += sizeof(struct unop);
-	    op_size(aTHX_ cUNOPx(baseop)->op_first, st);
+	    op_size(aTHX_ ((UNOP *)baseop)->op_first, st);
 	    TAG;break;
 	case OPc_BINOP: TAG;
 	    st->total_size += sizeof(struct binop);
-	    op_size(aTHX_ cBINOPx(baseop)->op_first, st);
-	    op_size(aTHX_ cBINOPx(baseop)->op_last, st);
+	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st);
+	    op_size(aTHX_ ((BINOP *)baseop)->op_last, st);
 	    TAG;break;
 	case OPc_LOGOP: TAG;
 	    st->total_size += sizeof(struct logop);
-	    op_size(aTHX_ cBINOPx(baseop)->op_first, st);
-	    op_size(aTHX_ cLOGOPx(baseop)->op_other, st);
+	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st);
+	    op_size(aTHX_ ((LOGOP *)baseop)->op_other, st);
 	    TAG;break;
 	case OPc_LISTOP: TAG;
 	    st->total_size += sizeof(struct listop);
-	    op_size(aTHX_ cLISTOPx(baseop)->op_first, st);
-	    op_size(aTHX_ cLISTOPx(baseop)->op_last, st);
+	    op_size(aTHX_ ((LISTOP *)baseop)->op_first, st);
+	    op_size(aTHX_ ((LISTOP *)baseop)->op_last, st);
 	    TAG;break;
 	case OPc_PMOP: TAG;
 	    st->total_size += sizeof(struct pmop);
-	    op_size(aTHX_ cPMOPx(baseop)->op_first, st);
-	    op_size(aTHX_ cPMOPx(baseop)->op_last, st);
+	    op_size(aTHX_ ((PMOP *)baseop)->op_first, st);
+	    op_size(aTHX_ ((PMOP *)baseop)->op_last, st);
 #if PERL_VERSION < 9 || (PERL_VERSION == 9 && PERL_SUBVERSION < 5)
-	    op_size(aTHX_ cPMOPx(baseop)->op_pmreplroot, st);
-	    op_size(aTHX_ cPMOPx(baseop)->op_pmreplstart, st);
+	    op_size(aTHX_ ((PMOP *)baseop)->op_pmreplroot, st);
+	    op_size(aTHX_ ((PMOP *)baseop)->op_pmreplstart, st);
 #endif
 	    /* This is defined away in perl 5.8.x, but it is in there for
 	       5.6.x */
 #ifdef PM_GETRE
-	    regex_size(PM_GETRE(cPMOPx(baseop)), st);
+	    regex_size(PM_GETRE((PMOP *)baseop), st);
 #else
-	    regex_size(cPMOPx(baseop)->op_pmregexp, st);
+	    regex_size(((PMOP *)baseop)->op_pmregexp, st);
 #endif
 	    TAG;break;
 	case OPc_SVOP: TAG;
@@ -428,22 +428,22 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	    if (!(baseop->op_type == OP_AELEMFAST
 		  && baseop->op_flags & OPf_SPECIAL)) {
 		/* not an OP_PADAV replacement */
-		sv_size(aTHX_ st, cSVOPx(baseop)->op_sv, SOME_RECURSION);
+		sv_size(aTHX_ st, ((SVOP *)baseop)->op_sv, SOME_RECURSION);
 	    }
 	    TAG;break;
       case OPc_PADOP: TAG;
 	  st->total_size += sizeof(struct padop);
 	  TAG;break;
 	case OPc_PVOP: TAG;
-	    check_new_and_strlen(st, cPVOPx(baseop)->op_pv);
+	    check_new_and_strlen(st, ((PVOP *)baseop)->op_pv);
 	    TAG;break;
 	case OPc_LOOP: TAG;
 	    st->total_size += sizeof(struct loop);
-	    op_size(aTHX_ cLOOPx(baseop)->op_first, st);
-	    op_size(aTHX_ cLOOPx(baseop)->op_last, st);
-	    op_size(aTHX_ cLOOPx(baseop)->op_redoop, st);
-	    op_size(aTHX_ cLOOPx(baseop)->op_nextop, st);
-	    op_size(aTHX_ cLOOPx(baseop)->op_lastop, st);
+	    op_size(aTHX_ ((LOOP *)baseop)->op_first, st);
+	    op_size(aTHX_ ((LOOP *)baseop)->op_last, st);
+	    op_size(aTHX_ ((LOOP *)baseop)->op_redoop, st);
+	    op_size(aTHX_ ((LOOP *)baseop)->op_nextop, st);
+	    op_size(aTHX_ ((LOOP *)baseop)->op_lastop, st);
 	    TAG;break;
 	case OPc_COP: TAG;
         {
