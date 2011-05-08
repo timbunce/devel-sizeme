@@ -5,6 +5,7 @@ Revision history for Perl extension Devel::Size.
  * Correctly handle SvOOK scalars. 5.12 and later don't use SvIVX().
  * Magic vtables aren't freed when magic is freed, so don't count them.
    (They are static structures. Anything that assumes otherwise is buggy.)
+ * Reinstate 5.6.x "support". (i.e. it compiles and passes tests.)
 
 0.75_51 2011-05-05 nicholas
  * Only use a static array of vtables on gcc.

@@ -135,7 +135,8 @@ sub gv_grew {
 gv_grew('glipp', 'zok', 'no strict "vars"; $zok = undef; 1', 'SCALAR');
 gv_grew('bang', 'boff', 'no strict "vars"; @boff = (); 1', 'ARRAY');
 gv_grew('clange', 'sock', 'no strict "vars"; %sock = (); 1', 'HASH');
-{
+SKIP: {
+    skip("Can't create FORMAT references prior to 5.8.0", 7) if $] < 5.008;
     local $Devel::Size::warn = 0;
     gv_grew('biff', 'zapeth', "format zapeth =\n.\n1", 'FORMAT');
 }

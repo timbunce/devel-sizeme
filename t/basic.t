@@ -3,7 +3,6 @@
 use Test::More tests => 19;
 use strict;
 use Devel::Size qw(size total_size);
-use Scalar::Util qw(weaken);
 
 can_ok ('Devel::Size', qw/
   size
@@ -84,8 +83,18 @@ cmp_ok (total_size(\&LARGE), '>', 8192,
 {
     my $a = [];
     my $b = \$a;
-    # making a weakref upgrades the target to PVMG and adds magic
-    weaken $b;
+    # Scalar::Util isn't in the core before 5.7.something.
+    # The test isn't really testing anything without the weaken(), but it
+    # isn't counter-productive or harmful to run it anyway.
+    unless (eval {
+	require Scalar::Util;
+	# making a weakref upgrades the target to PVMG and adds magic
+	Scalar::Util::weaken($b);
+	1;
+    }) {
+	die $@ if $] >= 5.008;
+    }
+
     is(total_size($a), total_size([]),
        'Any intial reference is dereferenced and discarded');
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-use 5.008;
+use 5.006;
 use ExtUtils::MakeMaker;
 use strict;
 
@@ -12,6 +12,7 @@ WriteMakefile(
 	      NAME => 'Devel::Size',
 	      VERSION_FROM => 'lib/Devel/Size.pm',
 	      DEFINE => "-DALIGN_BITS=$ptr_bits",
-	      (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.008') : ()),
+	      PREREQ_PM => { 'Test::More' => 0 },
+	      (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.006') : ()),
 	      (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
 );
