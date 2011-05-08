@@ -3,7 +3,7 @@ package Devel::Size;
 use strict;
 use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
-require 5.006;
+require 5.005;
 require Exporter;
 require XSLoader;
 

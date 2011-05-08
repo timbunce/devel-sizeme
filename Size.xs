@@ -16,6 +16,11 @@
 #  define SvOOK_offset(sv, len) STMT_START { len = SvIVX(sv); } STMT_END
 #endif
 
+#if PERL_VERSION < 6
+#  define PL_opargs opargs
+#  define PL_op_name op_name
+#endif
+
 #ifdef _MSC_VER 
 /* "structured exception" handling is a Microsoft extension to C and C++.
    It's *not* C++ exception handling - C++ exception handling can't capture
@@ -191,6 +196,13 @@ typedef enum {
     OPc_PVOP,   /* 9 */
     OPc_LOOP,   /* 10 */
     OPc_COP /* 11 */
+#ifdef OA_CONDOP
+    , OPc_CONDOP /* 12 */
+#endif
+#ifdef OA_GVOP
+    , OPc_GVOP /* 13 */
+#endif
+
 } opclass;
 
 static opclass
@@ -236,9 +248,17 @@ cc_opclass(const OP * const o)
         case OA_SVOP: TAG;
         return OPc_SVOP;
 
+#ifdef OA_PADOP
         case OA_PADOP: TAG;
         return OPc_PADOP;
+#endif
 
+#ifdef OA_GVOP
+        case OA_GVOP: TAG;
+        return OPc_GVOP;
+#endif
+
+#ifdef OA_PVOP_OR_SVOP
         case OA_PVOP_OR_SVOP: TAG;
             /*
              * Character translations (tr///) are usually a PVOP, keeping a 
@@ -249,6 +269,7 @@ cc_opclass(const OP * const o)
              */
         return (o->op_private & (OPpTRANS_TO_UTF|OPpTRANS_FROM_UTF))
             ? OPc_SVOP : OPc_PVOP;
+#endif
 
         case OA_LOOP: TAG;
         return OPc_LOOP;
@@ -298,6 +319,11 @@ cc_opclass(const OP * const o)
             return OPc_BASEOP;
         else
             return OPc_PVOP;
+
+#ifdef OA_CONDOP
+        case OA_CONDOP: TAG;
+	    return OPc_CONDOP;
+#endif
         }
         warn("Devel::Size: Can't determine class of operator %s, assuming BASEOP\n",
          PL_op_name[o->op_type]);
@@ -402,6 +428,14 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st);
 	    op_size(aTHX_ ((LOGOP *)baseop)->op_other, st);
 	    TAG;break;
+#ifdef OA_CONDOP
+	case OPc_CONDOP: TAG;
+	    st->total_size += sizeof(struct condop);
+	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st);
+	    op_size(aTHX_ ((CONDOP *)baseop)->op_true, st);
+	    op_size(aTHX_ ((CONDOP *)baseop)->op_false, st);
+	    TAG;break;
+#endif
 	case OPc_LISTOP: TAG;
 	    st->total_size += sizeof(struct listop);
 	    op_size(aTHX_ ((LISTOP *)baseop)->op_first, st);
@@ -431,9 +465,17 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
 		sv_size(aTHX_ st, ((SVOP *)baseop)->op_sv, SOME_RECURSION);
 	    }
 	    TAG;break;
+#ifdef OA_PADOP
       case OPc_PADOP: TAG;
 	  st->total_size += sizeof(struct padop);
 	  TAG;break;
+#endif
+#ifdef OA_GVOP
+      case OPc_GVOP: TAG;
+	  st->total_size += sizeof(struct gvop);
+	  sv_size(aTHX_ st, ((GVOP *)baseop)->op_gv, SOME_RECURSION);
+	  TAG;break;
+#endif
 	case OPc_PVOP: TAG;
 	    check_new_and_strlen(st, ((PVOP *)baseop)->op_pv);
 	    TAG;break;

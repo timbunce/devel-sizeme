@@ -16,3 +16,4 @@ t/pod_cov.t
 t/pvbm.t
 t/recurse.t
 t/warnings.t        A rather exhaustive test for the non-exceptional warnings
+typemap             The typemap for UV, missing from 5.005_xx
