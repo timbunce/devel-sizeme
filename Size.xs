@@ -831,6 +831,9 @@ new_state(pTHX)
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
+#if PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 0)
+    check_new(st, &PL_sv_placeholder);
+#endif
     return st;
 }
 
