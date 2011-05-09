@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Devel-Size
-version:            0.75_51
+version:            0.75_52
 abstract:           ~
 author:  []
 license:            perl
@@ -10,7 +10,9 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    perl:  5.008
+    perl:        5.005
+    Test::More:  0
+    XSLoader:    0
 no_index:
     directory:
         - t
