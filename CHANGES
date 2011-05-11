@@ -1,6 +1,9 @@
 Revision history for Perl extension Devel::Size.
 
-0.72_52 2011-05-09 nicholas
+0.76 2011-05-11 nicholas
+ * Just fix the version number in the line below.
+
+0.75_52 2011-05-09 nicholas
  * Use a table for SV body sizes. These incorporate the space saving post 5.8.x
  * Correctly handle SvOOK scalars. 5.12 and later don't use SvIVX().
  * Magic vtables aren't freed when magic is freed, so don't count them.
