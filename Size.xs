@@ -146,7 +146,7 @@ free_tracking_at(void **tv, int level)
 	/* Nodes */
 	do {
 	    if (tv[i]) {
-		free_tracking_at(tv[i], level);
+		free_tracking_at((void **) tv[i], level);
 		Safefree(tv[i]);
 	    }
 	} while (i--);
