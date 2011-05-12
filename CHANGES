@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.76_50 2011-05-12 nicholas
+ * Split out HEK size calculation into hek_size(). Add the shared HE overhead.
+
 0.76 2011-05-11 nicholas
  * Just fix the version number in the line below.
 

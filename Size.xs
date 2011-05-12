@@ -525,6 +525,29 @@ op_size(pTHX_ const OP * const baseop, struct state *st)
   }
 }
 
+static void
+hek_size(pTHX_ struct state *st, HEK *hek, U32 shared)
+{
+    /* Hash keys can be shared. Have we seen this before? */
+    if (!check_new(st, hek))
+	return;
+    st->total_size += HEK_BASESIZE + hek->hek_len
+#if PERL_VERSION < 8
+	+ 1 /* No hash key flags prior to 5.8.0  */
+#else
+	+ 2
+#endif
+	;
+    if (shared) {
+#if PERL_VERSION < 10
+	st->total_size += sizeof(struct he);
+#else
+	st->total_size += STRUCT_OFFSET(struct shared_he, shared_he_hek);
+#endif
+    }
+}
+
+
 #if PERL_VERSION < 8 || PERL_SUBVERSION < 9
 #  define SVt_LAST 16
 #endif
@@ -700,12 +723,7 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
           st->total_size += sizeof(HE);
-          if (cur_entry->hent_hek) {
-            /* Hash keys can be shared. Have we seen this before? */
-            if (check_new(st, cur_entry->hent_hek)) {
-              st->total_size += HEK_BASESIZE + cur_entry->hent_hek->hek_len + 2;
-            }
-          }
+	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing));
 	  if (recurse >= TOTAL_SIZE_RECURSION)
 	      sv_size(aTHX_ st, HeVAL(cur_entry), recurse);
           cur_entry = cur_entry->hent_next;
