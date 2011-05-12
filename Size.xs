@@ -745,8 +745,24 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
     if (SvOOK(thing)) {
 	/* This direct access is arguably "naughty": */
 	struct mro_meta *meta = HvAUX(thing)->xhv_mro_meta;
+#if PERL_VERSION > 13 || PERL_SUBVERSION > 8
+	/* As is this: */
+	I32 count = HvAUX(thing)->xhv_name_count;
+
+	if (count) {
+	    HEK **names = HvAUX(thing)->xhv_name_u.xhvnameu_names;
+	    if (count < 0)
+		count = -count;
+	    while (--count)
+		hek_size(aTHX_ st, names[count], 1);
+	}
+	else
+#endif
+	{
+	    hek_size(aTHX_ st, HvNAME_HEK(thing), 1);
+	}
+
 	st->total_size += sizeof(struct xpvhv_aux);
-	hek_size(aTHX_ st, HvNAME_HEK(thing), 1);
 	if (meta) {
 	    st->total_size += sizeof(struct mro_meta);
 	    sv_size(aTHX_ st, (SV *)meta->mro_nextmethod, TOTAL_SIZE_RECURSION);

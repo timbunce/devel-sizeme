@@ -4,7 +4,7 @@ Revision history for Perl extension Devel::Size.
  * Split out HEK size calculation into hek_size(). Add the shared HE overhead.
  * Handle shared hash key scalars correctly.
  * GvNAME() is shared from 5.10 onwards.
- * Count HvNAME(), the HV "aux" struct, and the mro_meta struct.
+ * Count HvNAME(), the HV "aux" struct, the mro_meta struct, and ENAMEs.
 
 0.76 2011-05-11 nicholas
  * Just fix the version number in the line below.
