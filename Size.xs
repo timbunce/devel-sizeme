@@ -795,7 +795,9 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   case SVt_PVGV: TAG;
     if(isGV_with_GP(thing)) {
 	st->total_size += GvNAMELEN(thing);
-#ifdef GvFILE
+#ifdef GvFILE_HEK
+	hek_size(aTHX_ st, GvFILE_HEK(thing), 1);
+#elif defined(GvFILE)
 #  if !defined(USE_ITHREADS) || (PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 8))
 	/* With itreads, before 5.8.9, this can end up pointing to freed memory
 	   if the GV was created in an eval, as GvFILE() points to CopFILE(),
