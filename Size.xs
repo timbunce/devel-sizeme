@@ -741,6 +741,30 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
         }
       }
     }
+#ifdef HvAUX
+    if (SvOOK(thing)) {
+	/* This direct access is arguably "naughty": */
+	struct mro_meta *meta = HvAUX(thing)->xhv_mro_meta;
+	st->total_size += sizeof(struct xpvhv_aux);
+	hek_size(aTHX_ st, HvNAME_HEK(thing), 1);
+	if (meta) {
+	    st->total_size += sizeof(struct mro_meta);
+	    sv_size(aTHX_ st, (SV *)meta->mro_nextmethod, TOTAL_SIZE_RECURSION);
+#if PERL_VERSION > 10 || (PERL_VERSION == 10 && PERL_SUBVERSION > 0)
+	    sv_size(aTHX_ st, (SV *)meta->isa, TOTAL_SIZE_RECURSION);
+#endif
+#if PERL_VERSION > 10
+	    sv_size(aTHX_ st, (SV *)meta->mro_linear_all, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, meta->mro_linear_current, TOTAL_SIZE_RECURSION);
+#else
+	    sv_size(aTHX_ st, (SV *)meta->mro_linear_dfs, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, (SV *)meta->mro_linear_c3, TOTAL_SIZE_RECURSION);
+#endif
+	}
+    }
+#else
+    check_new_and_strlen(st, HvNAME_get(thing));
+#endif
     TAG;break;
 
 

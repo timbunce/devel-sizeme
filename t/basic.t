@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More tests => 26;
+use Test::More tests => 30;
 use strict;
 use Devel::Size qw(size total_size);
 
@@ -143,5 +143,31 @@ sub shared_hash_keys {
 	skip("[keys %h] doesn't copy as shared hash key scalars prior to 5.10.0",
 	     1) if $] < 5.010;
 	is ($small, $big, 'The "shared" part of shared hash keys is spotted');
+    }
+}
+
+{
+    use vars '%DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG';
+    my $hash_size = total_size(\%DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG);
+    cmp_ok($hash_size, '>', 0, 'Hash size is sane');
+    my $stash_size
+	= total_size(\%DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG::);
+    cmp_ok($stash_size, '>',
+	   $hash_size + length 'DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG_DANG',
+	   'Stash size is larger than hash size plus length of the name');
+}
+
+{
+    my %h = (Perl => 'Rules');
+    my $hash_size = total_size(\%h);
+    cmp_ok($hash_size, '>', 0, 'Hash size is sane');
+    my $a = keys %h;
+    if ($] < 5.010) {
+	is(total_size(\%h), $hash_size,
+	   "Creating iteration state doesn't need to allocate storage");
+	# because all hashes carry the overhead of this storage from creation
+    } else {
+	cmp_ok(total_size(\%h), '>', $hash_size,
+	       'Creating iteration state allocates storage');
     }
 }
