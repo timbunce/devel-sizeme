@@ -17,6 +17,17 @@
 #ifndef SvOOK_offset
 #  define SvOOK_offset(sv, len) STMT_START { len = SvIVX(sv); } STMT_END
 #endif
+#ifndef SvIsCOW
+#  define SvIsCOW(sv)           ((SvFLAGS(sv) & (SVf_FAKE | SVf_READONLY)) == \
+                                    (SVf_FAKE | SVf_READONLY))
+#endif
+#ifndef SvIsCOW_shared_hash
+#  define SvIsCOW_shared_hash(sv)   (SvIsCOW(sv) && SvLEN(sv) == 0)
+#endif
+#ifndef SvSHARED_HEK_FROM_PV
+#  define SvSHARED_HEK_FROM_PV(pvx) \
+        ((struct hek*)(pvx - STRUCT_OFFSET(struct hek, hek_key)))
+#endif
 
 #if PERL_VERSION < 6
 #  define PL_opargs opargs
@@ -820,6 +831,8 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
   freescalar:
     if(recurse && SvROK(thing))
 	sv_size(aTHX_ st, SvRV_const(thing), recurse);
+    else if (SvIsCOW_shared_hash(thing))
+	hek_size(aTHX_ st, SvSHARED_HEK_FROM_PV(SvPVX(thing)), 1);
     else
 	st->total_size += SvLEN(thing);
 

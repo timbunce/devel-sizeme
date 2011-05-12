@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More tests => 19;
+use Test::More tests => 26;
 use strict;
 use Devel::Size qw(size total_size);
 
@@ -122,4 +122,26 @@ foreach(['undef', total_size(undef)],
     is(total_size($uurk), $before_size,
        "Size doesn't change because OOK is used");
     cmp_ok(length $uurk, '<', $before_size, 'but string is shorter');
+}
+
+sub shared_hash_keys {
+    my %h = @_;
+    my $one = total_size([keys %h]);
+    cmp_ok($one, '>', 0, 'Size of one entry is sane');
+    my $two =  total_size([keys %h, keys %h]);
+    cmp_ok($two, '>', $one, 'Two take more space than one');
+    my $increment = $two - $one;
+    is(total_size([keys %h, keys %h, keys %h]), $one + 2 * $increment,
+		 'Linear size increase for three');
+    return $increment;
+}
+
+{
+    my $small = shared_hash_keys(Perl => 'Rules');
+    my $big = shared_hash_keys('x' x 1024, '');
+ SKIP: {
+	skip("[keys %h] doesn't copy as shared hash key scalars prior to 5.10.0",
+	     1) if $] < 5.010;
+	is ($small, $big, 'The "shared" part of shared hash keys is spotted');
+    }
 }
