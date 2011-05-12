@@ -794,7 +794,11 @@ sv_size(pTHX_ struct state *const st, const SV * const orig_thing,
 
   case SVt_PVGV: TAG;
     if(isGV_with_GP(thing)) {
+#ifdef GvNAME_HEK
+	hek_size(aTHX_ st, GvNAME_HEK(thing), 1);
+#else	
 	st->total_size += GvNAMELEN(thing);
+#endif
 #ifdef GvFILE_HEK
 	hek_size(aTHX_ st, GvFILE_HEK(thing), 1);
 #elif defined(GvFILE)

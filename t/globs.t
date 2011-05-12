@@ -60,9 +60,18 @@ $SIG{__WARN__} = sub {
     my $copy = *PFLAP;
     my $copy_gv_size = total_size($copy);
     # GV copies point back to the real GV through GvEGV. They share the same GP
-    # and GvFILE
-    is($copy_gv_size, $real_gv_size + $incremental_gv_size - $gp_size,
-      'GV copies point back to the real GV');
+    # and GvFILE. In 5.10 and later GvNAME is also shared.
+    my $shared_gvname = 0;
+    if ($] >= 5.010) {
+	# Calculate the size of the shared HEK:
+	my %h = (PFLAP => 0);
+	my $shared = (keys %h)[0];
+	$shared_gvname = total_size($shared);
+	undef $shared;
+	$shared_gvname-= total_size($shared);
+    }
+    is($copy_gv_size, $real_gv_size + $incremental_gv_size - $gp_size
+       - $shared_gvname, 'GV copies point back to the real GV');
 }
 
 sub gv_grew {
