@@ -15,7 +15,12 @@ require Tie::Scalar;
 	   'size increases due to magic');
 }
 
-{
+SKIP: {
+    # bug in perl added in blead by commit 815f25c6e302f84e, fixed in commit
+    # f5c235e79ea25787, merged to maint-5.8 as 0710cc63c26afd0c and
+    # 8298b2e171ce84cf respectively.
+    skip("This triggers a formline assertion on $]", 4)
+	if $] > 5.008000 && $] < 5.008003;
     my $string = 'Perl Rules';
     my $before_size = total_size($string);
     formline $string;
