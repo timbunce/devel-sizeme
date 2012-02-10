@@ -74,12 +74,35 @@ $SIG{__WARN__} = sub {
        - $shared_gvname, 'GV copies point back to the real GV');
 }
 
-sub gv_grew {
-    my ($sub, $glob, $code, $type) = @_;
+# As of blead commit b50b20584a1bbc1a, Implement new 'use 5.xxx' plan,
+# use strict; will write to %^H. In turn, this causes the eval $code below
+# to have compile with a pp_hintseval with a private copy of %^H in the
+# optree. In turn, this private value is copied on op execution and put on
+# the stack. The act of copying requires a hash iterator, and the *first*
+# time the op is encountered its private HV doesn't have space for one, so
+# it's expanded to hold one. Which happens after $cv_was_size is assigned to.
+# Which matters, because it means that the total size of anything that can
+# reach \&gv_grew will include this extra size. In this case, this means that
+# if the code for generate_glob() is within gv_grew() [as it used to be],
+# then the generated subroutine's CvOUTSIDE points to an anon sub whose
+# CvOUTSIDE points to gv_grew(). Which means that the generated subroutine
+# gets "bigger" simply as a side effect of the eval executing.
+
+# The solution is to put the eval that creates the subroutine into a different
+# scope, so that its outside pointer chain doesn't include gv_grew(). Hence
+# it's now broken out into generate_glob():
+
+sub generate_glob {
+    my ($sub, $glob) = @_;
     # unthreaded, this gives us a way of getting to sv_size() from one of the
     # other *_size() functions, with a GV that has nothing allocated from its
     # GP:
     eval "sub $sub { *$glob }; 1" or die $@;
+}
+
+sub gv_grew {
+    my ($sub, $glob, $code, $type) = @_;
+    generate_glob($sub, $glob);
     # Assigning to IoFMT_GV() also provides this, threaded and unthreaded:
     $~ = $glob;
     
