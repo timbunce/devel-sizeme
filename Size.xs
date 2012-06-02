@@ -41,7 +41,7 @@
     functionality on other platforms.  */
 #  include <excpt.h>
 #  define TRY_TO_CATCH_SEGV __try
-#  define CAUGHT_EXCEPTION __except(EXCEPTION EXCEPTION_EXECUTE_HANDLER)
+#  define CAUGHT_EXCEPTION __except(EXCEPTION_EXECUTE_HANDLER)
 #else
 #  define TRY_TO_CATCH_SEGV if(1)
 #  define CAUGHT_EXCEPTION else
