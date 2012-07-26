@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::Size.
 
+0.78 2011-07-26 nicholas
+ [no changes]
+
 0.77_51 2012-07-17 nicholas
  * Fix for MSVC builds from bulk 88 [CPAN #77589]
 
