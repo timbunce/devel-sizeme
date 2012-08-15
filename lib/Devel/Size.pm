@@ -187,7 +187,7 @@ larger.
 Since version 0.72, Devel::Size uses a new pointer tracking mechanism
 that consumes far less memory than was previously the case. It does this
 by using a bit vector where 1 bit represents each 4- or 8-byte aligned pointer
-(32- or 64-bit platform dependant) that could exist. Further, it segments
+(32- or 64-bit platform dependent) that could exist. Further, it segments
 that bit vector and only allocates each chunk when an address is seen within
 that chunk. Since version 0.73, chunks are allocated in blocks of 2**16 bits
 (ie 8K), accessed via a 256-way tree. The tree is 2 levels deep on a 32 bit
