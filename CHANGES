@@ -1,6 +1,7 @@
 Revision history for Perl extension Devel::Size.
 
  * Spelling fix to docs from gregor herrmann [CPAN #78766]
+ * Fix measurement of struct svop [Tim]
 
 0.78 2011-07-26 nicholas
  [no changes]

@@ -9,6 +9,7 @@ use Config;
 my $ptr_bits = length $1;
 
 WriteMakefile(
+    OPTIMIZE => "-g",
 	      NAME => 'Devel::Size',
 	      VERSION_FROM => 'lib/Devel/Size.pm',
 	      DEFINE => "-DALIGN_BITS=$ptr_bits",
