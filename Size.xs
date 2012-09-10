@@ -99,6 +99,8 @@ struct state {
     void (*free_state_cb)(struct state *st);
     UV seqn;
     void *state_cb_data; /* free'd by free_state() after free_state_cb() call */
+    /* this stuff wil be moved to state_cb_data later */
+    FILE *node_stream;
 };
 
 #define ADD_SIZE(st, leafname, bytes) (NPathAddSizeCb(st, leafname, bytes) (st)->total_size += (bytes))
@@ -177,7 +179,7 @@ static const char *svtypenames[SVt_LAST] = {
 };
 
 int
-print_node_name(npath_node_t *npath_node)
+np_print_node_name(FILE *fp, npath_node_t *npath_node)
 {
     char buf[1024]; /* XXX */
 
@@ -186,60 +188,60 @@ print_node_name(npath_node_t *npath_node)
         const SV *sv = (SV*)npath_node->id;
         int type = SvTYPE(sv);
         char *typename = (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
-        fprintf(stderr, "SV(%s)", typename);
+        fprintf(fp, "SV(%s)", typename);
         switch(type) {  /* add some useful details */
-        case SVt_PVAV: fprintf(stderr, " fill=%d/%ld", av_len((AV*)sv), AvMAX((AV*)sv)); break;
-        case SVt_PVHV: fprintf(stderr, " fill=%ld/%ld", HvFILL((HV*)sv), HvMAX((HV*)sv)); break;
+        case SVt_PVAV: fprintf(fp, " fill=%d/%ld", av_len((AV*)sv), AvMAX((AV*)sv)); break;
+        case SVt_PVHV: fprintf(fp, " fill=%ld/%ld", HvFILL((HV*)sv), HvMAX((HV*)sv)); break;
         }
         break;
     }
     case NPtype_OP: { /* id is pointer to the OP op_size was called on */
         const OP *op = (OP*)npath_node->id;
-        fprintf(stderr, "OP(%s)", OP_NAME(op));
+        fprintf(fp, "OP(%s)", OP_NAME(op));
         break;
     }
     case NPtype_MAGIC: { /* id is pointer to the MAGIC struct */
         MAGIC *magic_pointer = (MAGIC*)npath_node->id;
         /* XXX it would be nice if we could reuse mg_names.c [sigh] */
-        fprintf(stderr, "MAGIC(%c)", magic_pointer->mg_type ? magic_pointer->mg_type : '0');
+        fprintf(fp, "MAGIC(%c)", magic_pointer->mg_type ? magic_pointer->mg_type : '0');
         break;
     }
     case NPtype_LINK:
-        fprintf(stderr, "%s->", npath_node->id);
+        fprintf(fp, "%s->", npath_node->id);
         break;
     case NPtype_NAME:
-        fprintf(stderr, "%s", npath_node->id);
+        fprintf(fp, "%s", npath_node->id);
         break;
     default:    /* assume id is a string pointer */
-        fprintf(stderr, "UNKNOWN(%d,%p)", npath_node->type, npath_node->id);
+        fprintf(fp, "UNKNOWN(%d,%p)", npath_node->type, npath_node->id);
         break;
     }
     return 0;
 }
 
 void
-print_indent(int depth) {
+np_dump_indent(int depth) {
     while (depth-- > 0)
         fprintf(stderr, ":   ");
 }
 
 int
-print_formatted_node(struct state *st, npath_node_t *npath_node) {
-    print_indent(npath_node->depth);
-    print_node_name(npath_node);
+dump_formatted_node(struct state *st, npath_node_t *npath_node) {
+    np_dump_indent(npath_node->depth);
+    np_print_node_name(stderr, npath_node);
     fprintf(stderr, "\t\t[#%ld @%u] ", npath_node->seqn, npath_node->depth);
     fprintf(stderr, "\n");
     return 0;
 }
 
 void
-walk_new_nodes(struct state *st, npath_node_t *npath_node, int (*cb)(struct state *st, npath_node_t *npath_node))
+np_walk_new_nodes(struct state *st, npath_node_t *npath_node, int (*cb)(struct state *st, npath_node_t *npath_node))
 {
     if (npath_node->seqn) /* node already output */
         return;
 
     if (npath_node->prev) {
-        walk_new_nodes(st, npath_node->prev, cb); /* recurse */
+        np_walk_new_nodes(st, npath_node->prev, cb); /* recurse */
         npath_node->depth = npath_node->prev->depth + 1;
     }
     else npath_node->depth = 0;
@@ -252,12 +254,12 @@ walk_new_nodes(struct state *st, npath_node_t *npath_node, int (*cb)(struct stat
 }
 
 int
-dump_path(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
+np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (!attr_type && !attr_value)
-        return 0;
-    walk_new_nodes(st, npath_node, print_formatted_node);
-    print_indent(npath_node->depth+1);
+        return 0; /* ignore zero sized leaf items */
+    np_walk_new_nodes(st, npath_node, dump_formatted_node);
+    np_dump_indent(npath_node->depth+1);
     if (attr_type) {
         fprintf(stderr, "~NAMED('%s') %lu", attr_name, attr_value);
     }
@@ -267,6 +269,32 @@ dump_path(struct state *st, npath_node_t *npath_node, UV attr_type, const char *
         fprintf(stderr, "=%ld ", attr_value+st->total_size);
     }
     fprintf(stderr, "\n");
+    return 0;
+}
+
+int
+np_stream_formatted_node(struct state *st, npath_node_t *npath_node) {
+    fprintf(st->node_stream, "N %lu %u ", npath_node->seqn,
+        (unsigned)npath_node->depth /* just to aid debugging */
+    );
+    np_print_node_name(st->node_stream, npath_node);
+    fprintf(st->node_stream, "\n");
+    return 0;
+}
+
+int
+np_stream_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
+{
+    if (!attr_type && !attr_value)
+        return 0; /* ignore zero sized leaf items */
+    np_walk_new_nodes(st, npath_node, np_stream_formatted_node);
+    if (attr_type) {
+        fprintf(st->node_stream, "A %lu ", npath_node->seqn);   /* Attribute name and value */
+    }
+    else {
+        fprintf(st->node_stream, "L %lu ", npath_node->seqn);   /* Leaf name and memory size */
+    }
+    fprintf(st->node_stream, "%lu %s\n", attr_value, attr_name);
     return 0;
 }
 
@@ -988,8 +1016,15 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
         while (cur_entry) {
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek", NPtype_LINK));
-	  if (recurse >= TOTAL_SIZE_RECURSION)
+	  if (recurse >= TOTAL_SIZE_RECURSION) {
+/* I've seen a PL_strtab HeVAL == 0xC
+ * just running perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()'
+ * but it seemed like a corruption - it would change come and go with irrelevant code changes.
+ * so we protect against that here, but I'd like to know the cause.
+ */
+if (PTR2UV(HeVAL(cur_entry)) > 1000)
 	      sv_size(aTHX_ st, NPathLink("HeVAL", NPtype_LINK), HeVAL(cur_entry), recurse);
+	  }
           cur_entry = cur_entry->hent_next;
         }
       }
@@ -1168,7 +1203,12 @@ new_state(pTHX)
     check_new(st, &PL_sv_placeholder);
 #endif
 #ifdef PATH_TRACKING
-    st->add_attr_cb = dump_path;
+if (getenv("M"))
+st->node_stream = stdout;
+    if (st->node_stream)
+        st->add_attr_cb = np_stream_node_path_info;
+    else
+        st->add_attr_cb = np_dump_node_path_info;
 #endif
     return st;
 }
@@ -1233,6 +1273,7 @@ CODE:
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO unused space in arenas */
   /* TODO unused space in malloc, for whichever mallocs support it */
+  /* TODO threads? */
   /* TODO anything missed? */
 
   RETVAL = st->total_size;
