@@ -1167,6 +1167,9 @@ new_state(pTHX)
 #if PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 0)
     check_new(st, &PL_sv_placeholder);
 #endif
+#ifdef PATH_TRACKING
+    st->add_attr_cb = dump_path;
+#endif
     return st;
 }
 
@@ -1189,12 +1192,49 @@ CODE:
   if (SvROK(thing)) {
     thing = SvRV(thing);
   }
-#ifdef PATH_TRACKING
-  st->add_attr_cb = dump_path;
-  if (st->add_attr_cb)
-    sv_dump(thing);
-#endif
+
   sv_size(aTHX_ st, NULL, thing, ix);
+  RETVAL = st->total_size;
+  free_state(st);
+}
+OUTPUT:
+  RETVAL
+
+UV
+perl_size()
+CODE:
+{
+  dNPathNodes(1, NULL);
+  struct state *st = new_state(aTHX);
+  
+  /* start with PL_defstash to get everything reachable from \%main::
+   * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
+   */
+  sv_size(aTHX_ st, NPathLink("PL_defstash", NPtype_LINK), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_defgv", NPtype_LINK), (SV*)PL_defgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_incgv", NPtype_LINK), (SV*)PL_incgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_rs", NPtype_LINK), (SV*)PL_rs, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_fdpid", NPtype_LINK), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_modglobal", NPtype_LINK), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_errors", NPtype_LINK), (SV*)PL_errors, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_stashcache", NPtype_LINK), (SV*)PL_stashcache, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_patchlevel", NPtype_LINK), (SV*)PL_patchlevel, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_apiversion", NPtype_LINK), (SV*)PL_apiversion, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_registered_mros", NPtype_LINK), (SV*)PL_registered_mros, TOTAL_SIZE_RECURSION);
+#ifdef USE_ITHREADS
+  sv_size(aTHX_ st, NPathLink("PL_regex_padav", NPtype_LINK), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
+#endif
+  /* TODO PL_pidstatus */
+  /* TODO PL_stashpad */
+
+  /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
+  sv_size(aTHX_ st, NPathLink("PL_strtab", NPtype_LINK), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
+
+  /* TODO stacks: cur, main, tmps, mark, scope, save */
+  /* TODO unused space in arenas */
+  /* TODO unused space in malloc, for whichever mallocs support it */
+  /* TODO anything missed? */
+
   RETVAL = st->total_size;
   free_state(st);
 }

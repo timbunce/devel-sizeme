@@ -9,7 +9,7 @@ require XSLoader;
 
 @ISA = qw(Exporter);
 
-@EXPORT_OK = qw(size total_size);
+@EXPORT_OK = qw(size total_size perl_size);
 
 # This allows declaration   use Devel::Size ':all';
 %EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
