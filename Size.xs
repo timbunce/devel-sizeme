@@ -1017,12 +1017,12 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek", NPtype_LINK));
 	  if (recurse >= TOTAL_SIZE_RECURSION) {
-/* I've seen a PL_strtab HeVAL == 0xC
+/* I've seen a PL_strtab HeVAL == 0xC and 0x40C etc
  * just running perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()'
  * but it seemed like a corruption - it would change come and go with irrelevant code changes.
  * so we protect against that here, but I'd like to know the cause.
  */
-if (PTR2UV(HeVAL(cur_entry)) > 1000)
+if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 	      sv_size(aTHX_ st, NPathLink("HeVAL", NPtype_LINK), HeVAL(cur_entry), recurse);
 	  }
           cur_entry = cur_entry->hent_next;
@@ -1246,6 +1246,7 @@ CODE:
 {
   dNPathNodes(1, NULL);
   struct state *st = new_state(aTHX);
+  dNPathSetNode("perl_size", NPtype_NAME); /* provide a root node */
   
   /* start with PL_defstash to get everything reachable from \%main::
    * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
