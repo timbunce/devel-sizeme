@@ -111,8 +111,8 @@ struct state {
 #define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(st, NP-1, 0, (name), (bytes))),
 #define pPATH npath_node_t *NPathArg
 
-/* A subtle point here is that each dNPathSetNode leaves NP pointing to
- * the next unused slot (though with prev already filled in)
+/* A subtle point here is that dNPathNodes and NPathPushNode leaves NP pointing
+ * to the next unused slot (though with prev already filled in)
  * whereas NPathLink leaves NP unchanged, it just fills in the slot NP points
  * to and passes that NP value to the function being called.
  */
@@ -123,14 +123,19 @@ struct state {
             NP->type = 0; \
             NP->id = "?0?"; /* DEBUG */ \
             NP->prev = prev_np
-#define dNPathSetNode(nodeid, nodetype) \
+#define NPathPushNode(nodeid, nodetype) \
             NP->id = nodeid; \
             NP->type = nodetype; \
-            if(0)fprintf(stderr,"dNPathSetNode (%p <-) %p <- [%d %s]\n", NP->prev, NP, nodetype,(char*)nodeid);\
+            if(0)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %s]\n", NP->prev, NP, nodetype,(char*)nodeid);\
             NP++; \
             NP->id="?+?"; /* DEBUG */ \
             NP->seqn = 0; \
             NP->prev = (NP-1)
+#define NPathSetNode(nodeid, nodetype) \
+            (NP-1)->id = nodeid; \
+            (NP-1)->type = nodetype; \
+            if(0)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %s]\n", (NP-1)->prev, (NP-1), nodetype,(char*)nodeid);\
+            (NP-1)->seqn = 0;
 
 /* dNPathUseParent points NP directly the the parents' name_path_nodes array
  * So the function can only safely call ADD_*() but not NPathLink, unless the
@@ -574,10 +579,13 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
   dNPathNodes(1, NPathArg);
   MAGIC *magic_pointer = SvMAGIC(thing);
 
+  /* push a dummy node for NPathSetNode to update inside the while loop */
+  NPathPushNode("dummy", NPtype_NAME);
+
   /* Have we seen the magic pointer?  (NULL has always been seen before)  */
   while (check_new(st, magic_pointer)) {
 
-    dNPathSetNode(magic_pointer, NPtype_MAGIC);
+    NPathSetNode(magic_pointer, NPtype_MAGIC);
 
     ADD_SIZE(st, "mg", sizeof(MAGIC));
     /* magic vtables aren't freed when magic is freed, so don't count them.
@@ -617,7 +625,7 @@ static void
 check_new_and_strlen(struct state *st, const char *const p, pPATH) {
     dNPathNodes(1, NPathArg->prev);
     if(check_new(st, p)) {
-        dNPathSetNode(NPathArg->id, NPtype_NAME);
+        NPathPushNode(NPathArg->id, NPtype_NAME);
 	ADD_SIZE(st, NPathArg->id, 1 + strlen(p));
     }
 }
@@ -627,7 +635,7 @@ regex_size(const REGEXP * const baseregex, struct state *st, pPATH) {
     dNPathNodes(1, NPathArg);
     if(!check_new(st, baseregex))
 	return;
-  dNPathSetNode("regex_size", NPtype_NAME);
+  NPathPushNode("regex_size", NPtype_NAME);
   ADD_SIZE(st, "REGEXP", sizeof(REGEXP));
 #if (PERL_VERSION < 11)     
   /* Note the size of the paren offset thing */
@@ -950,11 +958,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
       warn("Devel::Size: Unknown variable type: %d encountered\n", type);
       return;
   }
-  dNPathSetNode(thing, NPtype_SV);
+  NPathPushNode(thing, NPtype_SV);
   ADD_SIZE(st, "sv", sizeof(SV) + body_sizes[type]);
 
   if (type >= SVt_PVMG) {
-      magic_size(aTHX_ thing, st, NPathLink(NULL, 0));
+      magic_size(aTHX_ thing, st, NPathLink("MG", NPtype_LINK));
   }
 
   switch (type) {
@@ -1010,7 +1018,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
     if (HvARRAY(thing)) {
       HE *cur_entry;
       UV cur_bucket = 0;
-      dNPathSetNode("HvARRAY", NPtype_LINK);
+      NPathPushNode("HvARRAY", NPtype_LINK);
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
@@ -1246,7 +1254,7 @@ CODE:
 {
   dNPathNodes(1, NULL);
   struct state *st = new_state(aTHX);
-  dNPathSetNode("perl_size", NPtype_NAME); /* provide a root node */
+  NPathPushNode("perl_size", NPtype_NAME); /* provide a root node */
   
   /* start with PL_defstash to get everything reachable from \%main::
    * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
