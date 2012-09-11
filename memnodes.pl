@@ -3,37 +3,56 @@
 use strict;
 use warnings;
 
+my $opt_json = 1;
+
 my @stack;
 my %seqn2node;
 
-sub pop_stack {
-    my $x = pop @stack;
+sub enter_node {
+    my $x = shift;
+    if ($opt_json) {
+        print "    " x $x->{depth};
+        print qq({ "id": "$x->{seqn}", "name": "$x->{name}", "depth":$x->{depth}, "children":[ \n);
+    }
+    return;
+}
+
+sub leave_node {
+    my $x = shift;
     delete $seqn2node{$x->{seqn}};
-    my $size = 0; $size += $_  for values %{$x->{leaves}};
-    $x->{self_size} = $size;
+    my $self_size = 0; $self_size += $_  for values %{$x->{leaves}};
+    $x->{self_size} = $self_size;
     if (my $parent = $stack[-1]) {
         # link to parent
         $x->{parent_seqn} = $parent->{seqn};
         # accumulate into parent
         $parent->{kids_node_count} += 1 + ($x->{kids_node_count}||0);
-        $parent->{kids_size} += $size + $x->{kids_size};
+        $parent->{kids_size} += $self_size + $x->{kids_size};
         push @{$parent->{child_seqn}}, $x->{seqn};
     }
     # output
     # ...
-    return $x;
+    if ($opt_json) {
+        print "    " x $x->{depth};
+        my $size = $self_size + $x->{kids_size};
+        print qq(], "data":{ "\$area": $size } },\n);
+    }
+    return;
 }
+
+print "memnodes = [" if $opt_json;
 
 while (<>) {
     chomp;
     my ($type, $seqn, $val, $name, $extra) = split / /, $_, 5;
     if ($type eq "N") {     # Node ($val is depth)
         while ($val < @stack) {
-            my $x = pop_stack();
+            leave_node(my $x = pop @stack);
             warn "N $seqn d$val ends $x->{seqn} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n";
         }
         die 1 if $stack[$val];
         my $node = $stack[$val] = { seqn => $seqn, name => $name, extra => $extra, attr => [], leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
+        enter_node($node);
         $seqn2node{$seqn} = $node;
     }
     elsif ($type eq "L") {  # Leaf name and memory size
@@ -51,9 +70,11 @@ while (<>) {
 
 my $x;
 while (@stack > 1) {
-    $x = pop_stack() while @stack;
+    leave_node($x = pop @stack) while @stack;
     warn "EOF ends $x->{seqn} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n";
 }
+print " ];\n" if $opt_json;
+
 use Data::Dumper;
 warn Dumper(\$x);
 warn Dumper(\%seqn2node);
