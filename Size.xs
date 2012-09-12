@@ -149,7 +149,7 @@ struct state {
 #define NPtype_MAGIC    0x04
 #define NPtype_OP       0x05
 
-#define NPathLink(nodeid, nodetype)   ((NP->id = nodeid), (NP->type = nodetype), (NP->seqn = 0), NP)
+#define NPathLink(nodeid)   ((NP->id = nodeid), (NP->type = NPtype_LINK), (NP->seqn = 0), NP)
 #define NPathOpLink  (NPathArg)
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) (st->add_attr_cb && st->add_attr_cb(st, NP-1, attr_type, attr_name, attr_value))
 
@@ -231,7 +231,40 @@ np_dump_indent(int depth) {
 }
 
 int
-dump_formatted_node(struct state *st, npath_node_t *npath_node) {
+np_walk_new_nodes(struct state *st,
+    npath_node_t *npath_node,
+    npath_node_t *npath_node_deeper,
+    int (*cb)(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper))
+{
+    if (npath_node->seqn) /* node already output */
+        return 0;
+
+    if (npath_node->prev) {
+        np_walk_new_nodes(st, npath_node->prev, npath_node, cb); /* recurse */
+        npath_node->depth = npath_node->prev->depth + 1;
+    }
+    else npath_node->depth = 0;
+    npath_node->seqn = ++st->seqn;
+
+    if (cb) {
+        if (cb(st, npath_node, npath_node_deeper)) {
+            /* ignore this node */
+            assert(npath_node->prev);
+            assert(npath_node->depth);
+            assert(npath_node_deeper);
+            npath_node->depth--;
+            npath_node->seqn = --st->seqn;
+            npath_node_deeper->prev = npath_node->prev;
+        }
+    }
+
+    return 0;
+}
+
+int
+np_dump_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
+    if (0 && npath_node->type == NPtype_LINK)
+        return 1;
     np_dump_indent(npath_node->depth);
     np_print_node_name(stderr, npath_node);
     fprintf(stderr, "\t\t[#%ld @%u] ", npath_node->seqn, npath_node->depth);
@@ -239,31 +272,12 @@ dump_formatted_node(struct state *st, npath_node_t *npath_node) {
     return 0;
 }
 
-void
-np_walk_new_nodes(struct state *st, npath_node_t *npath_node, int (*cb)(struct state *st, npath_node_t *npath_node))
-{
-    if (npath_node->seqn) /* node already output */
-        return;
-
-    if (npath_node->prev) {
-        np_walk_new_nodes(st, npath_node->prev, cb); /* recurse */
-        npath_node->depth = npath_node->prev->depth + 1;
-    }
-    else npath_node->depth = 0;
-    npath_node->seqn = ++st->seqn;
-
-    if (cb)
-        cb(st, npath_node);
-
-    return;
-}
-
 int
 np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (!attr_type && !attr_value)
         return 0; /* ignore zero sized leaf items */
-    np_walk_new_nodes(st, npath_node, dump_formatted_node);
+    np_walk_new_nodes(st, npath_node, NULL, np_dump_formatted_node);
     np_dump_indent(npath_node->depth+1);
     if (attr_type) {
         fprintf(stderr, "~NAMED('%s') %lu", attr_name, attr_value);
@@ -278,9 +292,9 @@ np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type,
 }
 
 int
-np_stream_formatted_node(struct state *st, npath_node_t *npath_node) {
+np_stream_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
     fprintf(st->node_stream, "N %lu %u ", npath_node->seqn,
-        (unsigned)npath_node->depth /* just to aid debugging */
+        (unsigned)npath_node->depth
     );
     np_print_node_name(st->node_stream, npath_node);
     fprintf(st->node_stream, "\n");
@@ -292,7 +306,7 @@ np_stream_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_typ
 {
     if (!attr_type && !attr_value)
         return 0; /* ignore zero sized leaf items */
-    np_walk_new_nodes(st, npath_node, np_stream_formatted_node);
+    np_walk_new_nodes(st, npath_node, NULL, np_stream_formatted_node);
     if (attr_type) {
         fprintf(st->node_stream, "A %lu ", npath_node->seqn);   /* Attribute name and value */
     }
@@ -594,9 +608,9 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
 
 
     TRY_TO_CATCH_SEGV {
-	sv_size(aTHX_ st, NPathLink("mg_obj", NPtype_LINK), magic_pointer->mg_obj, TOTAL_SIZE_RECURSION);
+	sv_size(aTHX_ st, NPathLink("mg_obj"), magic_pointer->mg_obj, TOTAL_SIZE_RECURSION);
 	if (magic_pointer->mg_len == HEf_SVKEY) {
-	    sv_size(aTHX_ st, NPathLink("mg_ptr", NPtype_LINK), (SV *)magic_pointer->mg_ptr, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mg_ptr"), (SV *)magic_pointer->mg_ptr, TOTAL_SIZE_RECURSION);
 	}
 #if defined(PERL_MAGIC_utf8) && defined (PERL_MAGIC_UTF8_CACHESIZE)
 	else if (magic_pointer->mg_type == PERL_MAGIC_utf8) {
@@ -710,9 +724,9 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 	    /* This is defined away in perl 5.8.x, but it is in there for
 	       5.6.x */
 #ifdef PM_GETRE
-	    regex_size(PM_GETRE((PMOP *)baseop), st, NPathLink("PM_GETRE", NPtype_LINK));
+	    regex_size(PM_GETRE((PMOP *)baseop), st, NPathLink("PM_GETRE"));
 #else
-	    regex_size(((PMOP *)baseop)->op_pmregexp, st, NPathLink("op_pmregexp", NPtype_LINK));
+	    regex_size(((PMOP *)baseop)->op_pmregexp, st, NPathLink("op_pmregexp"));
 #endif
 	    TAG;break;
 	case OPc_SVOP: TAG;
@@ -720,7 +734,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 	    if (!(baseop->op_type == OP_AELEMFAST
 		  && baseop->op_flags & OPf_SPECIAL)) {
 		/* not an OP_PADAV replacement */
-		sv_size(aTHX_ st, NPathLink("SVOP", NPtype_LINK), ((SVOP *)baseop)->op_sv, SOME_RECURSION);
+		sv_size(aTHX_ st, NPathLink("SVOP"), ((SVOP *)baseop)->op_sv, SOME_RECURSION);
 	    }
 	    TAG;break;
 #ifdef OA_PADOP
@@ -731,11 +745,11 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 #ifdef OA_GVOP
       case OPc_GVOP: TAG;
 	  ADD_SIZE(st, "gvop", sizeof(struct gvop));
-	  sv_size(aTHX_ st, NPathLink("GVOP", NPtype_LINK), ((GVOP *)baseop)->op_gv, SOME_RECURSION);
+	  sv_size(aTHX_ st, NPathLink("GVOP"), ((GVOP *)baseop)->op_gv, SOME_RECURSION);
 	  TAG;break;
 #endif
 	case OPc_PVOP: TAG;
-	    check_new_and_strlen(st, ((PVOP *)baseop)->op_pv, NPathLink("op_pv", NPtype_LINK));
+	    check_new_and_strlen(st, ((PVOP *)baseop)->op_pv, NPathLink("op_pv"));
 	    TAG;break;
 	case OPc_LOOP: TAG;
 	    ADD_SIZE(st, "loop", sizeof(struct loop));
@@ -759,14 +773,14 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
           before 5.11 @33656, but later than 5.10, producing slightly too
           small memory sizes on these Perls. */
 #if (PERL_VERSION < 11)
-          check_new_and_strlen(st, basecop->cop_label, NPathLink("cop_label", NPtype_LINK));
+          check_new_and_strlen(st, basecop->cop_label, NPathLink("cop_label"));
 #endif
 #ifdef USE_ITHREADS
-          check_new_and_strlen(st, basecop->cop_file, NPathLink("cop_file", NPtype_LINK));
-          check_new_and_strlen(st, basecop->cop_stashpv, NPathLink("cop_stashpv", NPtype_LINK));
+          check_new_and_strlen(st, basecop->cop_file, NPathLink("cop_file"));
+          check_new_and_strlen(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));
 #else
-	  sv_size(aTHX_ st, NPathLink("cop_stash", NPtype_LINK), (SV *)basecop->cop_stash, SOME_RECURSION);
-	  sv_size(aTHX_ st, NPathLink("cop_filegv", NPtype_LINK), (SV *)basecop->cop_filegv, SOME_RECURSION);
+	  sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
+	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv, SOME_RECURSION);
 #endif
 
         }
@@ -784,10 +798,12 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 static void
 hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 {
-    dNPathUseParent(NPathArg);
+    dNPathNodes(1, NPathArg);
+
     /* Hash keys can be shared. Have we seen this before? */
     if (!check_new(st, hek))
 	return;
+    NPathPushNode("hek", NPtype_NAME);
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
 #if PERL_VERSION < 8
 	+ 1 /* No hash key flags prior to 5.8.0  */
@@ -962,7 +978,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
   ADD_SIZE(st, "sv", sizeof(SV) + body_sizes[type]);
 
   if (type >= SVt_PVMG) {
-      magic_size(aTHX_ thing, st, NPathLink("MG", NPtype_LINK));
+      magic_size(aTHX_ thing, st, NPathLink("MG"));
   }
 
   switch (type) {
@@ -973,7 +989,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
   case SVt_IV: TAG;
 #endif
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, NPathLink("RV", NPtype_LINK), SvRV_const(thing), recurse);
+	sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing), recurse);
     TAG;break;
 
   case SVt_PVAV: TAG;
@@ -987,7 +1003,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 	  SSize_t i = AvFILLp(thing) + 1;
 
 	  while (i--)
-	      sv_size(aTHX_ st, NPathLink("AVelem", NPtype_LINK), AvARRAY(thing)[i], recurse);
+	      sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i], recurse);
       }
     }
     /* Add in the bits on the other side of the beginning */
@@ -1005,7 +1021,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
        Post 5.9.something this is stored in magic, so will be found there,
        and Perl_av_arylen_p() takes a non-const AV*, hence compilers rightly
        complain about AvARYLEN() passing thing to it.  */
-    sv_size(aTHX_ st, NPathLink("ARYLEN", NPtype_LINK), AvARYLEN(thing), recurse);
+    sv_size(aTHX_ st, NPathLink("ARYLEN"), AvARYLEN(thing), recurse);
 #endif
     TAG;break;
   case SVt_PVHV: TAG;
@@ -1018,12 +1034,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
     if (HvARRAY(thing)) {
       HE *cur_entry;
       UV cur_bucket = 0;
-      NPathPushNode("HvARRAY", NPtype_LINK);
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
           ADD_SIZE(st, "he", sizeof(HE));
-	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek", NPtype_LINK));
+	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
 	  if (recurse >= TOTAL_SIZE_RECURSION) {
 /* I've seen a PL_strtab HeVAL == 0xC and 0x40C etc
  * just running perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()'
@@ -1031,7 +1046,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
  * so we protect against that here, but I'd like to know the cause.
  */
 if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
-	      sv_size(aTHX_ st, NPathLink("HeVAL", NPtype_LINK), HeVAL(cur_entry), recurse);
+	      sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry), recurse);
 	  }
           cur_entry = cur_entry->hent_next;
         }
@@ -1050,39 +1065,39 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 	    if (count < 0)
 		count = -count;
 	    while (--count)
-		hek_size(aTHX_ st, names[count], 1, NPathLink("HvAUXelem", NPtype_LINK));
+		hek_size(aTHX_ st, names[count], 1, NPathLink("HvAUXelem"));
 	}
 	else
 #endif
 	{
-	    hek_size(aTHX_ st, HvNAME_HEK(thing), 1, NPathLink("HvNAME_HEK", NPtype_LINK));
+	    hek_size(aTHX_ st, HvNAME_HEK(thing), 1, NPathLink("HvNAME_HEK"));
 	}
 
 	ADD_SIZE(st, "xpvhv_aux", sizeof(struct xpvhv_aux));
 	if (meta) {
 	    ADD_SIZE(st, "mro_meta", sizeof(struct mro_meta));
-	    sv_size(aTHX_ st, NPathLink("mro_nextmethod", NPtype_LINK), (SV *)meta->mro_nextmethod, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_nextmethod"), (SV *)meta->mro_nextmethod, TOTAL_SIZE_RECURSION);
 #if PERL_VERSION > 10 || (PERL_VERSION == 10 && PERL_SUBVERSION > 0)
-	    sv_size(aTHX_ st, NPathLink("isa", NPtype_LINK), (SV *)meta->isa, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("isa"), (SV *)meta->isa, TOTAL_SIZE_RECURSION);
 #endif
 #if PERL_VERSION > 10
-	    sv_size(aTHX_ st, NPathLink("mro_linear_all", NPtype_LINK), (SV *)meta->mro_linear_all, TOTAL_SIZE_RECURSION);
-	    sv_size(aTHX_ st, NPathLink("mro_linear_current", NPtype_LINK), meta->mro_linear_current, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_all"), (SV *)meta->mro_linear_all, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_current"), meta->mro_linear_current, TOTAL_SIZE_RECURSION);
 #else
-	    sv_size(aTHX_ st, NPathLink("mro_linear_dfs", NPtype_LINK), (SV *)meta->mro_linear_dfs, TOTAL_SIZE_RECURSION);
-	    sv_size(aTHX_ st, NPathLink("mro_linear_c3", NPtype_LINK), (SV *)meta->mro_linear_c3, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_dfs"), (SV *)meta->mro_linear_dfs, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_c3"), (SV *)meta->mro_linear_c3, TOTAL_SIZE_RECURSION);
 #endif
 	}
     }
 #else
-    check_new_and_strlen(st, HvNAME_get(thing), NPathLink("HvNAME", NPtype_LINK));
+    check_new_and_strlen(st, HvNAME_get(thing), NPathLink("HvNAME"));
 #endif
     TAG;break;
 
 
   case SVt_PVFM: TAG;
-    padlist_size(aTHX_ st, NPathLink("CvPADLIST", NPtype_LINK), CvPADLIST(thing), SOME_RECURSION);
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE", NPtype_LINK), (SV *)CvOUTSIDE(thing), recurse);
+    padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), recurse);
 
     if (st->go_yell && !st->fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
@@ -1091,28 +1106,28 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
     goto freescalar;
 
   case SVt_PVCV: TAG;
-    sv_size(aTHX_ st, NPathLink("CvSTASH", NPtype_LINK), (SV *)CvSTASH(thing), SOME_RECURSION);
-    sv_size(aTHX_ st, NPathLink("SvSTASH", NPtype_LINK), (SV *)SvSTASH(thing), SOME_RECURSION);
-    sv_size(aTHX_ st, NPathLink("CvGV", NPtype_LINK), (SV *)CvGV(thing), SOME_RECURSION);
-    padlist_size(aTHX_ st, NPathLink("CvPADLIST", NPtype_LINK), CvPADLIST(thing), SOME_RECURSION);
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE", NPtype_LINK), (SV *)CvOUTSIDE(thing), recurse);
+    sv_size(aTHX_ st, NPathLink("CvSTASH"), (SV *)CvSTASH(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing), SOME_RECURSION);
+    padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), recurse);
     if (CvISXSUB(thing)) {
-	sv_size(aTHX_ st, NPathLink("cv_const_sv", NPtype_LINK), cv_const_sv((CV *)thing), recurse);
+	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing), recurse);
     } else {
-	op_size(aTHX_ CvSTART(thing), st, NPathLink("CvSTART", NPtype_LINK));
-	op_size(aTHX_ CvROOT(thing), st, NPathLink("CvROOT", NPtype_LINK));
+	op_size(aTHX_ CvSTART(thing), st, NPathLink("CvSTART"));
+	op_size(aTHX_ CvROOT(thing), st, NPathLink("CvROOT"));
     }
     goto freescalar;
 
   case SVt_PVIO: TAG;
     /* Some embedded char pointers */
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name, NPathLink("xio_top_name", NPtype_LINK));
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name, NPathLink("xio_fmt_name", NPtype_LINK));
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name, NPathLink("xio_bottom_name", NPtype_LINK));
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name, NPathLink("xio_top_name"));
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name, NPathLink("xio_fmt_name"));
+    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name, NPathLink("xio_bottom_name"));
     /* Throw the GVs on the list to be walked if they're not-null */
-    sv_size(aTHX_ st, NPathLink("xio_top_gv", NPtype_LINK), (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
-    sv_size(aTHX_ st, NPathLink("xio_bottom_gv", NPtype_LINK), (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
-    sv_size(aTHX_ st, NPathLink("xio_fmt_gv", NPtype_LINK), (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, recurse);
+    sv_size(aTHX_ st, NPathLink("xio_top_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
+    sv_size(aTHX_ st, NPathLink("xio_bottom_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
+    sv_size(aTHX_ st, NPathLink("xio_fmt_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, recurse);
 
     /* Only go trotting through the IO structures if they're really
        trottable. If USE_PERLIO is defined we can do this. If
@@ -1131,13 +1146,13 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
   case SVt_PVGV: TAG;
     if(isGV_with_GP(thing)) {
 #ifdef GvNAME_HEK
-	hek_size(aTHX_ st, GvNAME_HEK(thing), 1, NPathLink("GvNAME_HEK", NPtype_LINK));
+	hek_size(aTHX_ st, GvNAME_HEK(thing), 1, NPathLink("GvNAME_HEK"));
 #else	
 	ADD_SIZE(st, "GvNAMELEN", GvNAMELEN(thing));
 #endif
         ADD_ATTR(st, 1, GvNAME_get(thing), 0);
 #ifdef GvFILE_HEK
-	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK", NPtype_LINK));
+	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK"));
 #elif defined(GvFILE)
 #  if !defined(USE_ITHREADS) || (PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 8))
 	/* With itreads, before 5.8.9, this can end up pointing to freed memory
@@ -1147,18 +1162,18 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 	   of cases. 5.9.something added a proper fix, by converting the GP to
 	   use a shared hash key (porperly reference counted), instead of a
 	   char * (owned by who knows? possibly no-one now) */
-	check_new_and_strlen(st, GvFILE(thing), NPathLink("GvFILE", NPtype_LINK));
+	check_new_and_strlen(st, GvFILE(thing), NPathLink("GvFILE"));
 #  endif
 #endif
 	/* Is there something hanging off the glob? */
 	if (check_new(st, GvGP(thing))) {
 	    ADD_SIZE(st, "GP", sizeof(GP));
-	    sv_size(aTHX_ st, NPathLink("gp_sv", NPtype_LINK), (SV *)(GvGP(thing)->gp_sv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_form", NPtype_LINK), (SV *)(GvGP(thing)->gp_form), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_av", NPtype_LINK), (SV *)(GvGP(thing)->gp_av), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_hv", NPtype_LINK), (SV *)(GvGP(thing)->gp_hv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_egv", NPtype_LINK), (SV *)(GvGP(thing)->gp_egv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_cv", NPtype_LINK), (SV *)(GvGP(thing)->gp_cv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_sv"), (SV *)(GvGP(thing)->gp_sv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_form"), (SV *)(GvGP(thing)->gp_form), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_av"), (SV *)(GvGP(thing)->gp_av), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_hv"), (SV *)(GvGP(thing)->gp_hv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_egv"), (SV *)(GvGP(thing)->gp_egv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_cv"), (SV *)(GvGP(thing)->gp_cv), recurse);
 	}
 #if (PERL_VERSION >= 9)
 	TAG; break;
@@ -1173,9 +1188,9 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
   case SVt_PV: TAG;
   freescalar:
     if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, NPathLink("RV", NPtype_LINK), SvRV_const(thing), recurse);
+	sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing), recurse);
     else if (SvIsCOW_shared_hash(thing))
-	hek_size(aTHX_ st, SvSHARED_HEK_FROM_PV(SvPVX(thing)), 1, NPathLink("SvSHARED_HEK_FROM_PV", NPtype_LINK));
+	hek_size(aTHX_ st, SvSHARED_HEK_FROM_PV(SvPVX(thing)), 1, NPathLink("SvSHARED_HEK_FROM_PV"));
     else
 	ADD_SIZE(st, "SvLEN", SvLEN(thing));
 
@@ -1259,25 +1274,25 @@ CODE:
   /* start with PL_defstash to get everything reachable from \%main::
    * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
    */
-  sv_size(aTHX_ st, NPathLink("PL_defstash", NPtype_LINK), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_defgv", NPtype_LINK), (SV*)PL_defgv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_incgv", NPtype_LINK), (SV*)PL_incgv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_rs", NPtype_LINK), (SV*)PL_rs, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_fdpid", NPtype_LINK), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_modglobal", NPtype_LINK), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_errors", NPtype_LINK), (SV*)PL_errors, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_stashcache", NPtype_LINK), (SV*)PL_stashcache, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_patchlevel", NPtype_LINK), (SV*)PL_patchlevel, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_apiversion", NPtype_LINK), (SV*)PL_apiversion, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_registered_mros", NPtype_LINK), (SV*)PL_registered_mros, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_defstash"), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_defgv"), (SV*)PL_defgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_incgv"), (SV*)PL_incgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_rs"), (SV*)PL_rs, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_errors"), (SV*)PL_errors, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_stashcache"), (SV*)PL_stashcache, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_patchlevel"), (SV*)PL_patchlevel, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_apiversion"), (SV*)PL_apiversion, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_registered_mros"), (SV*)PL_registered_mros, TOTAL_SIZE_RECURSION);
 #ifdef USE_ITHREADS
-  sv_size(aTHX_ st, NPathLink("PL_regex_padav", NPtype_LINK), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_regex_padav"), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
 #endif
   /* TODO PL_pidstatus */
   /* TODO PL_stashpad */
 
   /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
-  sv_size(aTHX_ st, NPathLink("PL_strtab", NPtype_LINK), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_strtab"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO unused space in arenas */

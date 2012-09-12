@@ -3,7 +3,11 @@
 use strict;
 use warnings;
 
-my $opt_json = 1;
+use Getopt::Long;
+
+GetOptions(
+    'json!' => \my $opt_json,
+) or exit 1;
 
 my @stack;
 my %seqn2node;
