@@ -118,9 +118,10 @@ function init(){
     //call for the requested subtree. When completed, the onComplete   
     //callback method should be called.  
     request: function(nodeId, level, onComplete){  
-      var tree = eval('(' + json + ')');  
+      //var tree = eval('(' + json + ')');  
+        var tree = memnodes[0];
       var subtree = $jit.json.getSubtree(tree, nodeId);  
-      $jit.json.prune(subtree, 1);  
+      $jit.json.prune(subtree, 2);  
       onComplete.onComplete(nodeId, subtree);  
     },
     //Add the name of the node in the corresponding label
@@ -130,8 +131,9 @@ function init(){
     }
   });
   
-  var pjson = eval('(' + json + ')');  
-  $jit.json.prune(pjson, 1);
+  //var pjson = eval('(' + json + ')');  
+  var pjson = memnodes[0];
+  $jit.json.prune(pjson, 2);
   
   tm.loadJSON(pjson);
   tm.refresh();
