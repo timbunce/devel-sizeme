@@ -1,5 +1,60 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Mojolicious::Lite;
+
+use ORLite {
+    file => '../x.db',
+    package => "MemView",
+    #user_version => 1,
+    readonly => 1,
+    #unicode => 1,
+};
+
+# Documentation browser under "/perldoc"
+plugin 'PODRenderer';
+
+get '/' => sub {
+    my $self = shift;
+    $self->render('index');
+};
+
+get '/jit_tree/:id/:depth' => sub {
+    my $self = shift;
+    my $id = $self->stash('id');
+    my $depth = $self->stash('depth');
+    warn "jit_tree $id $depth";
+    my $jit_tree = _fetch_node($id, $depth, sub {
+        my $node=shift; $node->{data}{'$area'} = $node->{self_size}+$node->{kids_size}
+    });
+    use Devel::Dwarn; Dwarn($jit_tree);
+    $self->render_json($jit_tree);
+};
+
+sub _fetch_node {
+    my ($id, $depth, $transform) = @_;
+    my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id);
+    if ($depth && $node->{child_seqns}) {
+        my @child_seqns = split /,/, $node->{child_seqns};
+        my @children = map { _fetch_node($_, $depth-1, $transform) } @child_seqns;
+        $node->{children} = \@children;
+    }
+    $transform->($node) if $transform;
+    return $node;
+}
+
+
+app->start;
+__DATA__
+@@ index.html.ep
+% layout 'default';
+% title 'Welcome';
+Welcome to the Mojolicious real-time web framework!
+
+@@ layouts/default.html.ep
+<!DOCTYPE html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>Treemap - TreeMap with on-demand nodes</title>
@@ -12,6 +67,7 @@
 
 <!-- JIT Library File -->
 <script language="javascript" type="text/javascript" src="jit.js"></script>
+<script language="javascript" type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
 
 <!-- Example File -->
 <script language="javascript" type="text/javascript" src="tmdata.js"></script>
