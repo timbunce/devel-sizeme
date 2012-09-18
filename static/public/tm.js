@@ -99,15 +99,22 @@ function init(){
         var html = "<div class=\"tip-title\">" + node.name 
           + "</div><div class=\"tip-text\">";
         var data = node.data;
-        if(data.artist) {
-          html += "Artist: " + data.artist + "<br />";
+
+    //"child_seqns"     => 4,
+    //"depth"           => 2,
+    //"id"              => 3,
+    //"kids_node_count" => 4426,
+    //"kids_size"       => 560058,
+    //"name"            => "SV(PVHV)",
+    //"parent_seqn"     => 2,
+    //"self_size"       => 1080,
+
+        html += sprintf("Name: %s<br />\n", data.name);
+        html += sprintf("Size: %d (%d + %d)<br />", data.self_size+data.kids_size, data.self_size, data.kids_size);
+        if (data.child_count) {
+            html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
         }
-        if(data.playcount) {
-          html += "Play count: " + data.playcount;
-        }
-        if(data.image) {
-          html += "<img src=\""+ data.image +"\" class=\"album\" />";
-        }
+
         tip.innerHTML =  html; 
       }  
     },
@@ -152,27 +159,6 @@ else {
   tm.refresh();
 }
 
-  var sq = $jit.id('r-sq'),
-      st = $jit.id('r-st'),
-      sd = $jit.id('r-sd');
-  var util = $jit.util;
-  util.addEvent(sq, 'change', function() {
-    if(!sq.checked) return;
-    util.extend(tm, new $jit.Layouts.TM.Squarified);
-    tm.refresh();
-  });
-  util.addEvent(st, 'change', function() {
-    if(!st.checked) return;
-    util.extend(tm, new $jit.Layouts.TM.Strip);
-    tm.layout.orientation = "v";
-    tm.refresh();
-  });
-  util.addEvent(sd, 'change', function() {
-    if(!sd.checked) return;
-    util.extend(tm, new $jit.Layouts.TM.SliceAndDice);
-    tm.layout.orientation = "v";
-    tm.refresh();
-  });
   //add event to the back button
   var back = $jit.id('back');
   $jit.util.addEvent(back, 'click', function() {

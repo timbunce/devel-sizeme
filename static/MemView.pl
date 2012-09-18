@@ -27,21 +27,35 @@ get '/jit_tree/:id/:depth' => sub {
     my $depth = $self->stash('depth');
     warn "jit_tree $id $depth";
     my $jit_tree = _fetch_node($id, $depth, sub {
-        my $node=shift; $node->{data}{'$area'} = $node->{self_size}+$node->{kids_size}
+        my ($node, $children) = @_;
+        $node->{'$area'} = $node->{self_size}+$node->{kids_size};
+        $node->{child_count} = @$children if $children;
+        my $jit_node = {
+            id   => $node->{id},
+            name => $node->{name},
+            data => $node,
+        };
+        $jit_node->{children} = $children if $children;
+        return $jit_node;
     });
-    use Devel::Dwarn; Dwarn($jit_tree);
+if(1){
+    use Devel::Dwarn;
+    use Data::Dump qw(pp);
+    local $jit_tree->{children};
+    pp($jit_tree);
+}
     $self->render_json($jit_tree);
 };
 
 sub _fetch_node {
     my ($id, $depth, $transform) = @_;
     my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id);
+    my $children;
     if ($depth && $node->{child_seqns}) {
         my @child_seqns = split /,/, $node->{child_seqns};
-        my @children = map { _fetch_node($_, $depth-1, $transform) } @child_seqns;
-        $node->{children} = \@children;
+        $children = [ map { _fetch_node($_, $depth-1, $transform) } @child_seqns ];
     }
-    $transform->($node) if $transform;
+    $node = $transform->($node, $children) if $transform;
     return $node;
 }
 
@@ -57,7 +71,7 @@ Welcome to the Mojolicious real-time web framework!
 <!DOCTYPE html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<title>Treemap - TreeMap with on-demand nodes</title>
+<title>Perl Memory Treemap</title>
 
 <!-- CSS Files -->
 <link type="text/css" href="css/base.css" rel="stylesheet" />
@@ -70,7 +84,7 @@ Welcome to the Mojolicious real-time web framework!
 <script language="javascript" type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
 
 <!-- Example File -->
-<script language="javascript" type="text/javascript" src="tmdata.js"></script>
+<script language="javascript" type="text/javascript" src="sprintf.js"></script>
 <script language="javascript" type="text/javascript" src="tm.js"></script>
 </head>
 
@@ -79,52 +93,14 @@ Welcome to the Mojolicious real-time web framework!
 
 <div id="left-container">
 
-
-
 <div class="text">
 <h4>
-TreeMap with on-demand nodes    
+Perl Memory TreeMap
 </h4> 
-
-            This example shows how you can use the <b>request</b> controller method to create a TreeMap with on demand nodes<br /><br />
-            This example makes use of native Canvas text and shadows, but can be easily adapted to use HTML like the other examples.<br /><br />
-            There should be only one level shown at a time.<br /><br /> 
-            Clicking on a band should show a new TreeMap with its most listened albums.<br /><br />            
-            
-</div>
-
-<div id="id-list">
-<table>
-    <tr>
-        <td>
-            <label for="r-sq">Squarified </label>
-        </td>
-        <td>
-            <input type="radio" id="r-sq" name="layout" checked="checked" value="left" />
-        </td>
-    </tr>
-    <tr>
-         <td>
-            <label for="r-st">Strip </label>
-         </td>
-         <td>
-            <input type="radio" id="r-st" name="layout" value="top" />
-         </td>
-    <tr>
-         <td>
-            <label for="r-sd">SliceAndDice </label>
-          </td>
-          <td>
-            <input type="radio" id="r-sd" name="layout" value="bottom" />
-          </td>
-    </tr>
-</table>
+    Clicking on a node will show a new TreeMap with the contents of that node.<br /><br />            
 </div>
 
 <a id="back" href="#" class="theme button white">Go to Parent</a>
-
-
-<div style="text-align:center;"><a href="example2.js">See the Example Code</a></div>            
 </div>
 
 <div id="center-container">
