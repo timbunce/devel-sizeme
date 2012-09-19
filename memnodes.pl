@@ -32,11 +32,12 @@ $dbh->do(q{
         kids_size integer,
         kids_node_count integer,
         child_ids text,
-        attr_json text
+        attr_json text,
+        leaves_json text
     )
 });
 my $node_ins_sth = $dbh->prepare(q{
-    INSERT INTO node VALUES (?,?,?,?,  ?,?,?,?,?)
+    INSERT INTO node VALUES (?,?,?,?,  ?,?,?,?,?,?)
 });
 
 my @stack;
@@ -73,11 +74,12 @@ sub leave_node {
     }
     if ($dbh) {
         my $attr_json = $j->encode($x->{attr});
+        my $leaves_json = $j->encode($x->{leaves});
         $node_ins_sth->execute(
             $x->{id}, $x->{name}, $x->{depth}, $x->{parent_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
             $x->{child_id} ? join(",", @{$x->{child_id}}) : undef,
-            $attr_json,
+            $attr_json, $leaves_json,
         );
         # XXX attribs
     }

@@ -107,7 +107,8 @@ function init(){
         html += sprintf("Depth: %d<br />", data.depth);
         html += sprintf("Parent: %d<br />", data.parent_id);
         html += sprintf("Id: %s%s<br />", node.id, data._ids_merged ? data._ids_merged : "");
-        html += JSON.stringify(data.attr, undefined, 4);
+        html += JSON.stringify(data.attr, undefined, 4) + "<br />";
+        html += JSON.stringify(data.leaves, undefined, 4) + "<br />";
 
         tip.innerHTML =  html; 
       }  
