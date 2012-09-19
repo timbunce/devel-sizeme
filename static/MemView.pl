@@ -42,50 +42,39 @@ get '/jit_tree/:id/:depth' => sub {
 if(1){
     use Devel::Dwarn;
     use Data::Dump qw(pp);
-#    local $jit_tree->{children};
+    local $jit_tree->{children};
     pp($jit_tree);
 }
     $self->render_json($jit_tree);
 };
 
-sub _merge_child_into_node {
-    my ($node, $child) = @_;
-  my $fake_data => {
-    "\$area"          => 23230,
-    "child_count"     => 2,
-    "child_seqns"     => "1414,1496",
-    "depth"           => 17,
-    "id"              => 1413,
-    "kids_node_count" => 83,
-    "kids_size"       => 23078,
-    "name"            => "SV(PVGV)",
-    "parent_seqn"     => 1412,
-    "self_size"       => 152,
-  };
-
-}
-
 sub _fetch_node_tree {
     my ($id, $depth) = @_;
     my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id)
         or die "Node '$id' not found";
-    if ($depth && $node->{child_seqns}) {
+    if ($node->{child_seqns}) {
         my @child_seqns = split /,/, $node->{child_seqns};
         my $children;
-        if (@child_seqns == -1) {
+        if (@child_seqns == 1) {
             my $child = _fetch_node_tree($child_seqns[0], $depth); # same depth
-            _merge_child_into_node($node, $child);
+            # merge node into child
+            # XXX id, depth, parent_seqn
+            warn "Merged $node->{name} #$node->{id} with only child $child->{name} #$child->{id}\n";
+            $child->{name} = "$node->{name} + $child->{name}";
+            $child->{$_} += $node->{$_} for (qw(self_size));
+            $child->{$_}  = $node->{$_} for (qw(parent_seqn));
+            $node = $child;
         }
-        else {
+        elsif ($depth) {
             $children = [ map { _fetch_node_tree($_, $depth-1) } @child_seqns ];
+            $node->{children} = $children;
+            $node->{child_count} = @$children;
         }
-        $node->{children} = $children;
-        $node->{child_count} = @$children;
     }
     return $node;
 }
 
-sub _transform_node_tree {  # depth first
+sub _transform_node_tree {  # recurse depth first
     my ($node, $transform) = @_;
     if (my $children = $node->{children}) {
         $_ = _transform_node_tree($_, $transform) for @$children;

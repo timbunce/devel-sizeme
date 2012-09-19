@@ -36,7 +36,7 @@ function init(){
     //show only one tree level
     levelsToShow: 2,
     //parent box title heights
-    titleHeight: 0,
+    titleHeight: 10,
     //enable animations
     animate: animate,
     //box offsets
@@ -114,6 +114,7 @@ function init(){
         if (data.child_count) {
             html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
         }
+        html += JSON.stringify(data, undefined, 4);
 
         tip.innerHTML =  html; 
       }  
@@ -126,6 +127,8 @@ function init(){
     request: function(nodeId, level, onComplete){  
         if (true) {
             jQuery.getJSON('jit_tree/'+nodeId+'/1', function(data) {
+                console.log("Node "+nodeId);
+                console.log(data);
                 onComplete.onComplete(nodeId, data);  
             });
         }
@@ -145,7 +148,7 @@ function init(){
   
 if(true) {
     jQuery.getJSON('jit_tree/1/1', function(data) {
-  console.log(data);
+        console.log(data);
         tm.loadJSON(data);
         tm.refresh();
     });
