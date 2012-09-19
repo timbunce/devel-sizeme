@@ -34,7 +34,7 @@ function init(){
     //where to inject the visualization
     injectInto: 'infovis',
     //show only one tree level
-    levelsToShow: 1,
+    levelsToShow: 2,
     //parent box title heights
     titleHeight: 0,
     //enable animations
@@ -125,7 +125,7 @@ function init(){
     //callback method should be called.  
     request: function(nodeId, level, onComplete){  
         if (true) {
-            jQuery.getJSON('jit_tree/'+nodeId+'/3', function(data) {
+            jQuery.getJSON('jit_tree/'+nodeId+'/1', function(data) {
                 onComplete.onComplete(nodeId, data);  
             });
         }
@@ -144,7 +144,7 @@ function init(){
   });
   
 if(true) {
-    jQuery.getJSON('jit_tree/1/2', function(data) {
+    jQuery.getJSON('jit_tree/1/1', function(data) {
   console.log(data);
         tm.loadJSON(data);
         tm.refresh();
