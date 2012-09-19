@@ -52,21 +52,26 @@ sub _fetch_node_tree {
     my ($id, $depth) = @_;
     my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id)
         or die "Node '$id' not found";
-    if ($node->{child_seqns}) {
-        my @child_seqns = split /,/, $node->{child_seqns};
+    if ($node->{child_ids}) {
+        my @child_ids = split /,/, $node->{child_ids};
         my $children;
-        if (@child_seqns == 1) {
-            my $child = _fetch_node_tree($child_seqns[0], $depth); # same depth
+        if (@child_ids == 1) {
+            my $child = _fetch_node_tree($child_ids[0], $depth); # same depth
             # merge node into child
-            # XXX id, depth, parent_seqn
+            # XXX id, depth, parent_id
             warn "Merged $node->{name} #$node->{id} with only child $child->{name} #$child->{id}\n";
             $child->{name} = "$node->{name} + $child->{name}";
             $child->{$_} += $node->{$_} for (qw(self_size));
-            $child->{$_}  = $node->{$_} for (qw(parent_seqn));
+            $child->{$_}  = $node->{$_} for (qw(parent_id));
+
+            $child->{_ids_merged} .= ",$node->{id}";
+            my @child_ids = split /,/, $node->{child_ids};
+            $child->{child_count} = @child_ids;
+
             $node = $child;
         }
         elsif ($depth) {
-            $children = [ map { _fetch_node_tree($_, $depth-1) } @child_seqns ];
+            $children = [ map { _fetch_node_tree($_, $depth-1) } @child_ids ];
             $node->{children} = $children;
             $node->{child_count} = @$children;
         }

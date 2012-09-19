@@ -34,9 +34,9 @@ function init(){
     //where to inject the visualization
     injectInto: 'infovis',
     //show only one tree level
-    levelsToShow: 2,
+    levelsToShow: 1,
     //parent box title heights
-    titleHeight: 10,
+    titleHeight: 11,
     //enable animations
     animate: animate,
     //box offsets
@@ -84,7 +84,7 @@ function init(){
       }
     },
     //duration of the animations
-    duration: 1000,
+    duration: 500,
     //Enable tips
     Tips: {
       enable: true,
@@ -100,21 +100,14 @@ function init(){
           + "</div><div class=\"tip-text\">";
         var data = node.data;
 
-    //"child_seqns"     => 4,
-    //"depth"           => 2,
-    //"id"              => 3,
-    //"kids_node_count" => 4426,
-    //"kids_size"       => 560058,
-    //"name"            => "SV(PVHV)",
-    //"parent_seqn"     => 2,
-    //"self_size"       => 1080,
-
-        html += sprintf("Name: %s<br />\n", data.name);
         html += sprintf("Size: %d (%d + %d)<br />", data.self_size+data.kids_size, data.self_size, data.kids_size);
         if (data.child_count) {
             html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
         }
-        html += JSON.stringify(data, undefined, 4);
+        html += sprintf("Depth: %d<br />", data.depth);
+        html += sprintf("Parent: %d<br />", data.parent_id);
+        html += sprintf("Id: %s%s<br />", node.id, data._ids_merged ? data._ids_merged : "");
+        //html += JSON.stringify(data, undefined, 4);
 
         tip.innerHTML =  html; 
       }  

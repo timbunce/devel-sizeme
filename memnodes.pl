@@ -23,12 +23,12 @@ $dbh->do(q{
         id integer primary key,
         name text,
         depth integer,
-        parent_seqn integer,
+        parent_id integer,
 
         self_size integer,
         kids_size integer,
         kids_node_count integer,
-        child_seqns text
+        child_ids text
     )
 });
 my $node_ins_sth = $dbh->prepare(q{
@@ -54,11 +54,11 @@ sub leave_node {
     $x->{self_size} = $self_size;
     if (my $parent = $stack[-1]) {
         # link to parent
-        $x->{parent_seqn} = $parent->{id};
+        $x->{parent_id} = $parent->{id};
         # accumulate into parent
         $parent->{kids_node_count} += 1 + ($x->{kids_node_count}||0);
         $parent->{kids_size} += $self_size + $x->{kids_size};
-        push @{$parent->{child_seqn}}, $x->{id};
+        push @{$parent->{child_id}}, $x->{id};
     }
     # output
     # ...
@@ -69,9 +69,9 @@ sub leave_node {
     }
     if ($dbh) {
         $node_ins_sth->execute(
-            $x->{id}, $x->{name}, $x->{depth}, $x->{parent_seqn},
+            $x->{id}, $x->{name}, $x->{depth}, $x->{parent_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
-            $x->{child_seqn} ? join(",", @{$x->{child_seqn}}) : undef
+            $x->{child_id} ? join(",", @{$x->{child_id}}) : undef
         );
         # XXX attribs
     }
