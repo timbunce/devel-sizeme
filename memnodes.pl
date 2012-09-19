@@ -5,6 +5,7 @@ use warnings;
 
 use DBI;
 use DBD::SQLite;
+use JSON::XS;
 
 use Getopt::Long;
 
@@ -12,6 +13,8 @@ GetOptions(
     'json!' => \my $opt_json,
     'db=s'  => \my $opt_db,
 ) or exit 1;
+
+my $j = JSON::XS->new->ascii->pretty(0);
 
 my $dbh = DBI->connect("dbi:SQLite:dbname=$opt_db","","", {
     RaiseError => 1, PrintError => 0, AutoCommit => 0
@@ -28,11 +31,12 @@ $dbh->do(q{
         self_size integer,
         kids_size integer,
         kids_node_count integer,
-        child_ids text
+        child_ids text,
+        attr_json text
     )
 });
 my $node_ins_sth = $dbh->prepare(q{
-    INSERT INTO node VALUES (?,?,?,?,  ?,?,?,?)
+    INSERT INTO node VALUES (?,?,?,?,  ?,?,?,?,?)
 });
 
 my @stack;
@@ -68,10 +72,12 @@ sub leave_node {
         print qq(], "data":{ "\$area": $size } },\n);
     }
     if ($dbh) {
+        my $attr_json = $j->encode($x->{attr});
         $node_ins_sth->execute(
             $x->{id}, $x->{name}, $x->{depth}, $x->{parent_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
-            $x->{child_id} ? join(",", @{$x->{child_id}}) : undef
+            $x->{child_id} ? join(",", @{$x->{child_id}}) : undef,
+            $attr_json,
         );
         # XXX attribs
     }

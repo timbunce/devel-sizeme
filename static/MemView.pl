@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use JSON::XS;
 use Mojolicious::Lite;
 
 use ORLite {
@@ -12,6 +13,8 @@ use ORLite {
     readonly => 1,
     #unicode => 1,
 };
+
+my $j = JSON::XS->new;
 
 # Documentation browser under "/perldoc"
 plugin 'PODRenderer';
@@ -52,6 +55,7 @@ sub _fetch_node_tree {
     my ($id, $depth) = @_;
     my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id)
         or die "Node '$id' not found";
+    $node->{attr}{self} = $j->decode(delete $node->{attr_json});
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
         my $children;
@@ -63,6 +67,8 @@ sub _fetch_node_tree {
             $child->{name} = "$node->{name} + $child->{name}";
             $child->{$_} += $node->{$_} for (qw(self_size));
             $child->{$_}  = $node->{$_} for (qw(parent_id));
+            Dwarn $node;
+            $child->{attr}{$node->{id}} = $node->{attr};
 
             $child->{_ids_merged} .= ",$node->{id}";
             my @child_ids = split /,/, $node->{child_ids};
