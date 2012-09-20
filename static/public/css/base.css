@@ -109,6 +109,8 @@ a {
 .tip {
     color: #111;
     width: 139px;
+    text-align: left;
+    white-space: pre;
     background-color: white;
     border:1px solid #ccc;
     -moz-box-shadow:#555 2px 2px 8px;

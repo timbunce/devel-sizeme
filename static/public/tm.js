@@ -25,6 +25,25 @@ var Log = {
   }
 };
 
+// http://stackoverflow.com/questions/5199901/how-to-sort-an-associative-array-by-its-values-in-javascript
+function bySortedValue(obj, comparitor, callback, context) {
+    var tuples = [];
+    for (var key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            tuples.push([key, obj[key]]);
+        }
+    }
+
+    tuples.sort(comparitor);
+
+    if (callback) {
+        var length = tuples.length;
+        while (length--) callback.call(context, tuples[length][0], tuples[length][1]);
+    }
+    return tuples;
+}
+
+
 
 function init(){
   //init data
@@ -100,15 +119,31 @@ function init(){
           + "</div><div class=\"tip-text\">";
         var data = node.data;
 
+        html += "<br />";
         html += sprintf("Size: %d (%d + %d)<br />", data.self_size+data.kids_size, data.self_size, data.kids_size);
+
+        if (data.self_size) {
+            html += sprintf("Memory usage:<br />");
+            bySortedValue(data.leaves,
+                function(a, b) { return a[1] - b[1] },
+                function(k, v) { html += sprintf(" %10s: %5d<br />", k, v);
+            });
+            html += "<br />";
+        }
+
+        html += sprintf("Attributes:<br />");
+        bySortedValue(data.attr,
+            function(a, b) { return a[0] > b[0] ? 1 : a[0] < b[0] ? -1 : 0 },
+            function(k, v) { html += sprintf(" %10s: %5d<br />", k, v);
+        });
+        html += "<br />";
+
         if (data.child_count) {
             html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
         }
+        html += sprintf("Id: %s%s<br />", node.id, data._ids_merged ? data._ids_merged : "");
         html += sprintf("Depth: %d<br />", data.depth);
         html += sprintf("Parent: %d<br />", data.parent_id);
-        html += sprintf("Id: %s%s<br />", node.id, data._ids_merged ? data._ids_merged : "");
-        html += JSON.stringify(data.attr, undefined, 4) + "<br />";
-        html += JSON.stringify(data.leaves, undefined, 4) + "<br />";
 
         tip.innerHTML =  html; 
       }  

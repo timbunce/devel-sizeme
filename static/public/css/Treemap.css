@@ -26,12 +26,12 @@
 /*TOOLTIPS*/
 .tip {
     color: #fff;
-    width: 139px;
+    width: auto;
     background-color: black;
     opacity:0.9;
     filter:alpha(opacity=90);
     font-size:10px;
-    font-family:Verdana, Geneva, Arial, Helvetica, sans-serif;
+    font-family: Menlo, Monaco, "Courier New", monospace;
     padding:7px;
 }
 
