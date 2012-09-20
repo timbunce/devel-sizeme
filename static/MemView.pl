@@ -5,6 +5,11 @@ use warnings;
 
 use JSON::XS;
 use Mojolicious::Lite;
+use Getopt::Long;
+
+GetOptions(
+    'db=s' => \(my $opt_db = '../x.db'),
+) or exit 1;
 
 use ORLite {
     file => '../x.db',
@@ -26,6 +31,8 @@ get '/' => sub {
 
 get '/jit_tree/:id/:depth' => sub {
     my $self = shift;
+    my $logarea = $self->param('logarea');
+
     my $id = $self->stash('id');
     my $depth = $self->stash('depth');
     warn "jit_tree $id $depth";
@@ -33,10 +40,11 @@ get '/jit_tree/:id/:depth' => sub {
     my $jit_tree = _transform_node_tree($node_tree, sub {
         my ($node) = @_;
         my $children = delete $node->{children}; # XXX edits the src tree
-        $node->{'$area'} = $node->{self_size}+$node->{kids_size};
+        my $area = $node->{self_size}+$node->{kids_size};
+        $node->{'$area'} = ($logarea) ? log($area) : $area;
         my $jit_node = {
             id   => $node->{id},
-            name => $node->{name},
+            name => $node->{title} || $node->{name},
             data => $node,
         };
         $jit_node->{children} = $children if $children;
@@ -55,8 +63,8 @@ sub _fetch_node_tree {
     my ($id, $depth) = @_;
     my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id)
         or die "Node '$id' not found";
-    $node->{attr}{self} = $j->decode(delete $node->{attr_json});
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
+    $node->{attr}   = $j->decode(delete $node->{attr_json});
 
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
@@ -69,7 +77,31 @@ sub _fetch_node_tree {
             $child->{name} = "$node->{name} + $child->{name}";
             $child->{$_} += $node->{$_} for (qw(self_size));
             $child->{$_}  = $node->{$_} for (qw(parent_id));
-            $child->{attr}{$node->{id}} = $node->{attr};
+
+            $child->{title} = join " + ", grep { defined && length } $child->{title}, $node->{title};
+            warn "Titled $child->{title}" if $child->{title};
+
+            for my $attr_type (keys %{ $node->{attr} }) {
+                my $src = $node->{attr}{$attr_type};
+                if (ref $src eq 'HASH') { # eg NPattr_NAME: {attr}{1}{$name} = $value
+                    my $dst = $child->{attr}{$attr_type} ||= {};
+                    for my $k (keys %$src) {
+                        warn "Node $child->{id} attr $attr_type:$k=$dst->{$k} overwritten by $src->{$k}\n"
+                            if defined $dst->{$k};
+                        $dst->{$k} = $src->{$k};
+                    }
+                }
+                else { # ARRAY eg NPattr_PADNAME: {attr}{2}[$val] = $name
+                    my $dst = $child->{attr}{$attr_type} ||= [];
+                    my $idx = @$src;
+                    while (--$idx >= 0) {
+                        warn "Node $child->{id} attr $attr_type:$idx=$dst->[$idx] overwritten by $src->[$idx]\n"
+                            if defined $dst->[$idx];
+                        $dst->[$idx] = $src->[$idx];
+                    }
+                }
+            }
+
             $child->{leaves}{$_} += $node->{leaves}{$_}
                 for keys %{ $node->{leaves} };
 
@@ -138,6 +170,13 @@ Perl Memory TreeMap
 </div>
 
 <a id="back" href="#" class="theme button white">Go to Parent</a>
+
+<br />
+<form name=params>
+<label for="logarea">&nbsp;Logarithmic scale
+<input type=checkbox id="logarea" name="logarea">
+</form>
+
 </div>
 
 <div id="center-container">

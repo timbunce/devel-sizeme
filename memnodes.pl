@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use DBI;
+use DBI qw(looks_like_number);
 use DBD::SQLite;
 use JSON::XS;
 
@@ -12,6 +12,8 @@ use Getopt::Long;
 GetOptions(
     'json!' => \my $opt_json,
     'db=s'  => \my $opt_db,
+    'verbose|v!' => \my $opt_verbose,
+    'debug|d!' => \my $opt_debug,
 ) or exit 1;
 
 my $j = JSON::XS->new->ascii->pretty(0);
@@ -25,6 +27,7 @@ $dbh->do(q{
     CREATE TABLE node (
         id integer primary key,
         name text,
+        title text,
         depth integer,
         parent_id integer,
 
@@ -37,7 +40,7 @@ $dbh->do(q{
     )
 });
 my $node_ins_sth = $dbh->prepare(q{
-    INSERT INTO node VALUES (?,?,?,?,  ?,?,?,?,?,?)
+    INSERT INTO node VALUES (?,?,?,?,?,  ?,?,?,?,?,?)
 });
 
 my @stack;
@@ -76,7 +79,7 @@ sub leave_node {
         my $attr_json = $j->encode($x->{attr});
         my $leaves_json = $j->encode($x->{leaves});
         $node_ins_sth->execute(
-            $x->{id}, $x->{name}, $x->{depth}, $x->{parent_id},
+            $x->{id}, $x->{name}, $x->{title}, $x->{depth}, $x->{parent_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
             $x->{child_id} ? join(",", @{$x->{child_id}}) : undef,
             $attr_json, $leaves_json,
@@ -94,10 +97,11 @@ while (<>) {
     if ($type eq "N") {     # Node ($val is depth)
         while ($val < @stack) {
             leave_node(my $x = pop @stack);
-            warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n";
+            warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
+                if $opt_verbose;
         }
         die 1 if $stack[$val];
-        my $node = $stack[$val] = { id => $id, name => $name, extra => $extra, attr => [], leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
+        my $node = $stack[$val] = { id => $id, name => $name, extra => $extra, attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
         enter_node($node);
         $seqn2node{$id} = $node;
     }
@@ -105,12 +109,28 @@ while (<>) {
         my $node = $seqn2node{$id} || die;
         $node->{leaves}{$name} += $val;
     }
-    elsif ($type eq "A") {  # Attribute name and value
+    elsif (looks_like_number($type)) {  # Attribute type, name and value
         my $node = $seqn2node{$id} || die;
-        push @{ $node->{attr} }, $name, $val; # pairs
+        my $attr = $node->{attr} || die;
+        if ($type == 1) { # NPattr_NAME
+            warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
+                if exists $attr->{$type}{$name};
+            $attr->{$type}{$name} = $val || $id;
+            warn "A \@$id: '$name' $val\n";
+            $node->{title} = $name if $type == 1 and !$val;
+        }
+        elsif (2 <= $type and $type <= 4) { # NPattr_PAD*
+            warn "Node $id already has attribute $type:$name (value $attr->{$type}[$val])\n"
+                if defined $attr->{$type}[$val];
+            $attr->{$type}[$val] = $name;
+        }
+        else {
+            warn "Invalid attribute type '$type' on line $. ($_)";
+        }
     }
     else {
         warn "Invalid type '$type' on line $. ($_)";
+        next;
     }
     $dbh->commit if $dbh and $id % 10_000 == 0;
 }

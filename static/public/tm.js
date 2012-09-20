@@ -45,6 +45,12 @@ function bySortedValue(obj, comparitor, callback, context) {
 
 
 
+function request_jit_tree(nodeId, level, onComplete){
+    var params = { logarea: 1 };
+    jQuery.getJSON('jit_tree/'+nodeId+'/1', params, onComplete);
+}
+
+
 function init(){
   //init data
   //end
@@ -115,9 +121,11 @@ function init(){
       //add content to the tooltip when a node
       //is hovered
       onShow: function(tip, node, isLeaf, domElement) {
-        var html = "<div class=\"tip-title\">" + node.name 
-          + "</div><div class=\"tip-text\">";
         var data = node.data;
+        var html = "<div class=\"tip-title\">"
+          + (data.title ? data.title : "")
+          + " " + data.name
+          + "</div><div class=\"tip-text\">";
 
         html += "<br />";
         html += sprintf("Size: %d (%d + %d)<br />", data.self_size+data.kids_size, data.self_size, data.kids_size);
@@ -130,6 +138,7 @@ function init(){
             });
             html += "<br />";
         }
+
 
         html += sprintf("Attributes:<br />");
         bySortedValue(data.attr,
@@ -145,6 +154,9 @@ function init(){
         html += sprintf("Depth: %d<br />", data.depth);
         html += sprintf("Parent: %d<br />", data.parent_id);
 
+        html += JSON.stringify(data.attr, undefined, 4);
+        //html += JSON.stringify(data, undefined, 4);
+
         tip.innerHTML =  html; 
       }  
     },
@@ -154,19 +166,11 @@ function init(){
     //call for the requested subtree. When completed, the onComplete   
     //callback method should be called.  
     request: function(nodeId, level, onComplete){  
-        if (true) {
-            jQuery.getJSON('jit_tree/'+nodeId+'/1', function(data) {
-                console.log("Node "+nodeId);
+            request_jit_tree(nodeId, level, function(data) {
+                console.log("Fetched node "+nodeId);
                 console.log(data);
                 onComplete.onComplete(nodeId, data);  
             });
-        }
-        else {
-            var tree = memnodes[0];
-            var subtree = $jit.json.getSubtree(tree, nodeId);  
-            $jit.json.prune(subtree, 2);  
-            onComplete.onComplete(nodeId, subtree);  
-        }
     },
     //Add the name of the node in the corresponding label
     //This method is called once, on label creation and only for DOM labels.
@@ -174,26 +178,17 @@ function init(){
         domElement.innerHTML = node.name;
     }
   });
-  
-if(true) {
-    jQuery.getJSON('jit_tree/1/1', function(data) {
+
+  request_jit_tree(1, 0, function(data) {
         console.log(data);
         tm.loadJSON(data);
         tm.refresh();
     });
-}
-else {
-  //var pjson = eval('(' + json + ')');  
-  var pjson = memnodes[0];
-  $jit.json.prune(pjson, 2);
-  console.log(pjson);
-  tm.loadJSON(pjson);
-  tm.refresh();
+
+    //add event to buttons
+    $jit.util.addEvent($jit.id('back'), 'click', function() { tm.out() });
+    $jit.util.addEvent($jit.id('logarea'), 'onchange', function() { tm.refresh() });
+
 }
 
-  //add event to the back button
-  var back = $jit.id('back');
-  $jit.util.addEvent(back, 'click', function() {
-    tm.out();
-  });
-}
+

@@ -108,7 +108,6 @@ struct state {
 #define PATH_TRACKING
 #ifdef PATH_TRACKING
 
-#define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(st, NP-1, 0, (name), (bytes))),
 #define pPATH npath_node_t *NPathArg
 
 /* A subtle point here is that dNPathNodes and NPathPushNode leaves NP pointing
@@ -149,8 +148,15 @@ struct state {
 #define NPtype_MAGIC    0x04
 #define NPtype_OP       0x05
 
+#define NPattr_LEAFSIZE 0x00
+#define NPattr_NAME     0x01
+#define NPattr_PADFAKE  0x02
+#define NPattr_PADNAME  0x03
+#define NPattr_PADTMP   0x04
+
 #define NPathLink(nodeid)   ((NP->id = nodeid), (NP->type = NPtype_LINK), (NP->seqn = 0), NP)
 #define NPathOpLink  (NPathArg)
+#define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(st, NP-1, NPattr_LEAFSIZE, (name), (bytes))),
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) (st->add_attr_cb && st->add_attr_cb(st, NP-1, attr_type, attr_name, attr_value))
 
 #else
@@ -307,11 +313,11 @@ np_stream_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_typ
     if (!attr_type && !attr_value)
         return 0; /* ignore zero sized leaf items */
     np_walk_new_nodes(st, npath_node, NULL, np_stream_formatted_node);
-    if (attr_type) {
-        fprintf(st->node_stream, "A %lu ", npath_node->seqn);   /* Attribute name and value */
+    if (attr_type) { /* Attribute type, name and value */
+        fprintf(st->node_stream, "%lu %lu ", attr_type, npath_node->seqn);
     }
-    else {
-        fprintf(st->node_stream, "L %lu ", npath_node->seqn);   /* Leaf name and memory size */
+    else { /* Leaf name and memory size */
+        fprintf(st->node_stream, "L %lu ", npath_node->seqn);
     }
     fprintf(st->node_stream, "%lu %s\n", attr_value, attr_name);
     return 0;
@@ -946,12 +952,12 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
         }
         if (namesv) {
             if (SvFAKE(namesv))
-                ADD_ATTR(st, 1, SvPVX_const(namesv), ix);
+                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), ix);
             else
-                ADD_ATTR(st, 1, SvPVX_const(namesv), ix);
+                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), ix);
         }
         else {
-            ADD_ATTR(st, 1, "SVs_PADTMP", ix);
+            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", ix);
         }
 
     }
@@ -1028,7 +1034,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
     /* Now the array of buckets */
     ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
     if (HvENAME(thing)) {
-        ADD_ATTR(st, 1, HvENAME(thing), 0);
+        ADD_ATTR(st, NPattr_NAME, HvENAME(thing), 0);
     }
     /* Now walk the bucket chain */
     if (HvARRAY(thing)) {
@@ -1150,7 +1156,7 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 #else	
 	ADD_SIZE(st, "GvNAMELEN", GvNAMELEN(thing));
 #endif
-        ADD_ATTR(st, 1, GvNAME_get(thing), 0);
+        ADD_ATTR(st, NPattr_NAME, GvNAME_get(thing), 0);
 #ifdef GvFILE_HEK
 	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK"));
 #elif defined(GvFILE)
@@ -1267,7 +1273,7 @@ UV
 perl_size()
 CODE:
 {
-  dNPathNodes(1, NULL);
+  dNPathNodes(2, NULL);
   struct state *st = new_state(aTHX);
   NPathPushNode("perl_size", NPtype_NAME); /* provide a root node */
   
@@ -1275,6 +1281,8 @@ CODE:
    * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
    */
   sv_size(aTHX_ st, NPathLink("PL_defstash"), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
+
+  NPathPushNode("others", NPtype_NAME); /* group these (typically much smaller) items */
   sv_size(aTHX_ st, NPathLink("PL_defgv"), (SV*)PL_defgv, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_incgv"), (SV*)PL_incgv, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_rs"), (SV*)PL_rs, TOTAL_SIZE_RECURSION);
