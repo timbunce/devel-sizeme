@@ -94,6 +94,7 @@ struct state {
        start with 0 bits, hence the start of this array will be hot, and the
        end unused. So put the flags next to the hot end.  */
     void *tracking[256];
+    int min_recurse_threshold;
     /* callback hooks and data */
     int (*add_attr_cb)(struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
     void (*free_state_cb)(struct state *st);
@@ -1005,7 +1006,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
       ADD_SIZE(st, "av_max", sizeof(SV *) * (AvMAX(thing) + 1));
       dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
 
-      if (recurse >= TOTAL_SIZE_RECURSION) {
+      if (recurse >= st->min_recurse_threshold) {
 	  SSize_t i = AvFILLp(thing) + 1;
 
 	  while (i--)
@@ -1045,7 +1046,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
         while (cur_entry) {
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
-	  if (recurse >= TOTAL_SIZE_RECURSION) {
+	  if (recurse >= st->min_recurse_threshold) {
 /* I've seen a PL_strtab HeVAL == 0xC and 0x40C etc
  * just running perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()'
  * but it seemed like a corruption - it would change come and go with irrelevant code changes.
@@ -1219,6 +1220,7 @@ new_state(pTHX)
 
     Newxz(st, 1, struct state);
     st->go_yell = TRUE;
+    st->min_recurse_threshold = TOTAL_SIZE_RECURSION;
     if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(warn_flag) ? TRUE : FALSE;
     }
@@ -1276,6 +1278,8 @@ CODE:
   dNPathNodes(2, NULL);
   struct state *st = new_state(aTHX);
   NPathPushNode("perl_size", NPtype_NAME); /* provide a root node */
+
+  st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
   
   /* start with PL_defstash to get everything reachable from \%main::
    * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
