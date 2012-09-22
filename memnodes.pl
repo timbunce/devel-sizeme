@@ -19,30 +19,33 @@ GetOptions(
 
 my $j = JSON::XS->new->ascii->pretty(0);
 
-my $dbh = DBI->connect("dbi:SQLite:dbname=$opt_db","","", {
-    RaiseError => 1, PrintError => 0, AutoCommit => 0
-});
-$dbh->do("PRAGMA synchronous = OFF");
-$dbh->do("DROP TABLE IF EXISTS node");
-$dbh->do(q{
-    CREATE TABLE node (
-        id integer primary key,
-        name text,
-        title text,
-        depth integer,
-        parent_id integer,
+my ($dbh, $node_ins_sth);
+if ($opt_db) {
+    $dbh = DBI->connect("dbi:SQLite:dbname=$opt_db","","", {
+        RaiseError => 1, PrintError => 0, AutoCommit => 0
+    });
+    $dbh->do("PRAGMA synchronous = OFF");
+    $dbh->do("DROP TABLE IF EXISTS node");
+    $dbh->do(q{
+        CREATE TABLE node (
+            id integer primary key,
+            name text,
+            title text,
+            depth integer,
+            parent_id integer,
 
-        self_size integer,
-        kids_size integer,
-        kids_node_count integer,
-        child_ids text,
-        attr_json text,
-        leaves_json text
-    )
-});
-my $node_ins_sth = $dbh->prepare(q{
-    INSERT INTO node VALUES (?,?,?,?,?,  ?,?,?,?,?,?)
-});
+            self_size integer,
+            kids_size integer,
+            kids_node_count integer,
+            child_ids text,
+            attr_json text,
+            leaves_json text
+        )
+    });
+    $node_ins_sth = $dbh->prepare(q{
+        INSERT INTO node VALUES (?,?,?,?,?,  ?,?,?,?,?,?)
+    });
+}
 
 my @stack;
 my %seqn2node;
@@ -98,10 +101,25 @@ sub leave_node {
         print qq(], "data":{ "\$area": $size } },\n);
     }
     if ($opt_dot) {
-        my @attr = (sprintf "label=%s", $dotnode->($x->{name}));
-        push @attr, "shape=point" if $x->{type} == 2;
-        printf qq{n%d [ %s ];\n}, $x->{id}, join(",", @attr);
-        printf qq{n%d -> n%d;\n}, $parent->{id}, $x->{id} if $parent;
+        printf "// n%d parent=%s(type=%s)\n", $x->{id},
+            $parent ? $parent->{id} : "",
+            $parent ? $parent->{type} : "";
+        if ($x->{type} != 2) {
+            my @node_attr = (sprintf "label=%s", $dotnode->($x->{name}));
+            if ($parent) { # probably a link
+                my @link_attr;
+                my $parent_id = $parent->{id};
+                if ($parent->{type} == 2) { # link
+                    (my $link_name = $parent->{name}) =~ s/->$//;
+                    push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
+                    $parent_id = ($stack[-2]||die "panic")->{id};
+                }
+                printf qq{n%d -> n%d [%s];\n},
+                    $parent_id, $x->{id}, join(",", @link_attr);
+            }
+            printf qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
+        }
+
     }
     if ($dbh) {
         my $attr_json = $j->encode($x->{attr});
