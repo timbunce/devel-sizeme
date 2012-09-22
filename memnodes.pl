@@ -50,11 +50,13 @@ if ($opt_db) {
 my @stack;
 my %seqn2node;
 
-    my $dotnode = sub {
-        my $name = shift;
-        $name =~ s/"/\\"/g;
-        return '"'.$name.'"';
-    };
+use HTML::Entities qw(encode_entities);;
+my $dotnode = sub {
+    my $name = encode_entities(shift);
+    $name =~ s/"/\\"/g;
+    #$name =~ s/</&lt;/g;
+    return '"'.$name.'"';
+};
 
 print "memnodes = [" if $opt_json;
 
