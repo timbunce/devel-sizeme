@@ -54,7 +54,6 @@ use HTML::Entities qw(encode_entities);;
 my $dotnode = sub {
     my $name = encode_entities(shift);
     $name =~ s/"/\\"/g;
-    #$name =~ s/</&lt;/g;
     return '"'.$name.'"';
 };
 
@@ -63,6 +62,14 @@ print "memnodes = [" if $opt_json;
 if ($opt_dot) {
     print "digraph {\n"; # }
     print "graph [overlap=false]\n"; # target="???", URL="???"
+}
+
+sub fmt_size {
+    my $size = shift;
+    my $kb = $size / 1024;
+    return $size if $kb < 5;
+    return sprintf "%.1fKb", $kb if $kb < 1000;
+    return sprintf "%.1fMb", $kb/1024;
 }
 
 
@@ -104,13 +111,28 @@ sub leave_node {
     }
     if ($opt_dot) {
         printf "// n%d parent=%s(type=%s)\n", $x->{id},
-            $parent ? $parent->{id} : "",
-            $parent ? $parent->{type} : "";
+                $parent ? $parent->{id} : "",
+                $parent ? $parent->{type} : ""
+            if 0;
         if ($x->{type} != 2) {
-            my @node_attr = (sprintf "label=%s", $dotnode->($x->{name}));
+            my $name = $x->{title} ? "\"$x->{title}\" $x->{name}" : $x->{name};
+
+            if ($x->{kids_size}) {
+                $name .= sprintf " %s+%s=%s", fmt_size($x->{self_size}), fmt_size($x->{kids_size}), fmt_size($x->{self_size}+$x->{kids_size});
+            }
+            else {
+                $name .= sprintf " +%s", fmt_size($x->{self_size});
+            }
+
+            my @node_attr = (
+                sprintf("label=%s", $dotnode->($name)),
+                "id=$x->{id}",
+            );
+            my @link_attr;
+            #if ($x->{name} eq 'hek') { push @node_attr, "shape=point"; push @node_attr, "labelfontsize=6"; }
             if ($parent) { # probably a link
-                my @link_attr;
                 my $parent_id = $parent->{id};
+                my @link_attr = ("id=$parent_id");
                 if ($parent->{type} == 2) { # link
                     (my $link_name = $parent->{name}) =~ s/->$//;
                     push @link_attr, (sprintf "label=%s", $dotnode->($link_name));

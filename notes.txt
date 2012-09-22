@@ -1,0 +1,13 @@
+
+make && rm -f /cores/* && M=1 perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()' >x.memnodes
+585475
+905979 - with recursion change
+
+perl memnodes.pl --dot x.memnodes > x.dot && open -a Graphviz x.dot && cat x.dot
+
+./memnodes.pl --db x.db x.memnodes
+
+./MemView.pl daemon
+
+open http://127.0.0.1:3000
+
