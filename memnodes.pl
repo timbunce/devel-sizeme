@@ -11,6 +11,7 @@ use Getopt::Long;
 
 GetOptions(
     'json!' => \my $opt_json,
+    'dot!' => \my $opt_dot,
     'db=s'  => \my $opt_db,
     'verbose|v!' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
@@ -46,11 +47,29 @@ my $node_ins_sth = $dbh->prepare(q{
 my @stack;
 my %seqn2node;
 
+    my $dotnode = sub {
+        my $name = shift;
+        $name =~ s/"/\\"/g;
+        return '"'.$name.'"';
+    };
+
+print "memnodes = [" if $opt_json;
+
+if ($opt_dot) {
+    print "digraph {\n"; # }
+    print "graph [overlap=false]\n"; # target="???", URL="???"
+}
+
+
 sub enter_node {
     my $x = shift;
     if ($opt_json) {
         print "    " x $x->{depth};
         print qq({ "id": "$x->{id}", "name": "$x->{name}", "depth":$x->{depth}, "children":[ \n);
+    }
+    if ($opt_dot) {
+        #printf $fh qq{\tn%d [ %s ]\n}, $x->{id}, $dotnode->($x->{name});
+        #print qq({ "id": "$x->{id}", "name": "$x->{name}", "depth":$x->{depth}, "children":[ \n);
     }
     return;
 }
@@ -58,9 +77,12 @@ sub enter_node {
 sub leave_node {
     my $x = shift;
     delete $seqn2node{$x->{id}};
+
     my $self_size = 0; $self_size += $_  for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
-    if (my $parent = $stack[-1]) {
+
+    my $parent = $stack[-1];
+    if ($parent) {
         # link to parent
         $x->{parent_id} = $parent->{id};
         # accumulate into parent
@@ -74,6 +96,12 @@ sub leave_node {
         print "    " x $x->{depth};
         my $size = $self_size + $x->{kids_size};
         print qq(], "data":{ "\$area": $size } },\n);
+    }
+    if ($opt_dot) {
+        my @attr = (sprintf "label=%s", $dotnode->($x->{name}));
+        push @attr, "shape=point" if $x->{type} == 2;
+        printf qq{n%d [ %s ];\n}, $x->{id}, join(",", @attr);
+        printf qq{n%d -> n%d;\n}, $parent->{id}, $x->{id} if $parent;
     }
     if ($dbh) {
         my $attr_json = $j->encode($x->{attr});
@@ -89,19 +117,18 @@ sub leave_node {
     return;
 }
 
-print "memnodes = [" if $opt_json;
 
 while (<>) {
     chomp;
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
-    if ($type eq "N") {     # Node ($val is depth)
+    if ($type =~ s/^-//) {     # Node type ($val is depth)
         while ($val < @stack) {
             leave_node(my $x = pop @stack);
             warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
                 if $opt_verbose;
         }
         die 1 if $stack[$val];
-        my $node = $stack[$val] = { id => $id, name => $name, extra => $extra, attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
+        my $node = $stack[$val] = { id => $id, type => $type, name => $name, extra => $extra, attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
         enter_node($node);
         $seqn2node{$id} = $node;
     }
@@ -141,6 +168,7 @@ while (@stack > 1) {
     warn "EOF ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n";
 }
 print " ];\n" if $opt_json;
+print "}\n" if $opt_dot;
 
 $dbh->commit if $dbh;
 

@@ -300,8 +300,8 @@ np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type,
 
 int
 np_stream_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
-    fprintf(st->node_stream, "N %lu %u ", npath_node->seqn,
-        (unsigned)npath_node->depth
+    fprintf(st->node_stream, "-%u %lu %u ",
+        npath_node->type, npath_node->seqn, (unsigned)npath_node->depth
     );
     np_print_node_name(st->node_stream, npath_node);
     fprintf(st->node_stream, "\n");
