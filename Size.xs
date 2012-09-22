@@ -155,7 +155,10 @@ struct state {
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
 
-#define NPathLink(nodeid)   ((NP->id = nodeid), (NP->type = NPtype_LINK), (NP->seqn = 0), NP)
+#define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
+#define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
+/* add a link and a name node to the path - a special case for op_size */
+#define NPathLinkAndNode(nid, nid2)  (_NPathLink(NP, nid, NPtype_LINK), _NPathLink(NP+1, nid2, NPtype_NAME), ((NP+1)->prev=NP), (NP+1))
 #define NPathOpLink  (NPathArg)
 #define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(st, NP-1, NPattr_LEAFSIZE, (name), (bytes))),
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) (st->add_attr_cb && st->add_attr_cb(st, NP-1, attr_type, attr_name, attr_value))
@@ -676,9 +679,10 @@ regex_size(const REGEXP * const baseregex, struct state *st, pPATH) {
 static void
 op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 {
-    /* op_size recurses to follow the chain of opcodes.
-     * For the 'path' we don't want the chain to be 'nested' in the path so we
-     * use ->prev in dNPathNodes.
+    /* op_size recurses to follow the chain of opcodes.  For the node path we
+     * don't want the chain to be 'nested' in the path so we use dNPathUseParent().
+     * Also, to avoid a link-to-a-link the caller should use NPathLinkAndNode()
+     * instead of NPathLink().
      */
     dNPathUseParent(NPathArg);
 
@@ -1121,8 +1125,8 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
     if (CvISXSUB(thing)) {
 	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing), recurse);
     } else {
-	op_size(aTHX_ CvSTART(thing), st, NPathLink("CvSTART"));
-	op_size(aTHX_ CvROOT(thing), st, NPathLink("CvROOT"));
+	if(1)op_size(aTHX_ CvSTART(thing), st, NPathLinkAndNode("CvSTART", "OPs")); /* XXX ? */
+	op_size(aTHX_ CvROOT(thing), st, NPathLinkAndNode("CvROOT", "OPs"));
     }
     goto freescalar;
 
