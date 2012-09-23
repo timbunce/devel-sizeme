@@ -156,7 +156,7 @@ Welcome to the Mojolicious real-time web framework!
 
 <!-- JIT Library File -->
 <script language="javascript" type="text/javascript" src="jit.js"></script>
-<script language="javascript" type="text/javascript" src="jquery-1.2.6-min.js"></script>
+<script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
 
 <!-- Example File -->
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
