@@ -111,24 +111,24 @@ struct state {
 
 #define pPATH npath_node_t *NPathArg
 
-/* A subtle point here is that dNPathNodes and NPathPushNode leaves NP pointing
+/* A subtle point here is that dNPathNodes and NPathPushNode leave NP pointing
  * to the next unused slot (though with prev already filled in)
  * whereas NPathLink leaves NP unchanged, it just fills in the slot NP points
  * to and passes that NP value to the function being called.
+ * seqn==0 indicates the node is new (hasn't been output yet)
  */
 #define dNPathNodes(nodes, prev_np) \
             npath_node_t name_path_nodes[nodes+1]; /* +1 for NPathLink */ \
             npath_node_t *NP = &name_path_nodes[0]; \
-            NP->seqn = 0; \
-            NP->type = 0; \
-            NP->id = "?0?"; /* DEBUG */ \
+            NP->seqn = NP->type = 0; NP->id = Nullch; /* safety/debug */ \
             NP->prev = prev_np
 #define NPathPushNode(nodeid, nodetype) \
             NP->id = nodeid; \
             NP->type = nodetype; \
+            NP->seqn = 0; \
             if(0)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %s]\n", NP->prev, NP, nodetype,(char*)nodeid);\
             NP++; \
-            NP->id="?+?"; /* DEBUG */ \
+            NP->id = Nullch; /* safety/debug */ \
             NP->seqn = 0; \
             NP->prev = (NP-1)
 #define NPathSetNode(nodeid, nodetype) \
