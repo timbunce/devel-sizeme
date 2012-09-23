@@ -15,6 +15,7 @@ GetOptions(
     'db=s'  => \my $opt_db,
     'verbose|v!' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
+    'showid!' => \my $opt_showid,
 ) or exit 1;
 
 my $j = JSON::XS->new->ascii->pretty(0);
@@ -31,6 +32,7 @@ if ($opt_db) {
             id integer primary key,
             name text,
             title text,
+            type integer,
             depth integer,
             parent_id integer,
 
@@ -43,7 +45,7 @@ if ($opt_db) {
         )
     });
     $node_ins_sth = $dbh->prepare(q{
-        INSERT INTO node VALUES (?,?,?,?,?,  ?,?,?,?,?,?)
+        INSERT INTO node VALUES (?,?,?,?,?,?,  ?,?,?,?,?,?)
     });
 }
 
@@ -105,7 +107,7 @@ sub leave_node {
     # output
     # ...
     if ($opt_json) {
-        print "    " x $x->{depth};
+        print "\t" x $x->{depth};
         my $size = $self_size + $x->{kids_size};
         print qq(], "data":{ "\$area": $size } },\n);
     }
@@ -123,6 +125,7 @@ sub leave_node {
             else {
                 $name .= sprintf " +%s", fmt_size($x->{self_size});
             }
+            $name .= " $x->{id}" if $opt_showid;
 
             my @node_attr = (
                 sprintf("label=%s", $dotnode->($name)),
@@ -149,7 +152,7 @@ sub leave_node {
         my $attr_json = $j->encode($x->{attr});
         my $leaves_json = $j->encode($x->{leaves});
         $node_ins_sth->execute(
-            $x->{id}, $x->{name}, $x->{title}, $x->{depth}, $x->{parent_id},
+            $x->{id}, $x->{name}, $x->{title}, $x->{type}, $x->{depth}, $x->{parent_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
             $x->{child_id} ? join(",", @{$x->{child_id}}) : undef,
             $attr_json, $leaves_json,
