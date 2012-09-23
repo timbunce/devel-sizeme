@@ -6,13 +6,17 @@ use warnings;
 use JSON::XS;
 use Mojolicious::Lite;
 use Getopt::Long;
+use Storable qw(dclone);
 
 GetOptions(
-    'db=s' => \(my $opt_db = '../x.db'),
+    'db=s' => \(my $opt_db = '../memnodes.db'),
+    'debug!' => \my $opt_debug,
 ) or exit 1;
 
+#warn "Reading from $opt_db\n";
+
 use ORLite {
-    file => '../x.db',
+    file => '../memnodes.db',
     package => "MemView",
     #user_version => 1,
     readonly => 1,
@@ -41,7 +45,7 @@ get '/jit_tree/:id/:depth' => sub {
         my ($node) = @_;
         my $children = delete $node->{children}; # XXX edits the src tree
         my $area = $node->{self_size}+$node->{kids_size};
-        $node->{'$area'} = ($logarea) ? log($area) : $area;
+        $node->{'$area'} = ($logarea) ? log($area) : $area; # XXX move to jit js
         my $jit_node = {
             id   => $node->{id},
             name => $node->{title} || $node->{name},
@@ -54,7 +58,7 @@ if(1){
     use Devel::Dwarn;
     use Data::Dump qw(pp);
     local $jit_tree->{children};
-    pp($jit_tree);
+    pp(dclone($jit_tree)); # dclone to avoid stringification
 }
     $self->render_json($jit_tree);
 };
@@ -63,23 +67,25 @@ sub _fetch_node_tree {
     my ($id, $depth) = @_;
     my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id)
         or die "Node '$id' not found";
+    $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size));
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
     $node->{attr}   = $j->decode(delete $node->{attr_json});
 
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
         my $children;
-        if (@child_ids == 1) {
+        if (@child_ids == 1 && $node->{type} == 2) {
             my $child = _fetch_node_tree($child_ids[0], $depth); # same depth
             # merge node into child
             # XXX id, depth, parent_id
-            warn "Merged $node->{name} #$node->{id} with only child $child->{name} #$child->{id}\n";
+            warn "Merged $node->{name} #$node->{id} with only child $child->{name} #$child->{id}\n"
+                if $opt_debug;
             $child->{name} = "$node->{name} + $child->{name}";
             $child->{$_} += $node->{$_} for (qw(self_size));
             $child->{$_}  = $node->{$_} for (qw(parent_id));
 
             $child->{title} = join " + ", grep { defined && length } $child->{title}, $node->{title};
-            warn "Titled $child->{title}" if $child->{title};
+            #warn "Titled $child->{title}" if $child->{title};
 
             for my $attr_type (keys %{ $node->{attr} }) {
                 my $src = $node->{attr}{$attr_type};
@@ -150,7 +156,7 @@ Welcome to the Mojolicious real-time web framework!
 
 <!-- JIT Library File -->
 <script language="javascript" type="text/javascript" src="jit.js"></script>
-<script language="javascript" type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
+<script language="javascript" type="text/javascript" src="jquery-1.2.6-min.js"></script>
 
 <!-- Example File -->
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
