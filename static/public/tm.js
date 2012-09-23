@@ -45,21 +45,20 @@ function bySortedValue(obj, comparitor, callback, context) {
 
 
 
-function request_jit_tree(nodeId, level, onComplete){
+function request_jit_tree(nodeId, level, depth, onComplete){
     var params = { logarea: 1 };
-    jQuery.getJSON('jit_tree/'+nodeId+'/1', params, onComplete);
+    jQuery.getJSON('jit_tree/'+nodeId+'/'+depth, params, onComplete);
 }
 
 
 function init(){
-  //init data
-  //end
+  var levelsToShow = 2;
   //init TreeMap
   var tm = new $jit.TM.Squarified({
     //where to inject the visualization
     injectInto: 'infovis',
     //show only one tree level
-    levelsToShow: 1,
+    levelsToShow: levelsToShow,
     //parent box title heights
     titleHeight: 11,
     //enable animations
@@ -166,7 +165,7 @@ function init(){
     //call for the requested subtree. When completed, the onComplete   
     //callback method should be called.  
     request: function(nodeId, level, onComplete){  
-            request_jit_tree(nodeId, level, function(data) {
+            request_jit_tree(nodeId, level, levelsToShow, function(data) {
                 console.log("Fetched node "+nodeId);
                 console.log(data);
                 onComplete.onComplete(nodeId, data);  
@@ -179,7 +178,7 @@ function init(){
     }
   });
 
-  request_jit_tree(1, 0, function(data) {
+  request_jit_tree(1, 0, levelsToShow, function(data) {
         console.log(data);
         tm.loadJSON(data);
         tm.refresh();
