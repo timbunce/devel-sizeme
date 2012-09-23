@@ -934,12 +934,12 @@ const U8 body_sizes[SVt_LAST] = {
 };
 
 
+/* based on Perl_do_dump_pad() - wraps sv_size and adds ADD_ATTR calls for the pad names */
 static void
 padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
 	const int recurse)
 {
     dNPathUseParent(NPathArg);
-    /* based on Perl_do_dump_pad() */
     const AV *pad_name;
     SV **pname;
     I32 ix;              
@@ -1238,8 +1238,8 @@ new_state(pTHX)
     check_new(st, &PL_sv_placeholder);
 #endif
 #ifdef PATH_TRACKING
-if (getenv("M"))
-st->node_stream = stdout;
+    if (getenv("M") && atoi(getenv("M"))) /* XXX quick hack */
+        st->node_stream = stdout;
     if (st->node_stream)
         st->add_attr_cb = np_stream_node_path_info;
     else
@@ -1304,8 +1304,15 @@ CODE:
 #ifdef USE_ITHREADS
   sv_size(aTHX_ st, NPathLink("PL_regex_padav"), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
 #endif
+  sv_size(aTHX_ st, NPathLink("PL_warnhook"), (SV*)PL_warnhook, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_diehook"), (SV*)PL_diehook, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_main_cv"), (SV*)PL_main_cv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_main_root"), (SV*)PL_main_root, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_main_start"), (SV*)PL_main_start, TOTAL_SIZE_RECURSION);
   /* TODO PL_pidstatus */
   /* TODO PL_stashpad */
+  /* TODO PL_compiling? COP */
 
   /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
   sv_size(aTHX_ st, NPathLink("PL_strtab"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
@@ -1313,6 +1320,9 @@ CODE:
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO unused space in arenas */
   /* TODO unused space in malloc, for whichever mallocs support it */
+  /* TODO PL_exitlist */
+  /* TODO environ */
+  /* TODO PerlIO? PL_known_layers PL_def_layerlist PL_perlio_fd_refcnt etc */
   /* TODO threads? */
   /* TODO anything missed? */
 
