@@ -1135,7 +1135,7 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
     goto freescalar;
 
   case SVt_PVCV: TAG;
-    sv_size(aTHX_ st, NPathLink("CvSTASH"), (SV *)CvSTASH(thing), SOME_RECURSION);
+    /* not CvSTASH, per https://rt.cpan.org/Ticket/Display.html?id=79366 */
     sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing), SOME_RECURSION);
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), SOME_RECURSION);
