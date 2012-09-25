@@ -808,7 +808,8 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
           check_new_and_strlen(st, basecop->cop_file, NPathLink("cop_file"));
           check_new_and_strlen(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));
 #else
-	  sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
+          if (SvREFCNT(basecop->cop_stash) == 1) /* XXX hack? */
+            sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv, SOME_RECURSION);
 #endif
 
@@ -1006,10 +1007,6 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
   NPathPushNode(thing, NPtype_SV);
   ADD_SIZE(st, "sv", sizeof(SV) + body_sizes[type]);
 
-  if (type >= SVt_PVMG) {
-      magic_size(aTHX_ thing, st, NPathLink("MG"));
-  }
-
   switch (type) {
 #if (PERL_VERSION < 11)
     /* Is it a reference? */
@@ -1053,6 +1050,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
     sv_size(aTHX_ st, NPathLink("ARYLEN"), AvARYLEN(thing), recurse);
 #endif
     TAG;break;
+
   case SVt_PVHV: TAG;
     /* Now the array of buckets */
     ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
@@ -1198,11 +1196,11 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 	if (check_new(st, GvGP(thing))) {
 	    ADD_SIZE(st, "GP", sizeof(GP));
 	    sv_size(aTHX_ st, NPathLink("gp_sv"), (SV *)(GvGP(thing)->gp_sv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_form"), (SV *)(GvGP(thing)->gp_form), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_av"), (SV *)(GvGP(thing)->gp_av), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_hv"), (SV *)(GvGP(thing)->gp_hv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_egv"), (SV *)(GvGP(thing)->gp_egv), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_cv"), (SV *)(GvGP(thing)->gp_cv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_egv"), (SV *)(GvGP(thing)->gp_egv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_form"), (SV *)(GvGP(thing)->gp_form), recurse);
 	}
 #if (PERL_VERSION >= 9)
 	TAG; break;
@@ -1231,6 +1229,11 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
     TAG;break;
 
   }
+
+  if (type >= SVt_PVMG) {
+      magic_size(aTHX_ thing, st, NPathLink("MG"));
+  }
+
   return;
 }
 
@@ -1310,7 +1313,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
         SV* sv;
         for (sv = sva + 1; sv < svend; ++sv) {
             if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
-                sv_size(aTHX_ st, NPathLink(""), sv, TOTAL_SIZE_RECURSION);
+                sv_size(aTHX_ st, NPathLink("arena"), sv, TOTAL_SIZE_RECURSION);
             }
             else if (check_new(st, sv)) { /* sanity check */
                 warn("unseen_sv_size encountered freed SV unexpectedly");
