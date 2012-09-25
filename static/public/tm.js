@@ -61,7 +61,7 @@ function init(){
     //show only one tree level
     levelsToShow: levelsToShow,
     //parent box title heights
-    titleHeight: 12,
+    titleHeight: 14,
     //enable animations
     animate: animate,
     //box offsets
@@ -69,7 +69,7 @@ function init(){
     //use canvas text
     Label: {
       type: labelType,
-      size: 9,
+      size: 10,
       family: 'Tahoma, Verdana, Arial'
     },
     //enable specific canvas styles
@@ -171,6 +171,9 @@ function init(){
                 console.log(data);
                 onComplete.onComplete(nodeId, data);  
             });
+            // XXX workaround jit bug where old tooltip is still shown till the
+            // mouse moves
+            jQuery("#_tooltip").fadeOut("fast");
     },
     //Add the name of the node in the corresponding label
     //This method is called once, on label creation and only for DOM labels.
