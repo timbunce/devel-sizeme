@@ -13,6 +13,7 @@ var labelType, useGradients, nativeTextSupport, animate;
   nativeTextSupport = labelType == 'Native';
   useGradients = nativeCanvasSupport;
   animate = !(iStuff || !nativeCanvasSupport);
+  console.log({ "labelType":labelType, "useGradients":useGradients, "nativeTextSupport":nativeTextSupport });
 })();
 
 var Log = {
@@ -46,7 +47,7 @@ function bySortedValue(obj, comparitor, callback, context) {
 
 
 function request_jit_tree(nodeId, level, depth, onComplete){
-    var params = { logarea: 1 };
+    var params = { logarea: 0 };
     jQuery.getJSON('jit_tree/'+nodeId+'/'+depth, params, onComplete);
 }
 
@@ -60,7 +61,7 @@ function init(){
     //show only one tree level
     levelsToShow: levelsToShow,
     //parent box title heights
-    titleHeight: 11,
+    titleHeight: 12,
     //enable animations
     animate: animate,
     //box offsets
@@ -175,6 +176,18 @@ function init(){
     //This method is called once, on label creation and only for DOM labels.
     onCreateLabel: function(domElement, node){
         domElement.innerHTML = node.name;
+
+        // this doesn't work with Label:{} above
+        var style = domElement.style;  
+        style.display = '';  
+        style.border = '1px solid transparent';  
+        domElement.onmouseover = function() {  
+            style.border = '1px solid #9FD4FF';  
+        };  
+        domElement.onmouseout = function() {  
+            style.border = '1px solid transparent';  
+        };  
+
     }
   });
 
