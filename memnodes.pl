@@ -168,7 +168,8 @@ while (<>) {
             warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
                 if $opt_verbose;
         }
-        die 1 if $stack[$val];
+        die "panic: stack already has item at depth $val"
+            if $stack[$val];
         my $node = $stack[$val] = { id => $id, type => $type, name => $name, extra => $extra, attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
         enter_node($node);
         $seqn2node{$id} = $node;
@@ -206,12 +207,11 @@ while (<>) {
     $dbh->commit if $dbh and $id % 10_000 == 0;
 }
 
-my $x;
-while (@stack > 1) {
-    leave_node($x = pop @stack) while @stack;
-    warn "EOF ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
-        if $opt_verbose;
-}
+my $top = $stack[0]; # grab top node before we pop all the nodes
+leave_node(pop @stack) while @stack;
+warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n"
+    if $opt_verbose;
+warn Dumper($top) if $opt_verbose;
 
 if ($dot_fh) {
     print $dot_fh "}\n";
@@ -222,7 +222,6 @@ if ($dot_fh) {
 $dbh->commit if $dbh;
 
 use Data::Dumper;
-warn Dumper(\$x) if $opt_verbose;
 warn Dumper(\%seqn2node) if %seqn2node; # should be empty
 
 =for
