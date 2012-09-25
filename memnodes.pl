@@ -1,7 +1,8 @@
-#!/bin/env perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
+use autodie;
 
 use DBI qw(looks_like_number);
 use DBD::SQLite;
@@ -10,8 +11,8 @@ use JSON::XS;
 use Getopt::Long;
 
 GetOptions(
-    'json!' => \my $opt_json,
-    'dot!' => \my $opt_dot,
+    'text!' => \my $opt_text,
+    'dot=s' => \my $opt_dot,
     'db=s'  => \my $opt_db,
     'verbose|v!' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
@@ -59,11 +60,12 @@ my $dotnode = sub {
     return '"'.$name.'"';
 };
 
-print "memnodes = [" if $opt_json;
 
+my $dot_fh;
 if ($opt_dot) {
-    print "digraph {\n"; # }
-    print "graph [overlap=false]\n"; # target="???", URL="???"
+    open $dot_fh, ">$opt_dot";
+    print $dot_fh "digraph {\n"; # }
+    print $dot_fh "graph [overlap=false]\n"; # target="???", URL="???"
 }
 
 sub fmt_size {
@@ -77,10 +79,6 @@ sub fmt_size {
 
 sub enter_node {
     my $x = shift;
-    if ($opt_json) {
-        print "    " x $x->{depth};
-        print qq({ "id": "$x->{id}", "name": "$x->{name}", "depth":$x->{depth}, "children":[ \n);
-    }
     if ($opt_dot) {
         #printf $fh qq{\tn%d [ %s ]\n}, $x->{id}, $dotnode->($x->{name});
         #print qq({ "id": "$x->{id}", "name": "$x->{name}", "depth":$x->{depth}, "children":[ \n);
@@ -106,11 +104,6 @@ sub leave_node {
     }
     # output
     # ...
-    if ($opt_json) {
-        print "\t" x $x->{depth};
-        my $size = $self_size + $x->{kids_size};
-        print qq(], "data":{ "\$area": $size } },\n);
-    }
     if ($opt_dot) {
         printf "// n%d parent=%s(type=%s)\n", $x->{id},
                 $parent ? $parent->{id} : "",
@@ -141,10 +134,10 @@ sub leave_node {
                     push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
                     $parent_id = ($stack[-2]||die "panic")->{id};
                 }
-                printf qq{n%d -> n%d [%s];\n},
+                printf $dot_fh qq{n%d -> n%d [%s];\n},
                     $parent_id, $x->{id}, join(",", @link_attr);
             }
-            printf qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
+            printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
         }
 
     }
@@ -162,11 +155,14 @@ sub leave_node {
     return;
 }
 
+my $indent = ":   ";
 
 while (<>) {
     chomp;
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
     if ($type =~ s/^-//) {     # Node type ($val is depth)
+        printf "%s%s %s [#%d @%d]\n", $indent x $val, $name, $extra||'', $id, $val
+            if $opt_text;
         while ($val < @stack) {
             leave_node(my $x = pop @stack);
             warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
@@ -180,15 +176,18 @@ while (<>) {
     elsif ($type eq "L") {  # Leaf name and memory size
         my $node = $seqn2node{$id} || die;
         $node->{leaves}{$name} += $val;
+        printf "%s+%d %s\n", $indent x ($node->{depth}+1), $val, $name
+            if $opt_text;
     }
     elsif (looks_like_number($type)) {  # Attribute type, name and value
         my $node = $seqn2node{$id} || die;
         my $attr = $node->{attr} || die;
-        if ($type == 1) { # NPattr_NAME
+        printf "%s~%s %d [t%d]\n", $indent x ($node->{depth}+1), $name, $val, $type
+            if $opt_text;
+        if ($type == 1 or $type == 5) { # NPattr_NAME
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
                 if exists $attr->{$type}{$name};
             $attr->{$type}{$name} = $val || $id;
-            warn "A \@$id: '$name' $val\n";
             $node->{title} = $name if $type == 1 and !$val;
         }
         elsif (2 <= $type and $type <= 4) { # NPattr_PAD*
@@ -210,16 +209,21 @@ while (<>) {
 my $x;
 while (@stack > 1) {
     leave_node($x = pop @stack) while @stack;
-    warn "EOF ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n";
+    warn "EOF ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
+        if $opt_verbose;
 }
-print " ];\n" if $opt_json;
-print "}\n" if $opt_dot;
+
+if ($dot_fh) {
+    print $dot_fh "}\n";
+    close $dot_fh;
+    system("open -a Graphviz $opt_dot");
+}
 
 $dbh->commit if $dbh;
 
 use Data::Dumper;
-warn Dumper(\$x);
-warn Dumper(\%seqn2node);
+warn Dumper(\$x) if $opt_verbose;
+warn Dumper(\%seqn2node) if %seqn2node; # should be empty
 
 =for
 SV(PVAV) fill=1/1       [#1 @0] 
