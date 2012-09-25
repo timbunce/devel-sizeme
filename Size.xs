@@ -97,11 +97,12 @@ struct state {
     int min_recurse_threshold;
     /* callback hooks and data */
     int (*add_attr_cb)(struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
-    void (*free_state_cb)(struct state *st);
+    void (*free_state_cb)(pTHX_ struct state *st);
     UV seqn;
     void *state_cb_data; /* free'd by free_state() after free_state_cb() call */
     /* this stuff wil be moved to state_cb_data later */
-    FILE *node_stream;
+    FILE *node_stream_fh;
+    char *node_stream_name;
 };
 
 #define ADD_SIZE(st, leafname, bytes) (NPathAddSizeCb(st, leafname, bytes) (st)->total_size += (bytes))
@@ -136,6 +137,8 @@ struct state {
             (NP-1)->type = nodetype; \
             if(0)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %s]\n", (NP-1)->prev, (NP-1), nodetype,(char*)nodeid);\
             (NP-1)->seqn = 0;
+#define NPathPopNode \
+            --NP
 
 /* dNPathUseParent points NP directly the the parents' name_path_nodes array
  * So the function can only safely call ADD_*() but not NPathLink, unless the
@@ -154,6 +157,7 @@ struct state {
 #define NPattr_PADFAKE  0x02
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
+#define NPattr_NOTE     0x05
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
 #define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
@@ -222,7 +226,7 @@ np_print_node_name(FILE *fp, npath_node_t *npath_node)
         break;
     }
     case NPtype_LINK:
-        fprintf(fp, "%s->", npath_node->id);
+        fprintf(fp, "%s", npath_node->id);
         break;
     case NPtype_NAME:
         fprintf(fp, "%s", npath_node->id);
@@ -277,6 +281,8 @@ np_dump_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t 
         return 1;
     np_dump_indent(npath_node->depth);
     np_print_node_name(stderr, npath_node);
+    if (npath_node->type == NPtype_LINK)
+        fprintf(stderr, "->"); /* cosmetic */
     fprintf(stderr, "\t\t[#%ld @%u] ", npath_node->seqn, npath_node->depth);
     fprintf(stderr, "\n");
     return 0;
@@ -285,17 +291,28 @@ np_dump_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t 
 int
 np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
-    if (!attr_type && !attr_value)
+    if (attr_type == NPattr_LEAFSIZE && !attr_value)
         return 0; /* ignore zero sized leaf items */
     np_walk_new_nodes(st, npath_node, NULL, np_dump_formatted_node);
     np_dump_indent(npath_node->depth+1);
-    if (attr_type) {
+    switch (attr_type) {
+    case NPattr_LEAFSIZE:
+        fprintf(stderr, "+%ld %s =%ld", attr_value, attr_name, attr_value+st->total_size);
+        break;
+    case NPattr_NAME:
         fprintf(stderr, "~NAMED('%s') %lu", attr_name, attr_value);
-    }
-    else {
-        fprintf(stderr, "+%ld ", attr_value);
-        fprintf(stderr, "%s ", attr_name);
-        fprintf(stderr, "=%ld ", attr_value+st->total_size);
+        break;
+    case NPattr_NOTE:
+        fprintf(stderr, "~note %s %lu", attr_name, attr_value);
+        break;
+    case NPattr_PADTMP:
+    case NPattr_PADNAME:
+    case NPattr_PADFAKE:
+        fprintf(stderr, "~pad%lu %s %lu", attr_type, attr_name, attr_value);
+        break;
+    default:
+        fprintf(stderr, "~??? %s %lu", attr_name, attr_value);
+        break;
     }
     fprintf(stderr, "\n");
     return 0;
@@ -303,11 +320,11 @@ np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type,
 
 int
 np_stream_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
-    fprintf(st->node_stream, "-%u %lu %u ",
+    fprintf(st->node_stream_fh, "-%u %lu %u ",
         npath_node->type, npath_node->seqn, (unsigned)npath_node->depth
     );
-    np_print_node_name(st->node_stream, npath_node);
-    fprintf(st->node_stream, "\n");
+    np_print_node_name(st->node_stream_fh, npath_node);
+    fprintf(st->node_stream_fh, "\n");
     return 0;
 }
 
@@ -318,14 +335,15 @@ np_stream_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_typ
         return 0; /* ignore zero sized leaf items */
     np_walk_new_nodes(st, npath_node, NULL, np_stream_formatted_node);
     if (attr_type) { /* Attribute type, name and value */
-        fprintf(st->node_stream, "%lu %lu ", attr_type, npath_node->seqn);
+        fprintf(st->node_stream_fh, "%lu %lu ", attr_type, npath_node->seqn);
     }
     else { /* Leaf name and memory size */
-        fprintf(st->node_stream, "L %lu ", npath_node->seqn);
+        fprintf(st->node_stream_fh, "L %lu ", npath_node->seqn);
     }
-    fprintf(st->node_stream, "%lu %s\n", attr_value, attr_name);
+    fprintf(st->node_stream_fh, "%lu %s\n", attr_value, attr_name);
     return 0;
 }
+
 
 #endif /* PATH_TRACKING */
 
@@ -1216,6 +1234,21 @@ if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
   return;
 }
 
+static void
+free_memnode_state(pTHX_ struct state *st)
+{
+    if (st->node_stream_fh && st->node_stream_name) {
+        if (*st->node_stream_name == '|') {
+            if (pclose(st->node_stream_fh))
+                warn("%s exited with an error status\n", st->node_stream_name);
+        }
+        else {
+            if (fclose(st->node_stream_fh))
+                warn("Error closing %s: %s\n", st->node_stream_name, strerror(errno));
+        }
+    }
+}
+
 static struct state *
 new_state(pTHX)
 {
@@ -1238,14 +1271,53 @@ new_state(pTHX)
     check_new(st, &PL_sv_placeholder);
 #endif
 #ifdef PATH_TRACKING
-    if (getenv("M") && atoi(getenv("M"))) /* XXX quick hack */
-        st->node_stream = stdout;
-    if (st->node_stream)
+    if (getenv("MEMNODES") && *getenv("MEMNODES")) { /* XXX quick hack */
+        st->node_stream_name = getenv("MEMNODES");
+        if (*st->node_stream_name == '|')
+            st->node_stream_fh = popen(st->node_stream_name+1, "w");
+        else
+            st->node_stream_fh = fopen(st->node_stream_name, "wb");
+        if (!st->node_stream_fh)
+            croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
         st->add_attr_cb = np_stream_node_path_info;
-    else
+    }
+    else 
         st->add_attr_cb = np_dump_node_path_info;
+    st->free_state_cb = free_memnode_state;
 #endif
     return st;
+}
+
+/* XXX based on S_visit() in sv.c */
+static void
+unseen_sv_size(pTHX_ struct state *st, pPATH)
+{
+    dVAR;
+    SV* sva;
+    I32 visited = 0;
+    dNPathNodes(1, NPathArg);
+
+    NPathPushNode("unseen", NPtype_NAME);
+
+    /* by this point we should have visited all the SVs
+     * so now we'll run through all the SVs via the arenas
+     * in order to find any thet we've missed for some reason.
+     * Once the rest of the code is finding all the SVs then any
+     * found here will be leaks.
+     */
+    for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
+        const SV * const svend = &sva[SvREFCNT(sva)];
+        SV* sv;
+        for (sv = sva + 1; sv < svend; ++sv) {
+            if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
+                sv_size(aTHX_ st, NPathLink(""), sv, TOTAL_SIZE_RECURSION);
+            }
+            else if (check_new(st, sv)) { /* sanity check */
+                warn("unseen_sv_size encountered freed SV unexpectedly");
+                sv_dump(sv);
+            }
+        }
+    }
 }
 
 MODULE = Devel::Size        PACKAGE = Devel::Size       
@@ -1279,15 +1351,13 @@ UV
 perl_size()
 CODE:
 {
-  dNPathNodes(2, NULL);
   struct state *st = new_state(aTHX);
-  NPathPushNode("perl_size", NPtype_NAME); /* provide a root node */
+  dNPathNodes(3, NULL);
 
   st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
-  
-  /* start with PL_defstash to get everything reachable from \%main::
-   * this seems to include PL_defgv, PL_incgv etc but I've listed them anyway
-   */
+
+  NPathPushNode("perl_size", NPtype_NAME); /* provide a root node */
+  /* start with PL_defstash to get everything reachable from \%main:: */
   sv_size(aTHX_ st, NPathLink("PL_defstash"), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
 
   NPathPushNode("others", NPtype_NAME); /* group these (typically much smaller) items */
@@ -1314,17 +1384,48 @@ CODE:
   /* TODO PL_stashpad */
   /* TODO PL_compiling? COP */
 
-  /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
-  sv_size(aTHX_ st, NPathLink("PL_strtab"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
-
   /* TODO stacks: cur, main, tmps, mark, scope, save */
-  /* TODO unused space in arenas */
-  /* TODO unused space in malloc, for whichever mallocs support it */
   /* TODO PL_exitlist */
+  /* TODO PL_reentrant_buffers etc */
   /* TODO environ */
   /* TODO PerlIO? PL_known_layers PL_def_layerlist PL_perlio_fd_refcnt etc */
   /* TODO threads? */
   /* TODO anything missed? */
+
+  /* --- by this point we should have seen all reachable SVs --- */
+
+  /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
+  sv_size(aTHX_ st, NPathLink("PL_strtab"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
+
+  /* unused space in sv head arenas */
+  if (PL_sv_root) {
+    SV *p = PL_sv_root;
+    UV free_heads = 1;
+#  define SvARENA_CHAIN(sv)     SvANY(sv) /* XXX */
+    while ((p = MUTABLE_SV(SvARENA_CHAIN(p)))) {
+        if (!check_new(st, p)) /* sanity check */
+            warn("Free'd SV head unexpectedly already seen");
+        ++free_heads;
+    }
+    NPathPushNode("unused_sv_heads", NPtype_NAME);
+    ADD_SIZE(st, "sv", free_heads * sizeof(SV));
+    NPathPopNode;
+  }
+  /* XXX iterate over bodies_by_type and crawl the free chains for each */
+
+  /* iterate over all SVs to find any we've not accounted for yet */
+  /* once the code above is visiting all SVs, any found here have been leaked */
+  unseen_sv_size(aTHX_ st, NPathLink("unaccounted"));
+
+  if (1) {
+    struct mstats ms = mstats();
+    NPathSetNode("unused malloc space", NPtype_NAME);
+    ADD_SIZE(st, "bytes_free", ms.bytes_free);
+    ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
+    ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
+    ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
+    ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
+  }
 
   RETVAL = st->total_size;
   free_state(st);
