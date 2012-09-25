@@ -109,7 +109,7 @@ function init(){
       }
     },
     //duration of the animations
-    duration: 500,
+    duration: 300,
     //Enable tips
     Tips: {
       enable: true,
