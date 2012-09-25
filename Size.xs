@@ -621,6 +621,17 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
   dNPathNodes(1, NPathArg);
   MAGIC *magic_pointer = SvMAGIC(thing);
 
+  if (!magic_pointer)
+    return;
+
+  if (!SvMAGICAL(thing)) {
+    if (0) {
+        warn("Ignoring suspect magic on this SV\n");
+        sv_dump((SV*)thing);
+    }
+    return;
+  }
+
   /* push a dummy node for NPathSetNode to update inside the while loop */
   NPathPushNode("dummy", NPtype_NAME);
 
@@ -636,6 +647,7 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
 
 
     TRY_TO_CATCH_SEGV {
+        /* XXX only chase mg_obj if mg->mg_flags & MGf_REFCOUNTED ? */
 	sv_size(aTHX_ st, NPathLink("mg_obj"), magic_pointer->mg_obj, TOTAL_SIZE_RECURSION);
 	if (magic_pointer->mg_len == HEf_SVKEY) {
 	    sv_size(aTHX_ st, NPathLink("mg_ptr"), (SV *)magic_pointer->mg_ptr, TOTAL_SIZE_RECURSION);
@@ -647,7 +659,9 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
 	    }
 	}
 #endif
+        /* XXX also handle mg->mg_type == PERL_MAGIC_utf8 ? */
 	else if (magic_pointer->mg_len > 0) {
+            if(0)do_magic_dump(0, Perl_debug_log, magic_pointer, 0, 0, FALSE, 0);
 	    if (check_new(st, magic_pointer->mg_ptr)) {
 		ADD_SIZE(st, "mg_len", magic_pointer->mg_len);
 	    }
@@ -1282,6 +1296,7 @@ new_state(pTHX)
             st->node_stream_fh = fopen(st->node_stream_name, "wb");
         if (!st->node_stream_fh)
             croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
+        setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
         st->add_attr_cb = np_stream_node_path_info;
     }
     else 
