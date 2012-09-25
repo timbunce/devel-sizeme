@@ -70,6 +70,7 @@ sub _fetch_node_tree {
     $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size));
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
     $node->{attr}   = $j->decode(delete $node->{attr_json});
+    $node->{name} .= " ->" if $node->{type} == 2 && $node->{name};
 
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
@@ -80,11 +81,11 @@ sub _fetch_node_tree {
             # XXX id, depth, parent_id
             warn "Merged $node->{name} #$node->{id} with only child $child->{name} #$child->{id}\n"
                 if $opt_debug;
-            $child->{name} = "$node->{name} + $child->{name}";
+            $child->{name} = "$node->{name} $child->{name}";
             $child->{$_} += $node->{$_} for (qw(self_size));
             $child->{$_}  = $node->{$_} for (qw(parent_id));
 
-            $child->{title} = join " + ", grep { defined && length } $child->{title}, $node->{title};
+            $child->{title} = join " ", grep { defined && length } $child->{title}, $node->{title};
             #warn "Titled $child->{title}" if $child->{title};
 
             for my $attr_type (keys %{ $node->{attr} }) {
