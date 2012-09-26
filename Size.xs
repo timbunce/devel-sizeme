@@ -977,7 +977,9 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
     SV **pname;
     I32 ix;              
 
-    if(!check_new(st, padlist))
+    if (!padlist)
+        return;
+    if( 0 && !check_new(st, padlist))
         return;
 
     pad_name = MUTABLE_AV(*av_fetch(MUTABLE_AV(padlist), 0, FALSE));
@@ -989,6 +991,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
             namesv = NULL;
         }
         if (namesv) {
+            /* SvFAKE: On a pad name SV, that slot in the frame AV is a REFCNT'ed reference to a lexical from "outside" */
             if (SvFAKE(namesv))
                 ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), ix);
             else
@@ -1028,8 +1031,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 #else
   case SVt_IV: TAG;
 #endif
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing), recurse);
+    if(recurse && SvROK(thing)) /* XXX maybe don't follow weakrefs */
+	sv_size(aTHX_ st, (SvWEAKREF(thing) ? NPathLink("weakRV") : NPathLink("RV")), SvRV_const(thing), recurse);
     TAG;break;
 
   case SVt_PVAV: TAG;
