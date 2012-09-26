@@ -7,8 +7,24 @@ use autodie;
 use DBI qw(looks_like_number);
 use DBD::SQLite;
 use JSON::XS;
+use Devel::Dwarn;
 
 use Getopt::Long;
+
+# XXX import these from the XS code
+use constant NPtype_NAME     => 0x01;
+use constant NPtype_LINK     => 0x02;
+use constant NPtype_SV       => 0x03;
+use constant NPtype_MAGIC    => 0x04;
+use constant NPtype_OP       => 0x05;
+
+use constant NPattr_LEAFSIZE => 0x00;
+use constant NPattr_NAME     => 0x01;
+use constant NPattr_PADFAKE  => 0x02;
+use constant NPattr_PADNAME  => 0x03;
+use constant NPattr_PADTMP   => 0x04;
+use constant NPattr_NOTE     => 0x05;
+
 
 GetOptions(
     'text!' => \my $opt_text,
@@ -79,12 +95,23 @@ sub fmt_size {
 
 sub enter_node {
     my $x = shift;
-    if ($opt_dot) {
-        #printf $fh qq{\tn%d [ %s ]\n}, $x->{id}, $dotnode->($x->{name});
-        #print qq({ "id": "$x->{id}", "name": "$x->{name}", "depth":$x->{depth}, "children":[ \n);
+
+    my $parent = $stack[-1];
+    if ($parent) {
+
+        # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
+        if ($parent->{name} eq 'SV(PVAV)' && @stack >= 4) {
+            if ((my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
+                my $padnames = $cvpl->{attr}{+NPattr_PADNAME} || [];
+                warn "@$padnames";
+                $x->{name} = "pad";
+            }
+        }
     }
-    return;
+
+    return $x;
 }
+
 
 sub leave_node {
     my $x = shift;
@@ -102,6 +129,7 @@ sub leave_node {
         $parent->{kids_size} += $self_size + $x->{kids_size};
         push @{$parent->{child_id}}, $x->{id};
     }
+
     # output
     # ...
     if ($opt_dot) {
@@ -109,7 +137,7 @@ sub leave_node {
                 $parent ? $parent->{id} : "",
                 $parent ? $parent->{type} : ""
             if 0;
-        if ($x->{type} != 2) {
+        if ($x->{type} != NPtype_LINK) {
             my $name = $x->{title} ? "\"$x->{title}\" $x->{name}" : $x->{name};
 
             if ($x->{kids_size}) {
@@ -129,7 +157,7 @@ sub leave_node {
             if ($parent) { # probably a link
                 my $parent_id = $parent->{id};
                 my @link_attr = ("id=$parent_id");
-                if ($parent->{type} == 2) { # link
+                if ($parent->{type} == NPtype_LINK) { # link
                     (my $link_name = $parent->{name}) =~ s/->$//;
                     push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
                     $parent_id = ($stack[-2]||die "panic")->{id};
@@ -156,10 +184,13 @@ sub leave_node {
 }
 
 my $indent = ":   ";
+my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE));
 
 while (<>) {
     chomp;
+
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
+
     if ($type =~ s/^-//) {     # Node type ($val is depth)
         printf "%s%s %s [#%d @%d]\n", $indent x $val, $name, $extra||'', $id, $val
             if $opt_text;
@@ -170,33 +201,44 @@ while (<>) {
         }
         die "panic: stack already has item at depth $val"
             if $stack[$val];
-        my $node = $stack[$val] = { id => $id, type => $type, name => $name, extra => $extra, attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0 };
-        enter_node($node);
+        my $node = enter_node({
+            id => $id, type => $type, name => $name, extra => $extra,
+            attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0
+        });
+        $stack[$val] = $node;
         $seqn2node{$id} = $node;
     }
-    elsif ($type eq "L") {  # Leaf name and memory size
+    # --- Leaf name and memory size
+    elsif ($type eq "L") {
         my $node = $seqn2node{$id} || die;
         $node->{leaves}{$name} += $val;
         printf "%s+%d %s\n", $indent x ($node->{depth}+1), $val, $name
             if $opt_text;
     }
-    elsif (looks_like_number($type)) {  # Attribute type, name and value
+    # --- Attribute type, name and value
+    elsif (looks_like_number($type)) {
         my $node = $seqn2node{$id} || die;
         my $attr = $node->{attr} || die;
-        printf "%s~%s %d [t%d]\n", $indent x ($node->{depth}+1), $name, $val, $type
-            if $opt_text;
-        if ($type == 1 or $type == 5) { # NPattr_NAME
+
+        if ($type == NPattr_NAME or $type == NPattr_NOTE) {
+            printf "%s~%s(%s) %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
+                if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
                 if exists $attr->{$type}{$name};
             $attr->{$type}{$name} = $val || $id;
             $node->{title} = $name if $type == 1 and !$val;
         }
-        elsif (2 <= $type and $type <= 4) { # NPattr_PAD*
+        elsif (NPattr_PADFAKE==$type or NPattr_PADTMP==$type or NPattr_PADNAME==$type) {
+            printf "%s~%s('%s') %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
+                if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}[$val])\n"
                 if defined $attr->{$type}[$val];
-            $attr->{$type}[$val] = $name;
+            $attr->{+NPattr_PADNAME}[$val] = $name; # store all as NPattr_PADNAME
+            Dwarn $attr;
         }
         else {
+            printf "%s~%s %d [t%d]\n", $indent x ($node->{depth}+1), $name, $val, $type
+                if $opt_text;
             warn "Invalid attribute type '$type' on line $. ($_)";
         }
     }
