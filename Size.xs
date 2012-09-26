@@ -1078,6 +1078,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
+/* XXX a HE should probably be a node so the keys and values are seen as pairs */
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
 	  if (recurse >= st->min_recurse_threshold) {
@@ -1088,6 +1089,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
  */
 if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 	      sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry), recurse);
+else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 	  }
           cur_entry = cur_entry->hent_next;
         }
