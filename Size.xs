@@ -1290,8 +1290,8 @@ new_state(pTHX)
     check_new(st, &PL_sv_placeholder);
 #endif
 #ifdef PATH_TRACKING
-    if (getenv("MEMNODES") && *getenv("MEMNODES")) { /* XXX quick hack */
-        st->node_stream_name = getenv("MEMNODES");
+    if (getenv("MEMVIEW") && *getenv("MEMVIEW")) { /* XXX quick hack */
+        st->node_stream_name = getenv("MEMVIEW");
         if (*st->node_stream_name == '|')
             st->node_stream_fh = popen(st->node_stream_name+1, "w");
         else
