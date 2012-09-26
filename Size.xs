@@ -977,9 +977,9 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
     SV **pname;
     I32 ix;              
 
-    if (!padlist) {
+    if(!check_new(st, padlist))
         return;
-    }
+
     pad_name = MUTABLE_AV(*av_fetch(MUTABLE_AV(padlist), 0, FALSE));
     pname = AvARRAY(pad_name);
 
