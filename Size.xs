@@ -1150,7 +1150,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 
   case SVt_PVFM: TAG;
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), recurse);
+    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), SOME_RECURSION);
 
     if (st->go_yell && !st->fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
@@ -1164,7 +1164,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
     sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing), SOME_RECURSION);
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), recurse);
+    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), SOME_RECURSION);
     if (CvISXSUB(thing)) {
 	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing), recurse);
     } else {
