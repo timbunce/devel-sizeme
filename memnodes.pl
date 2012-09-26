@@ -24,6 +24,7 @@ use constant NPattr_PADFAKE  => 0x02;
 use constant NPattr_PADNAME  => 0x03;
 use constant NPattr_PADTMP   => 0x04;
 use constant NPattr_NOTE     => 0x05;
+use constant NPattr_PRE_ATTR => 0x06;
 
 
 GetOptions(
@@ -99,12 +100,24 @@ sub enter_node {
     my $parent = $stack[-1];
     if ($parent) {
 
-        # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
-        if ($parent->{name} eq 'SV(PVAV)' && @stack >= 4) {
-            if ((my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
-                my $padnames = $cvpl->{attr}{+NPattr_PADNAME} || [];
-                warn "@$padnames";
-                $x->{name} = "pad";
+        if ($parent->{name} eq 'SV(PVAV)') {
+            Dwarn $x->{attr};
+            my $index = $x->{attr}{index};
+            # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
+            if (@stack >= 4 and (my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
+                # cache the pad names so we can eat them in order
+                my $padnames = $cvpl->{_cached}{padnames} ||= do {
+                    my @names = @{ $cvpl->{attr}{+NPattr_PADNAME} || []};
+                    $_ = "my(".($_||'').")" for @names;
+                    $names[0] = '@_';
+                    \@names;
+                };
+                #die Dwarn $x;
+                $x->{name} = $padnames->[$index] || "?";
+                $x->{name} =~ s/my\(SVs_PADTMP\)/PADTMP/; # XXX hack for neatness
+            }
+            else {
+                $x->{name} = "[$index]";
             }
         }
     }
@@ -185,6 +198,7 @@ sub leave_node {
 
 my $indent = ":   ";
 my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE));
+my $pending_pre_attr = {};
 
 while (<>) {
     chomp;
@@ -203,8 +217,10 @@ while (<>) {
             if $stack[$val];
         my $node = enter_node({
             id => $id, type => $type, name => $name, extra => $extra,
-            attr => {}, leaves => {}, depth => $val, self_size=>0, kids_size=>0
+            attr => { %$pending_pre_attr },
+            leaves => {}, depth => $val, self_size=>0, kids_size=>0
         });
+        %$pending_pre_attr = ();
         $stack[$val] = $node;
         $seqn2node{$id} = $node;
     }
@@ -220,7 +236,12 @@ while (<>) {
         my $node = $seqn2node{$id} || die;
         my $attr = $node->{attr} || die;
 
-        if ($type == NPattr_NAME or $type == NPattr_NOTE) {
+        # attributes to queue up and apply to the next node
+        if (NPattr_PRE_ATTR == $type) {
+            $pending_pre_attr->{$name} = $val;
+        }
+        # attributes where the string is a key (or always empty and the type is the key)
+        elsif ($type == NPattr_NAME or $type == NPattr_NOTE) {
             printf "%s~%s(%s) %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
                 if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
@@ -228,13 +249,13 @@ while (<>) {
             $attr->{$type}{$name} = $val || $id;
             $node->{title} = $name if $type == 1 and !$val;
         }
+        # attributes where the number is a key (or always zero)
         elsif (NPattr_PADFAKE==$type or NPattr_PADTMP==$type or NPattr_PADNAME==$type) {
             printf "%s~%s('%s') %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
                 if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}[$val])\n"
                 if defined $attr->{$type}[$val];
             $attr->{+NPattr_PADNAME}[$val] = $name; # store all as NPattr_PADNAME
-            Dwarn $attr;
         }
         else {
             printf "%s~%s %d [t%d]\n", $indent x ($node->{depth}+1), $name, $val, $type
