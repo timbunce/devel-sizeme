@@ -152,12 +152,18 @@ struct state {
 #define NPtype_MAGIC    0x04
 #define NPtype_OP       0x05
 
+/* XXX these should probably be generalizes into flag bits */
 #define NPattr_LEAFSIZE 0x00
 #define NPattr_NAME     0x01
 #define NPattr_PADFAKE  0x02
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
 #define NPattr_NOTE     0x05
+#define NPattr_PRE_ATTR 0x06
+
+#define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) (st->add_attr_cb && st->add_attr_cb(st, np, attr_type, attr_name, attr_value))
+#define ADD_ATTR(st, attr_type, attr_name, attr_value) _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
+#define ADD_PRE_ATTR(st, attr_type, attr_name, attr_value) (assert(!attr_type), _ADD_ATTR_NP(st, NPattr_PRE_ATTR, attr_name, attr_value, NP-1))
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
 #define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
@@ -165,7 +171,6 @@ struct state {
 #define NPathLinkAndNode(nid, nid2)  (_NPathLink(NP, nid, NPtype_LINK), _NPathLink(NP+1, nid2, NPtype_NAME), ((NP+1)->prev=NP), (NP+1))
 #define NPathOpLink  (NPathArg)
 #define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(st, NP-1, NPattr_LEAFSIZE, (name), (bytes))),
-#define ADD_ATTR(st, attr_type, attr_name, attr_value) (st->add_attr_cb && st->add_attr_cb(st, NP-1, attr_type, attr_name, attr_value))
 
 #else
 
@@ -1045,8 +1050,10 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
       if (recurse >= st->min_recurse_threshold) {
 	  SSize_t i = AvFILLp(thing) + 1;
 
-	  while (i--)
+	  while (i--) {
+              ADD_PRE_ATTR(st, 0, "index", i);
 	      sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i], recurse);
+          }
       }
     }
     /* Add in the bits on the other side of the beginning */
@@ -1153,6 +1160,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 
   case SVt_PVCV: TAG;
     /* not CvSTASH, per https://rt.cpan.org/Ticket/Display.html?id=79366 */
+    ADD_ATTR(st, NPattr_NAME, CvGV(thing) ? GvNAME(CvGV(thing)) : "UNDEFINED", 0);
     sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing), SOME_RECURSION);
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
