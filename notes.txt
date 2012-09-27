@@ -1,13 +1,7 @@
 
-make && rm -f /cores/* && M=1 perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()' >x.memnodes
-585475
-905979 - with recursion change
+MEMNODES='|./memnodes.pl --text --dot=memnodes.dot --db=memnodes.db' perl -Mblib -Mstrict -MDevel::Size=:all -e 'total_size(\%main::)'
 
-perl memnodes.pl --dot x.memnodes > x.dot && open -a Graphviz x.dot && cat x.dot
-
-./memnodes.pl --db x.db x.memnodes
-
-./MemView.pl daemon
+morbo -w MemView.pl -w public -w ../memnodes.db MemView.pl
 
 open http://127.0.0.1:3000
 
