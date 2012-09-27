@@ -100,8 +100,7 @@ sub enter_node {
     my $parent = $stack[-1];
     if ($parent) {
 
-        if ($parent->{name} eq 'SV(PVAV)') {
-            Dwarn $x->{attr};
+        if ($x->{name} eq 'AVelem' and $parent->{name} eq 'SV(PVAV)') {
             my $index = $x->{attr}{index};
             # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
             if (@stack >= 4 and (my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
