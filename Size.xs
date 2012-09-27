@@ -98,9 +98,9 @@ struct state {
     /* callback hooks and data */
     int (*add_attr_cb)(struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
     void (*free_state_cb)(pTHX_ struct state *st);
-    UV seqn;
     void *state_cb_data; /* free'd by free_state() after free_state_cb() call */
     /* this stuff wil be moved to state_cb_data later */
+    UV seqn;
     FILE *node_stream_fh;
     char *node_stream_name;
 };
@@ -1450,7 +1450,7 @@ CODE:
 
   if (1) {
     struct mstats ms = mstats();
-    NPathSetNode("unused malloc space", NPtype_NAME);
+    NPathSetNode("freed_malloc_space", NPtype_NAME);
     ADD_SIZE(st, "bytes_free", ms.bytes_free);
     ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
     ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
