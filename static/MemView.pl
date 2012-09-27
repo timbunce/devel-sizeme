@@ -39,7 +39,6 @@ get '/jit_tree/:id/:depth' => sub {
 
     my $id = $self->stash('id');
     my $depth = $self->stash('depth');
-    warn "jit_tree $id $depth";
     my $node_tree = _fetch_node_tree($id, $depth);
     my $jit_tree = _transform_node_tree($node_tree, sub {
         my ($node) = @_;
@@ -70,7 +69,7 @@ sub _fetch_node_tree {
     $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size));
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
     $node->{attr}   = $j->decode(delete $node->{attr_json});
-    $node->{name} .= " ->" if $node->{type} == 2 && $node->{name};
+    $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
@@ -98,7 +97,7 @@ sub _fetch_node_tree {
                         $dst->{$k} = $src->{$k};
                     }
                 }
-                else { # ARRAY eg NPattr_PADNAME: {attr}{2}[$val] = $name
+                elsif (ref $src eq 'ARRAY') { # eg NPattr_PADNAME: {attr}{2}[$val] = $name
                     my $dst = $child->{attr}{$attr_type} ||= [];
                     my $idx = @$src;
                     while (--$idx >= 0) {
@@ -106,6 +105,11 @@ sub _fetch_node_tree {
                             if defined $dst->[$idx];
                         $dst->[$idx] = $src->[$idx];
                     }
+                }
+                else { # assume scalar
+                    warn "Node $child->{id} attr $attr_type=$child->{attr}{$attr_type} overwritten by $src\n"
+                        if exists $child->{attr}{$attr_type};
+                    $child->{attr}{$attr_type} = $src;
                 }
             }
 
@@ -173,7 +177,7 @@ Welcome to the Mojolicious real-time web framework!
 <h4>
 Perl Memory TreeMap
 </h4> 
-    Clicking on a node will show a new TreeMap with the contents of that node.<br /><br />            
+    Click on a node to zoom in.<br /><br />            
 </div>
 
 <a id="back" href="#" class="theme button white">Go to Parent</a>
