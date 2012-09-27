@@ -4189,16 +4189,22 @@ var Accessors;
     }
 
     var dollar = prefix + prop;
+    var val;
 
     if(force) {
-      return data[dollar];
+      val = data[dollar];
     }
-
-    if(!this.Config.overridable)
-      return prefixConfig[prop] || 0;
-
-    return (dollar in data) ?
-      data[dollar] : ((dollar in this.data) ? this.data[dollar] : (prefixConfig[prop] || 0));
+    else if(!this.Config.overridable) {
+      val = prefixConfig[prop] || 0;
+    }
+    else {
+      val = (dollar in data) ?
+        data[dollar] : ((dollar in this.data) ? this.data[dollar] : (prefixConfig[prop] || 0));
+    }
+    if (dollar == 'XXX$area') {
+        val = Math.log(val);
+    }
+    return val;
   }
 
   var setDataInternal = function(prefix, prop, value, type) {
