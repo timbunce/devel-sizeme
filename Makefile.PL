@@ -13,7 +13,12 @@ WriteMakefile(
     NAME => 'Devel::Memory',
     VERSION_FROM => 'lib/Devel/Memory.pm',
     DEFINE => "-DALIGN_BITS=$ptr_bits",
-    PREREQ_PM => { 'Test::More' => 0, XSLoader => 0, },
+    PREREQ_PM => {
+        'Test::More' => 0,
+        'JSON::XS' => 0,
+        'HTML::Entities' => 0,
+        XSLoader => 0,
+    },
     EXE_FILES => [ 'bin/dmemtree.pl' ],
     (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.005') : ()),
     (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
