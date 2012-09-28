@@ -205,7 +205,9 @@ while (<>) {
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
 
     if ($type =~ s/^-//) {     # Node type ($val is depth)
-        printf "%s%s %s [#%d @%d]\n", $indent x $val, $name, $extra||'', $id, $val
+        printf "%s%s%s %s [#%d @%d]\n", $indent x $val, $name,
+                ($type == NPtype_LINK) ? "->" : "",
+                $extra||'', $id, $val
             if $opt_text;
         while ($val < @stack) {
             leave_node(my $x = pop @stack);
