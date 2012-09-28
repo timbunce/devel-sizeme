@@ -300,7 +300,7 @@ if ($opt_verbose) {
 if ($dot_fh) {
     print $dot_fh "}\n";
     close $dot_fh;
-    system("open -a Graphviz $opt_dot");
+    system("open -a Graphviz $opt_dot") if $^O eq 'darwin'; # OSX
 }
 
 $dbh->commit if $dbh;
