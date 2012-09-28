@@ -7,6 +7,7 @@ use JSON::XS;
 use Mojolicious::Lite;
 use Getopt::Long;
 use Storable qw(dclone);
+use Devel::Dwarn;
 
 GetOptions(
     'db=s' => \(my $opt_db = '../memnodes.db'),
@@ -35,10 +36,14 @@ get '/' => sub {
 
 get '/jit_tree/:id/:depth' => sub {
     my $self = shift;
-    my $logarea = $self->param('logarea');
 
     my $id = $self->stash('id');
     my $depth = $self->stash('depth');
+
+    my $logarea = (defined $self->param('logarea'))
+        ? $self->param('logarea')
+        : Mojo::URL->new($self->req->headers->referrer)->query->param('logarea');
+
     my $node_tree = _fetch_node_tree($id, $depth);
     my $jit_tree = _transform_node_tree($node_tree, sub {
         my ($node) = @_;
@@ -53,12 +58,14 @@ get '/jit_tree/:id/:depth' => sub {
         $jit_node->{children} = $children if $children;
         return $jit_node;
     });
-if(1){
-    use Devel::Dwarn;
-    use Data::Dump qw(pp);
-    local $jit_tree->{children};
-    pp(dclone($jit_tree)); # dclone to avoid stringification
-}
+
+    if(1){
+        use Devel::Dwarn;
+        use Data::Dump qw(pp);
+        local $jit_tree->{children};
+        pp(dclone($jit_tree)); # dclone to avoid stringification
+    }
+
     $self->render_json($jit_tree);
 };
 
@@ -74,7 +81,9 @@ sub _fetch_node_tree {
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
         my $children;
-        if (@child_ids == 1 && $node->{type} == 2) {
+        if (@child_ids == 1
+            && $node->{type} == 2 # only collapse links
+        ) {
             my $child = _fetch_node_tree($child_ids[0], $depth); # same depth
             # merge node into child
             # XXX id, depth, parent_id

@@ -26,6 +26,26 @@ var Log = {
   }
 };
 
+/**
+ * Convert number of bytes into human readable format
+ *
+ * @param integer bytes     Number of bytes to convert
+ * @param integer precision Number of digits after the decimal separator
+ * @return string
+ * via http://codeaid.net/javascript/convert-size-in-bytes-to-human-readable-format-(javascript)
+ */
+function bytesToSize(bytes, precision) {
+    var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    var posttxt = 0;
+    while( bytes >= 1024 ) {
+        posttxt++;
+        bytes = bytes / 1024;
+    }
+    var num = (posttxt) ? Number(bytes).toFixed(precision) : bytes;
+    return num + " " + sizes[posttxt];
+}
+
+
 // http://stackoverflow.com/questions/5199901/how-to-sort-an-associative-array-by-its-values-in-javascript
 function bySortedValue(obj, comparitor, callback, context) {
     var tuples = [];
@@ -47,7 +67,7 @@ function bySortedValue(obj, comparitor, callback, context) {
 
 
 function request_jit_tree(nodeId, level, depth, onComplete){
-    var params = { logarea: 0 };
+    var params = { };//logarea: 0 };
     jQuery.getJSON('jit_tree/'+nodeId+'/'+depth, params, onComplete);
 }
 
@@ -67,7 +87,7 @@ function init(){
     //box offsets
     offset: 1,
     //use canvas text
-    Label: {
+    XXX_Label: {
       type: labelType,
       size: 10,
       family: 'Tahoma, Verdana, Arial'
@@ -123,30 +143,37 @@ function init(){
       onShow: function(tip, node, isLeaf, domElement) {
         var data = node.data;
         var html = "<div class=\"tip-title\">"
-          + (data.title ? data.title : "")
+          + (data.title ? "\""+data.title+"\"" : "")
           + " " + data.name
           + "</div><div class=\"tip-text\">";
 
         html += "<br />";
-        html += sprintf("Size: %d (%d + %d)<br />", data.self_size+data.kids_size, data.self_size, data.kids_size);
-
+        html += sprintf("Memory use: %s<br />", bytesToSize(data.self_size+data.kids_size,2));
+        if (data.kids_size) {
+            html += sprintf("Child use:  %s<br />", bytesToSize(data.kids_size,2));
+        }
         if (data.self_size) {
-            html += sprintf("Memory usage:<br />");
+            html += sprintf("Own use:    %s<br />", bytesToSize(data.self_size,2));
+            html += sprintf("<div style=\"color:grey\">");
             bySortedValue(data.leaves,
                 function(a, b) { return a[1] - b[1] },
-                function(k, v) { html += sprintf(" %10s: %5d<br />", k, v);
+                function(k, v) { html += sprintf(" %9s: %s<br />", k, bytesToSize(v,2));
             });
-            html += "<br />";
+            html += sprintf("</div>");
         }
+        html += "<br />";
 
 
+    if (0) {
         html += sprintf("Attributes:<br />");
         bySortedValue(data.attr,
             function(a, b) { return a[0] > b[0] ? 1 : a[0] < b[0] ? -1 : 0 },
             function(k, v) { html += sprintf(" %10s: %5d<br />", k, v);
         });
         html += "<br />";
+    }
 
+        html += sprintf("<div style=\"color:grey\">");
         if (data.child_count) {
             html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
         }
@@ -154,8 +181,9 @@ function init(){
         html += sprintf("Depth: %d<br />", data.depth);
         html += sprintf("Parent: %d<br />", data.parent_id);
 
-        html += JSON.stringify(data.attr, undefined, 4);
+        //html += JSON.stringify(data.attr, undefined, 4);
         //html += JSON.stringify(data, undefined, 4);
+        html += sprintf("</div>");
 
         tip.innerHTML =  html; 
       }  
@@ -191,7 +219,8 @@ function init(){
             style.border = '1px solid transparent';  
         };  
 
-    }
+    },
+    onPlaceLabel: function(domElement, node){ },
   });
 
   request_jit_tree(1, 0, levelsToShow, function(data) {
