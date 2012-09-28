@@ -1107,7 +1107,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
 	  if (recurse >= st->min_recurse_threshold) {
-            if (orig_thing == PL_strtab) {
+            if (orig_thing == (SV*)PL_strtab) {
                 /* For PL_strtab the HeVAL is used as a refcnt */
                 ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
             }
@@ -1288,7 +1288,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 static void
 free_memnode_state(pTHX_ struct state *st)
 {
-    if (st->node_stream_fh && st->node_stream_name) {
+    if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
         if (*st->node_stream_name == '|') {
             if (pclose(st->node_stream_fh))
                 warn("%s exited with an error status\n", st->node_stream_name);
@@ -1321,22 +1321,27 @@ new_state(pTHX)
 #if PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 0)
     check_new(st, &PL_sv_placeholder);
 #endif
+
 #ifdef PATH_TRACKING
-    if (getenv("MEMVIEW") && *getenv("MEMVIEW")) { /* XXX quick hack */
-        st->node_stream_name = getenv("MEMVIEW");
-        if (*st->node_stream_name == '|')
-            st->node_stream_fh = popen(st->node_stream_name+1, "w");
-        else
-            st->node_stream_fh = fopen(st->node_stream_name, "wb");
-        if (!st->node_stream_fh)
-            croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
-        setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
-        st->add_attr_cb = np_stream_node_path_info;
+    /* XXX quick hack */
+    st->node_stream_name = getenv("PERL_DMEM");
+    if (st->node_stream_name) {
+        if (*st->node_stream_name) {
+            if (*st->node_stream_name == '|')
+                st->node_stream_fh = popen(st->node_stream_name+1, "w");
+            else
+                st->node_stream_fh = fopen(st->node_stream_name, "wb");
+            if (!st->node_stream_fh)
+                croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
+            setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
+            st->add_attr_cb = np_stream_node_path_info;
+        }
+        else 
+            st->add_attr_cb = np_dump_node_path_info;
     }
-    else 
-        st->add_attr_cb = np_dump_node_path_info;
     st->free_state_cb = free_memnode_state;
 #endif
+
     return st;
 }
 
@@ -1448,7 +1453,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
 }
 
 
-MODULE = Devel::Size        PACKAGE = Devel::Size       
+MODULE = Devel::Memory        PACKAGE = Devel::Memory       
 
 PROTOTYPES: DISABLE
 

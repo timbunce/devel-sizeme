@@ -2,7 +2,7 @@
 
 use strict;
 use Test::More tests => 2;
-use Devel::Size ':all';
+use Devel::Memory ':all';
 use Config;
 
 use constant PVBM => 'galumphing';

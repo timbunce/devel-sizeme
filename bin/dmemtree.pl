@@ -1,5 +1,19 @@
 #!/usr/bin/env perl
 
+# Read the raw memory data from Devel::Memory and process the tree
+# (as a stack, propagating data such as totals, up the tree).
+# Output completed nodes in the request formats.
+# Needs to be generalized to support pluggable output formats.
+# Making nodes into (lightweight fast) objects would be smart.
+# Tests would be even smarter!
+#
+# When working on this code it's important to have a sense of the flow.
+# Specifically the way that depth drives the completion of nodes.
+# It's a depth-first stream processing machine, which only ever holds
+# a single stack of the currently incomplete nodes, which is always the same as
+# the current depth. I.e., when a node of depth N arrives, all nodes >N are
+# popped off the stack and 'completed', each rippling data up to its parent.
+
 use strict;
 use warnings;
 use autodie;
@@ -8,6 +22,7 @@ use DBI qw(looks_like_number);
 use DBD::SQLite;
 use JSON::XS;
 use Devel::Dwarn;
+use HTML::Entities qw(encode_entities);;
 
 use Getopt::Long;
 
@@ -70,7 +85,6 @@ if ($opt_db) {
 my @stack;
 my %seqn2node;
 
-use HTML::Entities qw(encode_entities);;
 my $dotnode = sub {
     my $name = encode_entities(shift);
     $name =~ s/"/\\"/g;
@@ -104,14 +118,12 @@ sub enter_node {
             my $index = $x->{attr}{index};
             # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
             if (@stack >= 4 and (my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
-                # cache the pad names so we can eat them in order
                 my $padnames = $cvpl->{_cached}{padnames} ||= do {
                     my @names = @{ $cvpl->{attr}{+NPattr_PADNAME} || []};
                     $_ = "my(".($_||'').")" for @names;
                     $names[0] = '@_';
                     \@names;
                 };
-                #die Dwarn $x;
                 $x->{name} = $padnames->[$index] || "?";
                 $x->{name} =~ s/my\(SVs_PADTMP\)/PADTMP/; # XXX hack for neatness
             }
@@ -129,7 +141,7 @@ sub leave_node {
     my $x = shift;
     delete $seqn2node{$x->{id}};
 
-    my $self_size = 0; $self_size += $_  for values %{$x->{leaves}};
+    my $self_size = 0; $self_size += $_ for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
 
     my $parent = $stack[-1];
@@ -192,11 +204,12 @@ sub leave_node {
         );
         # XXX attribs
     }
-    return;
+
+    return $x;
 }
 
 my $indent = ":   ";
-my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE));
+my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE)); # XXX get from XS in some way
 my $pending_pre_attr = {};
 
 while (<>) {
@@ -205,12 +218,15 @@ while (<>) {
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
 
     if ($type =~ s/^-//) {     # Node type ($val is depth)
+
         printf "%s%s%s %s [#%d @%d]\n", $indent x $val, $name,
                 ($type == NPtype_LINK) ? "->" : "",
                 $extra||'', $id, $val
             if $opt_text;
+
+        # this is the core driving logic
         while ($val < @stack) {
-            leave_node(my $x = pop @stack);
+            my $x = leave_node(pop @stack);
             warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
                 if $opt_verbose;
         }
@@ -225,6 +241,7 @@ while (<>) {
         $stack[$val] = $node;
         $seqn2node{$id} = $node;
     }
+
     # --- Leaf name and memory size
     elsif ($type eq "L") {
         my $node = $seqn2node{$id} || die;
@@ -232,7 +249,8 @@ while (<>) {
         printf "%s+%d %s\n", $indent x ($node->{depth}+1), $val, $name
             if $opt_text;
     }
-    # --- Attribute type, name and value
+
+    # --- Attribute type, name and value (all rather hackish)
     elsif (looks_like_number($type)) {
         my $node = $seqn2node{$id} || die;
         my $attr = $node->{attr} || die;
@@ -268,14 +286,16 @@ while (<>) {
         warn "Invalid type '$type' on line $. ($_)";
         next;
     }
+
     $dbh->commit if $dbh and $id % 10_000 == 0;
 }
-
 my $top = $stack[0]; # grab top node before we pop all the nodes
 leave_node(pop @stack) while @stack;
-warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n"
-    if $opt_verbose;
-warn Dumper($top) if $opt_verbose;
+
+if ($opt_verbose) {
+    warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
+    warn Dumper($top);
+}
 
 if ($dot_fh) {
     print $dot_fh "}\n";
@@ -288,7 +308,8 @@ $dbh->commit if $dbh;
 use Data::Dumper;
 warn Dumper(\%seqn2node) if %seqn2node; # should be empty
 
-=for
+=for This is out of date but gives you an idea of the data and stream
+
 SV(PVAV) fill=1/1       [#1 @0] 
 :   +64 sv =64 
 :   +16 av_max =80 

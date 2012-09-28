@@ -2,13 +2,13 @@
 
 use strict;
 use Test::More tests => 44;
-use Devel::Size ':all';
+use Devel::Memory ':all';
 use Config;
 
 my $warn_count;
 
 $SIG{__WARN__} = sub {
-    return if $_[0] eq "Devel::Size: Can't size up perlio layers yet\n";
+    return if $_[0] =~ "Can't size up perlio layers yet\n";
     ++$warn_count;
     warn @_;
 };
@@ -169,12 +169,12 @@ gv_grew('bang', 'boff', 'no strict "vars"; @boff = (); 1', 'ARRAY');
 gv_grew('clange', 'sock', 'no strict "vars"; %sock = (); 1', 'HASH');
 SKIP: {
     skip("Can't create FORMAT references prior to 5.8.0", 7) if $] < 5.008;
-    local $Devel::Size::warn = 0;
+    local $Devel::Memory::warn = 0;
     gv_grew('biff', 'zapeth', "format zapeth =\n.\n1", 'FORMAT');
 }
 gv_grew('crunch_eth', 'awkkkkkk', 'sub awkkkkkk {}; 1', 'CODE');
 
-# Devel::Size isn't even tracking PVIOs from GVs (yet)
+# Devel::Memory isn't even tracking PVIOs from GVs (yet)
 # gv_grew('kapow', 'thwape', 'opendir *thwape, "."', 'IO');
 
 is($warn_count, undef, 'No warnings emitted');

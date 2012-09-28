@@ -2,15 +2,15 @@
 
 use Test::More tests => 30;
 use strict;
-use Devel::Size qw(size total_size);
+use Devel::Memory qw(size total_size);
 
-can_ok ('Devel::Size', qw/
+can_ok ('Devel::Memory', qw/
   size
   total_size
   /);
 
-die ("Uhoh, test uses an outdated version of Devel::Size")
-    unless is ($Devel::Size::VERSION, '0.78_50', 'VERSION MATCHES');
+die ("Uhoh, test uses an outdated version of Devel::Memory")
+    unless is ($Devel::Memory::VERSION, '0.01', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:

@@ -1,7 +1,0 @@
-
-MEMNODES='|./memnodes.pl --text --dot=memnodes.dot --db=memnodes.db' perl -Mblib -Mstrict -MDevel::Size=:all -e 'total_size(\%main::)'
-
-morbo -w MemView.pl -w public -w ../memnodes.db MemView.pl
-
-open http://127.0.0.1:3000
-

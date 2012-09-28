@@ -2,7 +2,7 @@
 
 use strict;
 use Test::More tests => 12;
-use Devel::Size ':all';
+use Devel::Memory ':all';
 
 sub zwapp;
 sub swoosh($$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$);

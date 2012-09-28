@@ -10,10 +10,11 @@ my $ptr_bits = length $1;
 
 WriteMakefile(
     OPTIMIZE => "-g",
-	      NAME => 'Devel::Size',
-	      VERSION_FROM => 'lib/Devel/Size.pm',
-	      DEFINE => "-DALIGN_BITS=$ptr_bits",
-	      PREREQ_PM => { 'Test::More' => 0, XSLoader => 0, },
-	      (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.005') : ()),
-	      (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
+    NAME => 'Devel::Memory',
+    VERSION_FROM => 'lib/Devel/Memory.pm',
+    DEFINE => "-DALIGN_BITS=$ptr_bits",
+    PREREQ_PM => { 'Test::More' => 0, XSLoader => 0, },
+    EXE_FILES => [ 'bin/dmemtree.pl' ],
+    (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.005') : ()),
+    (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
 );

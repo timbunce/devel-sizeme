@@ -1,3 +1,4 @@
+// based closely on http://thejit.org/static/v20/Jit/Examples/Treemap/example2.html
 var labelType, useGradients, nativeTextSupport, animate;
 
 (function() {
@@ -87,6 +88,7 @@ function init(){
     //box offsets
     offset: 1,
     //use canvas text
+    // XXX disabled to allow the onMouseEnter/onMouseLeave Events to fire to set the blue border
     XXX_Label: {
       type: labelType,
       size: 10,
@@ -141,6 +143,8 @@ function init(){
       //add content to the tooltip when a node
       //is hovered
       onShow: function(tip, node, isLeaf, domElement) {
+
+          // XXX all this needs html escaping
         var data = node.data;
         var html = "<div class=\"tip-title\">"
           + (data.title ? "\""+data.title+"\"" : "")

@@ -1,3 +1,29 @@
+package Devel::Memory;
+
+use strict;
+use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS $warn $dangle);
+
+require 5.005;
+require Exporter;
+require XSLoader;
+
+@ISA = qw(Exporter);
+
+@EXPORT_OK = qw(size total_size perl_size);
+
+# This allows declaration   use Devel::Memory ':all';
+%EXPORT_TAGS = ( 'all' => \@EXPORT_OK );
+
+$VERSION = '0.01';
+
+XSLoader::load( __PACKAGE__);
+
+$warn = 1;
+$dangle = 0; ## Set true to enable warnings about dangling pointers
+
+1;
+__END__
+
 =pod
 
 Devel::Memory - Perl extension for finding the memory usage of Perl variables
@@ -13,7 +39,7 @@ Devel::Memory - Perl extension for finding the memory usage of Perl variables
 
 =head1 DESCRIPTION
 
-Acts like Devel::Size 0.77 is the PERL_DMEM env var is not set.
+Acts like Devel::Size 0.77 if the PERL_DMEM env var is not set.
 
 Except that it also provides perl_size() and heap_size() functions.
 
@@ -43,7 +69,7 @@ The --db output is a SQLite database. (Very subject to change.)
 
 Example usage:
 
-  PERL_DMEM='|./dmemtree.pl --db=dmemtree.db' perl -MDevel::Size=:all -e 'total_size(sub { })'
+  PERL_DMEM='|dmemtree.pl --db=dmemtree.db' perl -MDevel::Memory=:all -e 'total_size(sub { })'
 
 The dmemview.pl script is a Mojolicious::Lite application that serves data to
 an interactive treemap visualization of the memory use. It can be run as:
@@ -52,43 +78,23 @@ an interactive treemap visualization of the memory use. It can be run as:
 
 and then open http://127.0.0.1:3000
 
-
-=head1 Build and Install
-
-To build and install this module, you need:
-
-     Perl
-     a working C or C++ compiler
-     a make (or namke on Windows) utility
-
-Follow these steps:
-
-On Linux, Cygwin, or Unix:
-
-    perl Makefile.PL
-    make
-    make test
-    sudo make install
-    
-On Windows:
-
-    perl Makefile.PL
-    nmake
-    nmake test
-    nmake install
-
-=head1 BUGREPORTS
-
 Please report bugs to:
 
     http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-Memory
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005 Dan Sugalski, Copyright (C) 2007-2008 Tels,
-Copyright (C) 2011-2012 Nicholas Clark, Copyright 2012 (C) Tim Bunce.
+Copyright (C) 2005 Dan Sugalski,
+Copyright (C) 2007-2008 Tels,
+Copyright (C) BrowserUK 2008,
+Copyright (C) 2011-2012 Nicholas Clark,
+Copyright (C) 2012 Tim Bunce.
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl v5.8.8.
+
+=head1 SEE ALSO
+
+perl(1), L<Devel::Size>.
 
 =cut

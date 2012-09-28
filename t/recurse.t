@@ -8,7 +8,7 @@
 
 use Test::More;
 use strict;
-use Devel::Size ':all';
+use Devel::Memory ':all';
 
 my %types = (
     NULL => undef,

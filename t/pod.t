@@ -21,6 +21,6 @@ SKIP:
       eval "use Test::Pod;";
       $@ ? 0 : 1;
       };
-  pod_file_ok( '../lib/Devel/Size.pm' );
+  pod_file_ok( '../lib/Devel/Memory.pm' );
   }
 
