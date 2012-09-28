@@ -175,7 +175,8 @@ function init(){
 
         html += sprintf("<div style=\"color:grey\">");
         if (data.child_count) {
-            html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
+            //html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
+            html += sprintf("Children: %d<br />", data.kids_node_count);
         }
         html += sprintf("Id: %s%s<br />", node.id, data._ids_merged ? data._ids_merged : "");
         html += sprintf("Depth: %d<br />", data.depth);
