@@ -1,5 +1,19 @@
 /* -*- mode: C -*- */
 
+/* TODO
+ *
+ * Refactor this to split out D:M code from Devel::Size code.
+ *
+ * Start migrating Devel::Size's Size.xs towards the new code.
+ *
+ * ADD_PRE_ATTR for index should check if the ptr is new first. Currently we're
+ * generating lots of ADD_PRE_ATTR's for SVs that we've already seen via other paths.
+ * That's wasteful and likely to cause subtle bugs.
+ *
+ * Give HE's their own node so keys and values can be tied together
+ *
+ */
+
 #undef NDEBUG /* XXX */
 #include <assert.h>
 
@@ -1027,7 +1041,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
       return;
   }
   NPathPushNode(thing, NPtype_SV);
-  ADD_SIZE(st, "sv", sizeof(SV) + body_sizes[type]);
+  ADD_SIZE(st, "sv_head", sizeof(SV));
+  ADD_SIZE(st, "sv_body", body_sizes[type]);
 
   switch (type) {
 #if (PERL_VERSION < 11)
@@ -1092,6 +1107,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
 	  if (recurse >= st->min_recurse_threshold) {
+            if (orig_thing == PL_strtab) {
+                /* For PL_strtab the HeVAL is used as a refcnt */
+                ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
+            }
+            else {
 /* I've seen a PL_strtab HeVAL == 0xC and 0x40C etc
  * just running perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()'
  * but it seemed like a corruption - it would change come and go with irrelevant code changes.
@@ -1100,6 +1120,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
 	      sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry), recurse);
 else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
+            }
 	  }
           cur_entry = cur_entry->hent_next;
         }
@@ -1344,50 +1365,27 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
                 sv_size(aTHX_ st, NPathLink("arena"), sv, TOTAL_SIZE_RECURSION);
             }
             else if (check_new(st, sv)) { /* sanity check */
-                warn("unseen_sv_size encountered freed SV unexpectedly");
                 sv_dump(sv);
+                warn("unseen_sv_size encountered freed SV unexpectedly"); /* XXX warn uses an SV, I think */
             }
         }
     }
 }
 
-MODULE = Devel::Size        PACKAGE = Devel::Size       
-
-PROTOTYPES: DISABLE
-
-UV
-size(orig_thing)
-     SV *orig_thing
-ALIAS:
-    total_size = TOTAL_SIZE_RECURSION
-CODE:
+static void
+perl_size(pTHX_ struct state *const st, pPATH)
 {
-  SV *thing = orig_thing;
-  struct state *st = new_state(aTHX);
-  
-  /* If they passed us a reference then dereference it. This is the
-     only way we can check the sizes of arrays and hashes */
-  if (SvROK(thing)) {
-    thing = SvRV(thing);
-  }
+  dNPathNodes(3, NPathArg);
 
-  sv_size(aTHX_ st, NULL, thing, ix);
-  RETVAL = st->total_size;
-  free_state(st);
-}
-OUTPUT:
-  RETVAL
+  /* if(!check_new(st, interp)) return; */
+  NPathPushNode("perl", NPtype_NAME);
 
-UV
-perl_size()
-CODE:
-{
-  struct state *st = new_state(aTHX);
-  dNPathNodes(3, NULL);
-
-  st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
-
-  NPathPushNode("perl_size", NPtype_NAME); /* provide a root node */
+/*
+ *      perl
+ *          PL_defstash
+ *          others
+ *      unknown <== = O/S Heap size - perl - free_malloc_space
+ */
   /* start with PL_defstash to get everything reachable from \%main:: */
   sv_size(aTHX_ st, NPathLink("PL_defstash"), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
 
@@ -1426,13 +1424,13 @@ CODE:
   /* --- by this point we should have seen all reachable SVs --- */
 
   /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
-  sv_size(aTHX_ st, NPathLink("PL_strtab"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_strtab-unseen"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
 
   /* unused space in sv head arenas */
   if (PL_sv_root) {
     SV *p = PL_sv_root;
     UV free_heads = 1;
-#  define SvARENA_CHAIN(sv)     SvANY(sv) /* XXX */
+#  define SvARENA_CHAIN(sv)     SvANY(sv) /* XXX breaks encapsulation*/
     while ((p = MUTABLE_SV(SvARENA_CHAIN(p)))) {
         if (!check_new(st, p)) /* sanity check */
             warn("Free'd SV head unexpectedly already seen");
@@ -1447,16 +1445,75 @@ CODE:
   /* iterate over all SVs to find any we've not accounted for yet */
   /* once the code above is visiting all SVs, any found here have been leaked */
   unseen_sv_size(aTHX_ st, NPathLink("unaccounted"));
+}
 
-  if (1) {
-    struct mstats ms = mstats();
-    NPathSetNode("freed_malloc_space", NPtype_NAME);
-    ADD_SIZE(st, "bytes_free", ms.bytes_free);
-    ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
-    ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
-    ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
-    ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
+
+MODULE = Devel::Size        PACKAGE = Devel::Size       
+
+PROTOTYPES: DISABLE
+
+UV
+size(orig_thing)
+     SV *orig_thing
+ALIAS:
+    total_size = TOTAL_SIZE_RECURSION
+CODE:
+{
+  SV *thing = orig_thing;
+  struct state *st = new_state(aTHX);
+  
+  /* If they passed us a reference then dereference it. This is the
+     only way we can check the sizes of arrays and hashes */
+  if (SvROK(thing)) {
+    thing = SvRV(thing);
   }
+
+  sv_size(aTHX_ st, NULL, thing, ix);
+  RETVAL = st->total_size;
+  free_state(st);
+}
+OUTPUT:
+  RETVAL
+
+UV
+perl_size()
+CODE:
+{
+  /* just the current perl interpreter */
+  struct state *st = new_state(aTHX);
+  st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
+  perl_size(aTHX_ st, NULL);
+  RETVAL = st->total_size;
+  free_state(st);
+}
+OUTPUT:
+  RETVAL
+
+UV
+heap_size()
+CODE:
+{
+  /* the current perl interpreter plus malloc, in the context of total heap size */
+  struct mstats ms = mstats(); /* mstats() first */
+  struct state *st = new_state(aTHX);
+  dNPathNodes(1, NULL);
+  NPathPushNode("heap", NPtype_NAME);
+
+  st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
+
+  perl_size(aTHX_ st, NPathLink("perl_interp"));
+
+  NPathSetNode("free_malloc_space", NPtype_NAME);
+  ADD_SIZE(st, "bytes_free", ms.bytes_free);
+  ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
+  ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
+  ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
+  ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
+
+  /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
+  /* for now we use bytes_total as an approximation */
+  NPathSetNode("unknown", NPtype_NAME);
+  ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
 
   RETVAL = st->total_size;
   free_state(st);
