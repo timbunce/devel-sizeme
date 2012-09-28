@@ -1499,7 +1499,13 @@ heap_size()
 CODE:
 {
   /* the current perl interpreter plus malloc, in the context of total heap size */
+# ifdef _MALLOC_MALLOC_H_ /* OSX. Now sure where else mstats is available */
+# define HAS_MSTATS
+# endif
+# ifdef HAS_MSTATS
+  /* some systems have the SVID2/XPG mallinfo structure and function */
   struct mstats ms = mstats(); /* mstats() first */
+# endif
   struct state *st = new_state(aTHX);
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
@@ -1514,11 +1520,14 @@ CODE:
   ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
   ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
   ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
-
+# ifdef HAS_MSTATS
   /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
   /* for now we use bytes_total as an approximation */
   NPathSetNode("unknown", NPtype_NAME);
   ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
+# else
+    /* XXX ? */
+# endif
 
   RETVAL = st->total_size;
   free_state(st);
