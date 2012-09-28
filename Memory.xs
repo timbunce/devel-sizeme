@@ -1513,14 +1513,13 @@ CODE:
   st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
 
   perl_size(aTHX_ st, NPathLink("perl_interp"));
-
+# ifdef HAS_MSTATS
   NPathSetNode("free_malloc_space", NPtype_NAME);
   ADD_SIZE(st, "bytes_free", ms.bytes_free);
   ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
   ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
   ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
   ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
-# ifdef HAS_MSTATS
   /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
   /* for now we use bytes_total as an approximation */
   NPathSetNode("unknown", NPtype_NAME);
