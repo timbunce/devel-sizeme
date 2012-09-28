@@ -9,6 +9,13 @@ use Getopt::Long;
 use Storable qw(dclone);
 use Devel::Dwarn;
 
+=pod TODO
+
+    Protect against nodes with thousands of children
+        perhaps replace all with single merged child that has no children itself.
+
+=cut
+
 GetOptions(
     'db=s' => \(my $opt_db = '../memnodes.db'),
     'debug!' => \my $opt_debug,
