@@ -17,6 +17,8 @@ WriteMakefile(
         'Test::More' => 0,
         'JSON::XS' => 0,
         'HTML::Entities' => 0,
+        'Mojolicious::Lite' => 0,
+        'Devel::Dwarn' => 0,
         XSLoader => 0,
     },
     EXE_FILES => [ 'bin/dmemtree.pl' ],
