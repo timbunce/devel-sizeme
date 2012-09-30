@@ -881,12 +881,11 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 static void
 hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 {
-    dNPathNodes(1, NPathArg);
+    dNPathUseParent(NPathArg);
 
     /* Hash keys can be shared. Have we seen this before? */
     if (!check_new(st, hek))
 	return;
-    NPathPushNode("hek", NPtype_NAME);
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
 #if PERL_VERSION < 8
 	+ 1 /* No hash key flags prior to 5.8.0  */
@@ -1112,18 +1111,20 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 
   case SVt_PVHV: TAG;
     /* Now the array of buckets */
-    ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
     if (HvENAME(thing)) {
         ADD_ATTR(st, NPattr_NAME, HvENAME(thing), 0);
     }
+    ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
     /* Now walk the bucket chain */
     if (HvARRAY(thing)) {
       HE *cur_entry;
       UV cur_bucket = 0;
+
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
-/* XXX a HE should probably be a node so the keys and values are seen as pairs */
+          NPathPushNode("he", NPtype_LINK);
+          NPathPushNode("he+hek", NPtype_NAME);
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
 	  if (recurse >= st->min_recurse_threshold) {
@@ -1143,9 +1144,12 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
             }
 	  }
           cur_entry = cur_entry->hent_next;
+          NPathPopNode;
+          NPathPopNode;
         }
-      }
+      } /* bucket chain */
     }
+
 #ifdef HvAUX
     if (SvOOK(thing)) {
 	/* This direct access is arguably "naughty": */
