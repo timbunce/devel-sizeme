@@ -23,8 +23,9 @@ use DBD::SQLite;
 use JSON::XS;
 use Devel::Dwarn;
 use HTML::Entities qw(encode_entities);;
-
+use Data::Dumper;
 use Getopt::Long;
+use Carp qw(carp croak confess);
 
 # XXX import these from the XS code
 use constant NPtype_NAME     => 0x01;
@@ -51,6 +52,7 @@ GetOptions(
     'showid!' => \my $opt_showid,
 ) or exit 1;
 
+$| = 1 if $opt_debug;
 my $run_size = 0;
 my $total_size = 0;
 
@@ -62,27 +64,6 @@ if ($opt_db) {
         RaiseError => 1, PrintError => 0, AutoCommit => 0
     });
     $dbh->do("PRAGMA synchronous = OFF");
-    $dbh->do("DROP TABLE IF EXISTS node");
-    $dbh->do(q{
-        CREATE TABLE node (
-            id integer primary key,
-            name text,
-            title text,
-            type integer,
-            depth integer,
-            parent_id integer,
-
-            self_size integer,
-            kids_size integer,
-            kids_node_count integer,
-            child_ids text,
-            attr_json text,
-            leaves_json text
-        )
-    });
-    $node_ins_sth = $dbh->prepare(q{
-        INSERT INTO node VALUES (?,?,?,?,?,?,  ?,?,?,?,?,?)
-    });
 }
 
 my @stack;
@@ -96,11 +77,6 @@ my $dotnode = sub {
 
 
 my $dot_fh;
-if ($opt_dot) {
-    open $dot_fh, ">$opt_dot";
-    print $dot_fh "digraph {\n"; # }
-    print $dot_fh "graph [overlap=false]\n"; # target="???", URL="???"
-}
 
 sub fmt_size {
     my $size = shift;
@@ -113,6 +89,7 @@ sub fmt_size {
 
 sub enter_node {
     my $x = shift;
+    warn "enter_node $x->{id}\n" if $opt_debug;
 
     my $parent = $stack[-1];
     if ($parent) {
@@ -142,6 +119,8 @@ sub enter_node {
 
 sub leave_node {
     my $x = shift;
+    confess unless defined $x->{id};
+    warn "leave_node $x->{id}\n" if $opt_debug;
     delete $seqn2node{$x->{id}};
 
     my $self_size = 0; $self_size += $_ for values %{$x->{leaves}};
@@ -216,6 +195,7 @@ my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE)); # XXX get from XS i
 my $pending_pre_attr = {};
 
 while (<>) {
+    warn $_ if $opt_debug;
     chomp;
 
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
@@ -235,6 +215,7 @@ while (<>) {
         }
         die "panic: stack already has item at depth $val"
             if $stack[$val];
+        die "Depth out of sync\n" if $val != @stack;
         my $node = enter_node({
             id => $id, type => $type, name => $name, extra => $extra,
             attr => { %$pending_pre_attr },
@@ -286,6 +267,66 @@ while (<>) {
             warn "Invalid attribute type '$type' on line $. ($_)";
         }
     }
+    elsif ($type eq 'S') { # start of a run
+        die "Unexpected start token" if @stack;
+        if ($opt_dot) {
+            open $dot_fh, ">$opt_dot";
+            print $dot_fh "digraph {\n"; # }
+            print $dot_fh "graph [overlap=false]\n"; # target="???", URL="???"
+        }
+        if ($dbh) {
+            # XXX add a size_run table records each run
+            # XXX pick a table name to store the run nodes in
+            #$run_ins_sth->execute(
+            my $table = "node";
+            $dbh->do("DROP TABLE IF EXISTS $table");
+            $dbh->do(qq{
+                CREATE TABLE $table (
+                    id integer primary key,
+                    name text,
+                    title text,
+                    type integer,
+                    depth integer,
+                    parent_id integer,
+
+                    self_size integer,
+                    kids_size integer,
+                    kids_node_count integer,
+                    child_ids text,
+                    attr_json text,
+                    leaves_json text
+                )
+            });
+            $node_ins_sth = $dbh->prepare(qq{
+                INSERT INTO $table VALUES (?,?,?,?,?,?,  ?,?,?,?,?,?)
+            });
+        }
+    }
+    elsif ($type eq 'E') { # end of a run
+
+        my $top = $stack[0]; # grab top node before we pop all the nodes
+        leave_node(pop @stack) while @stack;
+        my $top_size = $top->{self_size}+$top->{kids_size};
+
+        printf "Stored %d nodes sizing %s (%d)\n",
+            $top->{kids_node_count}, fmt_size($top_size), $top_size;
+
+        if ($opt_verbose or $run_size != $top_size) {
+            warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
+            warn Dumper($top);
+        }
+        die "panic: seqn2node should be empty ". Dumper(\%seqn2node)
+            if %seqn2node;
+        %$pending_pre_attr = ();
+
+        if ($dot_fh) {
+            print $dot_fh "}\n";
+            close $dot_fh;
+            system("open -a Graphviz $opt_dot") if $^O eq 'darwin'; # OSX
+        }
+
+        $dbh->commit if $dbh;
+    }
     else {
         warn "Invalid type '$type' on line $. ($_)";
         next;
@@ -293,28 +334,8 @@ while (<>) {
 
     $dbh->commit if $dbh and $id % 10_000 == 0;
 }
-my $top = $stack[0]; # grab top node before we pop all the nodes
-leave_node(pop @stack) while @stack;
-my $top_size = $top->{self_size}+$top->{kids_size};
+die "EOF without end token" if @stack;
 
-printf "Stored %d nodes recording %s (%d)\n",
-    $top->{kids_node_count}, fmt_size($top_size), $top_size;
-
-if ($opt_verbose or $run_size != $top_size) {
-    warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
-    warn Dumper($top);
-}
-
-if ($dot_fh) {
-    print $dot_fh "}\n";
-    close $dot_fh;
-    system("open -a Graphviz $opt_dot") if $^O eq 'darwin'; # OSX
-}
-
-$dbh->commit if $dbh;
-
-use Data::Dumper;
-warn Dumper(\%seqn2node) if %seqn2node; # should be empty
 
 =for This is out of date but gives you an idea of the data and stream
 

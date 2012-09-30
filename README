@@ -11,11 +11,11 @@ TODO
     sizeme_store
     sizeme_graph
     tests
-    Add R(un) and E(nd) tokens
-    Support multiple runs
+    Support multiple runs to same sizeme_store process, generating separate files
     Name runs to allow total_size (for example) of multiple data structures
 
 Optimizations:
+    Smarter array index output - only if node not seen before, so split check_new
     Remove depth from stream?
 Future
     Add addr to leaf to visualize memory layout

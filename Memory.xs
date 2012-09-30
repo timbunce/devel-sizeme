@@ -108,6 +108,7 @@ struct state {
        start with 0 bits, hence the start of this array will be hot, and the
        end unused. So put the flags next to the hot end.  */
     void *tracking[256];
+    NV start_time_nv;
     int min_recurse_threshold;
     /* callback hooks and data */
     int (*add_attr_cb)(struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
@@ -215,6 +216,24 @@ static const char *svtypenames[SVt_LAST] = {
   "NULL", "BIND", "IV", "NV", "PV", "PVIV", "PVNV", "PVMG", "REGEXP", "PVGV", "PVLV", "PVAV", "PVHV", "PVCV", "PVFM", "PVIO",
 #endif
 };
+
+static NV
+gettimeofday_nv(void)
+{
+#ifdef HAS_GETTIMEOFDAY
+    struct timeval when;
+    gettimeofday(&when, (struct timezone *) 0);
+    return when.tv_sec + (when.tv_usec / 1000000.0);
+#else
+    if (u2time) {
+        UV time_of_day[2];
+        (*u2time)(aTHX_ &time_of_day);
+        return time_of_day[0] + (time_of_day[1] / 1000000.0);
+    }
+    return (NV)time();
+#endif
+}
+
 
 int
 np_print_node_name(FILE *fp, npath_node_t *npath_node)
@@ -1289,6 +1308,8 @@ static void
 free_memnode_state(pTHX_ struct state *st)
 {
     if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
+        fprintf(st->node_stream_fh, "E %lu %f %s\n",
+            getpid(), gettimeofday_nv()-st->start_time_nv, "unnamed");
         if (*st->node_stream_name == '|') {
             if (pclose(st->node_stream_fh))
                 warn("%s exited with an error status\n", st->node_stream_name);
@@ -1315,6 +1336,7 @@ new_state(pTHX)
     if (NULL != (warn_flag = perl_get_sv("Devel::Size::dangle", FALSE))) {
 	st->dangle_whine = SvIV(warn_flag) ? TRUE : FALSE;
     }
+    st->start_time_nv = gettimeofday_nv();
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
@@ -1333,8 +1355,10 @@ new_state(pTHX)
                 st->node_stream_fh = fopen(st->node_stream_name, "wb");
             if (!st->node_stream_fh)
                 croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
-            setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
+            if(0)setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
             st->add_attr_cb = np_stream_node_path_info;
+            fprintf(st->node_stream_fh, "S %lu %f %s\n",
+                getpid(), st->start_time_nv, "unnamed");
         }
         else 
             st->add_attr_cb = np_dump_node_path_info;

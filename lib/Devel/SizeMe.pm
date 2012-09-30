@@ -2,7 +2,7 @@ package Devel::SizeMe;
 
 require Devel::Memory;
 
-$ENV{SIZEME} = "|sizeme_store.pl --db sizeme.db";
+$ENV{SIZEME} = "|sizeme_store.pl -d --text --db sizeme.db";
 
 # It's handy to say "perl -d:SizeMe" but has side effects
 # currently we simple disable the debugger (as best we can)
