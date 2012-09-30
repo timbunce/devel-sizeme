@@ -638,18 +638,7 @@ cc_opclass(const OP * const o)
 static void
 magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
   dNPathNodes(1, NPathArg);
-  MAGIC *magic_pointer = SvMAGIC(thing);
-
-  if (!magic_pointer)
-    return;
-
-  if (!SvMAGICAL(thing)) {
-    if (0) {
-        warn("Ignoring suspect magic on this SV\n");
-        sv_dump((SV*)thing);
-    }
-    return;
-  }
+  MAGIC *magic_pointer = SvMAGIC(thing); /* caller ensures thing is SvMAGICAL */
 
   /* push a dummy node for NPathSetNode to update inside the while loop */
   NPathPushNode("dummy", NPtype_NAME);
@@ -1280,6 +1269,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   }
 
   if (type >= SVt_PVMG) {
+    if (SvMAGICAL(thing))
       magic_size(aTHX_ thing, st, NPathLink("MG"));
   }
 
