@@ -1172,7 +1172,6 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   case SVt_PVCV: TAG;
     /* not CvSTASH, per https://rt.cpan.org/Ticket/Display.html?id=79366 */
     ADD_ATTR(st, NPattr_NAME, CvGV(thing) ? GvNAME(CvGV(thing)) : "UNDEFINED", 0);
-    sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing), SOME_RECURSION);
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
     sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), SOME_RECURSION);
@@ -1273,6 +1272,8 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
       magic_size(aTHX_ thing, st, NPathLink("MG"));
     if (SvPAD_OUR(thing) && SvOURSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing), SOME_RECURSION);
+    if (SvSTASH(thing))
+      sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
   }
 
   return;
