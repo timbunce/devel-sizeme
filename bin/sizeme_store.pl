@@ -306,10 +306,14 @@ while (<>) {
 
         my $top = $stack[0]; # grab top node before we pop all the nodes
         leave_node(pop @stack) while @stack;
+
         my $top_size = $top->{self_size}+$top->{kids_size};
 
-        printf "Stored %d nodes sizing %s (%d)\n",
-            $top->{kids_node_count}, fmt_size($top_size), $top_size;
+        printf "Stored %d nodes (${.}n) sizing %s (%d) in %.2fs\n",
+            $top->{kids_node_count}, fmt_size($top_size), $top_size,
+            $val;
+        # the duration here ($val) is from Devel::SizeMe perspective
+        # ie doesn't include time to read file/pipe and commit to database.
 
         if ($opt_verbose or $run_size != $top_size) {
             warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
