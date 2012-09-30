@@ -110,7 +110,7 @@ struct state {
     void *tracking[256];
     int min_recurse_threshold;
     /* callback hooks and data */
-    int (*add_attr_cb)(struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
+    int (*add_attr_cb)(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
     void (*free_state_cb)(pTHX_ struct state *st);
     void *state_cb_data; /* free'd by free_state() after free_state_cb() call */
     /* this stuff wil be moved to state_cb_data later */
@@ -175,7 +175,7 @@ struct state {
 #define NPattr_NOTE     0x05
 #define NPattr_PRE_ATTR 0x06
 
-#define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) (st->add_attr_cb && st->add_attr_cb(st, np, attr_type, attr_name, attr_value))
+#define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) (st->add_attr_cb && st->add_attr_cb(aTHX_ st, np, attr_type, attr_name, attr_value))
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
 #define ADD_PRE_ATTR(st, attr_type, attr_name, attr_value) (assert(!attr_type), _ADD_ATTR_NP(st, NPattr_PRE_ATTR, attr_name, attr_value, NP-1))
 
@@ -184,7 +184,7 @@ struct state {
 /* add a link and a name node to the path - a special case for op_size */
 #define NPathLinkAndNode(nid, nid2)  (_NPathLink(NP, nid, NPtype_LINK), _NPathLink(NP+1, nid2, NPtype_NAME), ((NP+1)->prev=NP), (NP+1))
 #define NPathOpLink  (NPathArg)
-#define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(st, NP-1, NPattr_LEAFSIZE, (name), (bytes))),
+#define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(aTHX_ st, NP-1, NPattr_LEAFSIZE, (name), (bytes))),
 
 #else
 
@@ -217,7 +217,7 @@ static const char *svtypenames[SVt_LAST] = {
 };
 
 int
-np_print_node_name(FILE *fp, npath_node_t *npath_node)
+np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
 {
     char buf[1024]; /* XXX */
 
@@ -264,23 +264,23 @@ np_dump_indent(int depth) {
 }
 
 int
-np_walk_new_nodes(struct state *st,
+np_walk_new_nodes(pTHX_ struct state *st,
     npath_node_t *npath_node,
     npath_node_t *npath_node_deeper,
-    int (*cb)(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper))
+    int (*cb)(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper))
 {
     if (npath_node->seqn) /* node already output */
         return 0;
 
     if (npath_node->prev) {
-        np_walk_new_nodes(st, npath_node->prev, npath_node, cb); /* recurse */
+        np_walk_new_nodes(aTHX_ st, npath_node->prev, npath_node, cb); /* recurse */
         npath_node->depth = npath_node->prev->depth + 1;
     }
     else npath_node->depth = 0;
     npath_node->seqn = ++st->seqn;
 
     if (cb) {
-        if (cb(st, npath_node, npath_node_deeper)) {
+        if (cb(aTHX_ st, npath_node, npath_node_deeper)) {
             /* ignore this node */
             assert(npath_node->prev);
             assert(npath_node->depth);
@@ -295,11 +295,11 @@ np_walk_new_nodes(struct state *st,
 }
 
 int
-np_dump_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
+np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
     if (0 && npath_node->type == NPtype_LINK)
         return 1;
     np_dump_indent(npath_node->depth);
-    np_print_node_name(stderr, npath_node);
+    np_print_node_name(aTHX_ stderr, npath_node);
     if (npath_node->type == NPtype_LINK)
         fprintf(stderr, "->"); /* cosmetic */
     fprintf(stderr, "\t\t[#%ld @%u] ", npath_node->seqn, npath_node->depth);
@@ -308,11 +308,11 @@ np_dump_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t 
 }
 
 int
-np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
+np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (attr_type == NPattr_LEAFSIZE && !attr_value)
         return 0; /* ignore zero sized leaf items */
-    np_walk_new_nodes(st, npath_node, NULL, np_dump_formatted_node);
+    np_walk_new_nodes(aTHX_ st, npath_node, NULL, np_dump_formatted_node);
     np_dump_indent(npath_node->depth+1);
     switch (attr_type) {
     case NPattr_LEAFSIZE:
@@ -338,21 +338,21 @@ np_dump_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type,
 }
 
 int
-np_stream_formatted_node(struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
+np_stream_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
     fprintf(st->node_stream_fh, "-%u %lu %u ",
         npath_node->type, npath_node->seqn, (unsigned)npath_node->depth
     );
-    np_print_node_name(st->node_stream_fh, npath_node);
+    np_print_node_name(aTHX_ st->node_stream_fh, npath_node);
     fprintf(st->node_stream_fh, "\n");
     return 0;
 }
 
 int
-np_stream_node_path_info(struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
+np_stream_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (!attr_type && !attr_value)
         return 0; /* ignore zero sized leaf items */
-    np_walk_new_nodes(st, npath_node, NULL, np_stream_formatted_node);
+    np_walk_new_nodes(aTHX_ st, npath_node, NULL, np_stream_formatted_node);
     if (attr_type) { /* Attribute type, name and value */
         fprintf(st->node_stream_fh, "%lu %lu ", attr_type, npath_node->seqn);
     }
@@ -457,11 +457,11 @@ free_tracking_at(void **tv, int level)
 }
 
 static void
-free_state(struct state *st)
+free_state(pTHX_ struct state *st)
 {
     const int top_level = (sizeof(void *) * 8 - LEAF_BITS - BYTE_BITS) / 8;
     if (st->free_state_cb)
-        st->free_state_cb(st);
+        st->free_state_cb(aTHX_ st);
     if (st->state_cb_data)
         Safefree(st->state_cb_data);
     free_tracking_at((void **)st->tracking, top_level);
@@ -696,8 +696,9 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
   }
 }
 
+#define check_new_and_strlen(st, p, ppath) S_check_new_and_strlen(aTHX_ st, p, ppath)
 static void
-check_new_and_strlen(struct state *st, const char *const p, pPATH) {
+S_check_new_and_strlen(pTHX_ struct state *st, const char *const p, pPATH) {
     dNPathNodes(1, NPathArg->prev);
     if(check_new(st, p)) {
         NPathPushNode(NPathArg->id, NPtype_NAME);
@@ -706,7 +707,7 @@ check_new_and_strlen(struct state *st, const char *const p, pPATH) {
 }
 
 static void
-regex_size(const REGEXP * const baseregex, struct state *st, pPATH) {
+regex_size(pTHX_ const REGEXP * const baseregex, struct state *st, pPATH) {
     dNPathNodes(1, NPathArg);
     if(!check_new(st, baseregex))
 	return;
@@ -786,9 +787,9 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 	    /* This is defined away in perl 5.8.x, but it is in there for
 	       5.6.x */
 #ifdef PM_GETRE
-	    regex_size(PM_GETRE((PMOP *)baseop), st, NPathLink("PM_GETRE"));
+	    regex_size(aTHX_ PM_GETRE((PMOP *)baseop), st, NPathLink("PM_GETRE"));
 #else
-	    regex_size(((PMOP *)baseop)->op_pmregexp, st, NPathLink("op_pmregexp"));
+	    regex_size(aTHX_ ((PMOP *)baseop)->op_pmregexp, st, NPathLink("op_pmregexp"));
 #endif
 	    TAG;break;
 	case OPc_SVOP: TAG;
@@ -1475,7 +1476,7 @@ CODE:
 
   sv_size(aTHX_ st, NULL, thing, ix);
   RETVAL = st->total_size;
-  free_state(st);
+  free_state(aTHX_ st);
 }
 OUTPUT:
   RETVAL
@@ -1489,7 +1490,7 @@ CODE:
   st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
-  free_state(st);
+  free_state(aTHX_ st);
 }
 OUTPUT:
   RETVAL
@@ -1529,7 +1530,7 @@ CODE:
 # endif
 
   RETVAL = st->total_size;
-  free_state(st);
+  free_state(aTHX_ st);
 }
 OUTPUT:
   RETVAL
