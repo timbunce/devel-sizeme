@@ -104,11 +104,11 @@ sub enter_node {
                     $names[0] = '@_';
                     \@names;
                 };
-                $x->{name} = $padnames->[$index] || "?";
+                $x->{name} = (defined $index and $padnames->[$index]) || "?";
                 $x->{name} =~ s/my\(SVs_PADTMP\)/PADTMP/; # XXX hack for neatness
             }
             else {
-                $x->{name} = "[$index]";
+                $x->{name} = "[$index]" if defined $index;
             }
         }
     }
