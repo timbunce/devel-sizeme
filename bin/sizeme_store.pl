@@ -162,7 +162,7 @@ sub leave_node {
             else {
                 $name .= sprintf " +%s", fmt_size($x->{self_size});
             }
-            $name .= " $x->{id}" if $opt_showid;
+            $name .= " #$x->{id}" if $opt_showid;
 
             my @node_attr = (
                 sprintf("label=%s", $dotnode->($name)),
