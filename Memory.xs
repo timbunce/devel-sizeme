@@ -1324,7 +1324,7 @@ new_state(pTHX)
 
 #ifdef PATH_TRACKING
     /* XXX quick hack */
-    st->node_stream_name = getenv("PERL_DMEM");
+    st->node_stream_name = getenv("SIZEME");
     if (st->node_stream_name) {
         if (*st->node_stream_name) {
             if (*st->node_stream_name == '|')

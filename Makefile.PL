@@ -21,7 +21,7 @@ WriteMakefile(
         'Devel::Dwarn' => 0,
         XSLoader => 0,
     },
-    EXE_FILES => [ 'bin/dmemtree.pl' ],
+    EXE_FILES => [ 'bin/sizeme_store.pl' ],
     (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.005') : ()),
     (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
 );

@@ -51,6 +51,9 @@ GetOptions(
     'showid!' => \my $opt_showid,
 ) or exit 1;
 
+my $run_size = 0;
+my $total_size = 0;
+
 my $j = JSON::XS->new->ascii->pretty(0);
 
 my ($dbh, $node_ins_sth);
@@ -246,7 +249,8 @@ while (<>) {
     elsif ($type eq "L") {
         my $node = $seqn2node{$id} || die;
         $node->{leaves}{$name} += $val;
-        printf "%s+%d %s\n", $indent x ($node->{depth}+1), $val, $name
+        $run_size += $val;
+        printf "%s+%d=%d %s\n", $indent x ($node->{depth}+1), $val, $run_size, $name
             if $opt_text;
     }
 
@@ -291,8 +295,12 @@ while (<>) {
 }
 my $top = $stack[0]; # grab top node before we pop all the nodes
 leave_node(pop @stack) while @stack;
+my $top_size = $top->{self_size}+$top->{kids_size};
 
-if ($opt_verbose) {
+printf "Stored %d nodes recording %s (%d)\n",
+    $top->{kids_node_count}, fmt_size($top_size), $top_size;
+
+if ($opt_verbose or $run_size != $top_size) {
     warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
     warn Dumper($top);
 }

@@ -1,3 +1,28 @@
+TODO
+
+    Rename to Devel::SizeMe
+    Devel::SizeMe::Core - loads XS and sets options
+    Devel::SizeMe - loads XS
+        -d:SizeMe=opts
+    Devel::SizeMe::Stream - parse raw stream
+    Devel::SizeMe::Store - db write
+    Devel::SizeMe::Data - db read / orlite?
+    Devel::SizeMe::Graph - data reading/processing for sizeme_graph
+    sizeme_store
+    sizeme_graph
+    tests
+    Add R(un) and E(nd) tokens
+    Support multiple runs
+    Name runs to allow total_size (for example) of multiple data structures
+
+Optimizations:
+    Remove depth from stream?
+Future
+    Add addr to leaf to visualize memory layout
+    Add token for ptr to node already seen (identified by addr I presume)
+        so we can move from a Tree to a DAG and see alternative name paths.
+
+
 =pod
 
 Devel::Memory - Perl extension for finding the memory usage of Perl variables
