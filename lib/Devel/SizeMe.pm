@@ -3,7 +3,9 @@ package Devel::SizeMe;
 require Devel::Memory;
 
 my $gz = (0) ? "gzip -c | gzip -dc |" : ""; # currently saves ~3%
-$ENV{SIZEME} = "| $gz sizeme_store.pl --db sizeme.db";
+$ENV{SIZEME} = "| $gz sizeme_store.pl -d --text --dot=sizeme.dot --showid --db=sizeme.db";
+
+my $do_size_at_end = 0; # set true below for "perl -d:SizeMe ..."
 
 # It's handy to say "perl -d:SizeMe" but has side effects
 # currently we simple disable the debugger (as best we can)
@@ -16,10 +18,11 @@ $ENV{SIZEME} = "| $gz sizeme_store.pl --db sizeme.db";
 if ($^P) { # default is 0x73f
     warn "Note: Devel::SizeMe currently disables perl debugger mode\n";
     $^P = 0;
+    $do_size_at_end = 1;
 }
 
 END {
-    Devel::Memory::perl_size();
+    Devel::Memory::perl_size() if $do_size_at_end;
 }
 
 1;

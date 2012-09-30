@@ -41,6 +41,7 @@ use constant NPattr_PADNAME  => 0x03;
 use constant NPattr_PADTMP   => 0x04;
 use constant NPattr_NOTE     => 0x05;
 use constant NPattr_PRE_ATTR => 0x06;
+my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE PREATTR)); # XXX get from XS in some way
 
 
 GetOptions(
@@ -89,13 +90,15 @@ sub fmt_size {
 
 sub enter_node {
     my $x = shift;
-    warn "enter_node $x->{id}\n" if $opt_debug;
+    warn ">> enter_node $x->{id}\n" if $opt_debug;
 
     my $parent = $stack[-1];
     if ($parent) {
 
         if ($x->{name} eq 'AVelem' and $parent->{name} eq 'SV(PVAV)') {
-            my $index = $x->{attr}{index};
+            my $index = $x->{attr}{+NPattr_NOTE}{i};
+            Dwarn $x->{attr};
+            Dwarn $index;
             # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
             if (@stack >= 4 and (my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
                 my $padnames = $cvpl->{_cached}{padnames} ||= do {
@@ -111,6 +114,7 @@ sub enter_node {
                 $x->{name} = "[$index]" if defined $index;
             }
         }
+
     }
 
     return $x;
@@ -120,11 +124,16 @@ sub enter_node {
 sub leave_node {
     my $x = shift;
     confess unless defined $x->{id};
-    warn "leave_node $x->{id}\n" if $opt_debug;
+    warn "<< leave_node $x->{id}\n" if $opt_debug;
     delete $seqn2node{$x->{id}};
 
     my $self_size = 0; $self_size += $_ for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
+
+    if ($x->{name} eq 'AVelem') {
+        my $index = $x->{attr}{+NPattr_NOTE}{i};
+        $x->{name} = "[$index]" if defined $index;
+    }
 
     my $parent = $stack[-1];
     if ($parent) {
@@ -143,6 +152,7 @@ sub leave_node {
                 $parent ? $parent->{id} : "",
                 $parent ? $parent->{type} : ""
             if 0;
+
         if ($x->{type} != NPtype_LINK) {
             my $name = $x->{title} ? "\"$x->{title}\" $x->{name}" : $x->{name};
 
@@ -158,20 +168,20 @@ sub leave_node {
                 sprintf("label=%s", $dotnode->($name)),
                 "id=$x->{id}",
             );
-            my @link_attr;
-            #if ($x->{name} eq 'hek') { push @node_attr, "shape=point"; push @node_attr, "labelfontsize=6"; }
-            if ($parent) { # probably a link
-                my $parent_id = $parent->{id};
-                my @link_attr = ("id=$parent_id");
-                if ($parent->{type} == NPtype_LINK) { # link
-                    (my $link_name = $parent->{name}) =~ s/->$//;
-                    push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
-                    $parent_id = ($stack[-2]||die "panic")->{id};
-                }
-                printf $dot_fh qq{n%d -> n%d [%s];\n},
-                    $parent_id, $x->{id}, join(",", @link_attr);
-            }
             printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
+        }
+        else { # NPtype_LINK
+            my @kids = @{$x->{child_id}};
+            die "panic: NPtype_LINK has more than one child: @kids"
+                if @kids > 1;
+            for my $child_id (@kids) { # wouldn't work right, eg id= attr
+                #die Dwarn $x;
+                my @link_attr = ("id=$x->{id}");
+                (my $link_name = $x->{name}) =~ s/->$//;
+                push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
+                printf $dot_fh qq{n%d -> n%d [%s];\n},
+                    $x->{parent_id}, $child_id, join(",", @link_attr);
+            }
         }
 
     }
@@ -191,11 +201,10 @@ sub leave_node {
 }
 
 my $indent = ":   ";
-my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE)); # XXX get from XS in some way
 my $pending_pre_attr = {};
 
 while (<>) {
-    warn $_ if $opt_debug;
+    warn "== $_" if $opt_debug;
     chomp;
 
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
@@ -250,8 +259,9 @@ while (<>) {
                 if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
                 if exists $attr->{$type}{$name};
-            $attr->{$type}{$name} = $val || $id;
-            $node->{title} = $name if $type == 1 and !$val;
+            $attr->{$type}{$name} = $val;
+            Dwarn $attr;
+            $node->{title} = $name if $type == NPattr_NAME and !$val; # XXX hack
         }
         # attributes where the number is a key (or always zero)
         elsif (NPattr_PADFAKE==$type or NPattr_PADTMP==$type or NPattr_PADNAME==$type) {

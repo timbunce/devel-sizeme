@@ -174,10 +174,11 @@ struct state {
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
 #define NPattr_NOTE     0x05
-#define NPattr_PRE_ATTR 0x06
+#define NPattr_PRE_ATTR 0x06 /* deprecated */
 
 #define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) (st->add_attr_cb && st->add_attr_cb(st, np, attr_type, attr_name, attr_value))
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
+#define ADD_LINK_ATTR(st, attr_type, attr_name, attr_value) (assert(NP->seqn), _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP))
 #define ADD_PRE_ATTR(st, attr_type, attr_name, attr_value) (assert(!attr_type), _ADD_ATTR_NP(st, NPattr_PRE_ATTR, attr_name, attr_value, NP-1))
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
@@ -1085,8 +1086,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 	  SSize_t i = AvFILLp(thing) + 1;
 
 	  while (i--) {
-              ADD_PRE_ATTR(st, 0, "index", i);
-	      sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i], recurse);
+	      if (sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i], recurse))
+                ADD_LINK_ATTR(st, NPattr_NOTE, "i", i);
           }
       }
     }
@@ -1308,7 +1309,7 @@ static void
 free_memnode_state(pTHX_ struct state *st)
 {
     if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
-        fprintf(st->node_stream_fh, "E %lu %f %s\n",
+        fprintf(st->node_stream_fh, "E %d %f %s\n",
             getpid(), gettimeofday_nv()-st->start_time_nv, "unnamed");
         if (*st->node_stream_name == '|') {
             if (pclose(st->node_stream_fh))
@@ -1357,7 +1358,7 @@ new_state(pTHX)
                 croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
             if(0)setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
             st->add_attr_cb = np_stream_node_path_info;
-            fprintf(st->node_stream_fh, "S %lu %f %s\n",
+            fprintf(st->node_stream_fh, "S %d %f %s\n",
                 getpid(), st->start_time_nv, "unnamed");
         }
         else 
