@@ -501,7 +501,7 @@ free_state(struct state *st)
 #define SOME_RECURSION 1
 #define TOTAL_SIZE_RECURSION 2
 
-static void sv_size(pTHX_ struct state *, pPATH, const SV *const, const int recurse);
+static bool sv_size(pTHX_ struct state *, pPATH, const SV *const, const int recurse);
 
 typedef enum {
     OPc_NULL,   /* 0 */
@@ -1044,7 +1044,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
 }
 
 
-static void
+static bool
 sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 	const int recurse) {
   const SV *thing = orig_thing;
@@ -1052,12 +1052,12 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
   U32 type;
 
   if(!check_new(st, orig_thing))
-      return;
+      return 0;
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
       warn("Devel::Size: Unknown variable type: %d encountered\n", type);
-      return;
+      return 1;
   }
   NPathPushNode(thing, NPtype_SV);
   ADD_SIZE(st, "sv_head", sizeof(SV));
@@ -1301,7 +1301,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
       magic_size(aTHX_ thing, st, NPathLink("MG"));
   }
 
-  return;
+  return 1;
 }
 
 static void
