@@ -20,6 +20,7 @@ WriteMakefile(
         'Mojolicious::Lite' => 0,
         'Devel::Dwarn' => 0,
         XSLoader => 0,
+        ORLite => 0,
     },
     EXE_FILES => [ 'bin/dmemtree.pl' ],
     (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.005') : ()),
