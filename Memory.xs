@@ -1271,6 +1271,8 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   if (type >= SVt_PVMG) {
     if (SvMAGICAL(thing))
       magic_size(aTHX_ thing, st, NPathLink("MG"));
+    if (SvPAD_OUR(thing) && SvOURSTASH(thing))
+      sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing), SOME_RECURSION);
   }
 
   return;
