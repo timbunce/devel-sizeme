@@ -2,7 +2,8 @@ package Devel::SizeMe;
 
 require Devel::Memory;
 
-$ENV{SIZEME} = "|sizeme_store.pl -d --text --db sizeme.db";
+my $gz = (0) ? "gzip -c | gzip -dc |" : ""; # currently saves ~3%
+$ENV{SIZEME} = "| $gz sizeme_store.pl --db sizeme.db";
 
 # It's handy to say "perl -d:SizeMe" but has side effects
 # currently we simple disable the debugger (as best we can)
