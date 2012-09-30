@@ -8,8 +8,8 @@ TODO
     Devel::SizeMe::Store - db write
     Devel::SizeMe::Data - db read / orlite?
     Devel::SizeMe::Graph - data reading/processing for sizeme_graph
-    sizeme_store
-    sizeme_graph
+    sizeme_store - script wrapper for Devel::SizeMe::Store
+    sizeme_graph - Mojolicious app wrapper using Devel::SizeMe::Graph
     tests
     Support multiple runs to same sizeme_store process, generating separate files
     Name runs to allow total_size (for example) of multiple data structures

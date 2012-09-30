@@ -904,7 +904,7 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 }
 
 
-#if PERL_VERSION < 8 || PERL_SUBVERSION < 9
+#if PERL_VERSION < 8 || PERL_SUBVERSION < 9 /* XXX plain || seems like a bug */
 #  define SVt_LAST 16
 #endif
 
@@ -1150,7 +1150,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
     if (SvOOK(thing)) {
 	/* This direct access is arguably "naughty": */
 	struct mro_meta *meta = HvAUX(thing)->xhv_mro_meta;
-#if PERL_VERSION > 13 || PERL_SUBVERSION > 8
+#if PERL_VERSION > 13 || PERL_SUBVERSION > 8 /* XXX plain || seems like a bug */
 	/* As is this: */
 	I32 count = HvAUX(thing)->xhv_name_count;
 
