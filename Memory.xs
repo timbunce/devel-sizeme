@@ -1471,7 +1471,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   check_new_and_strlen(st, PL_inplace, NPathLink("PL_inplace"));
   /* TODO PL_pidstatus */
   /* TODO PL_stashpad */
-  op_size_class(aTHX_ &PL_compiling, OPc_COP, 0, st, NPathLink("PL_compiling"));
+  op_size_class(aTHX_ &PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
