@@ -112,7 +112,7 @@ struct state {
     void *tracking[256];
     int min_recurse_threshold;
     /* callback hooks and data */
-    int (*add_attr_cb)(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
+    void (*add_attr_cb)(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
     void (*free_state_cb)(pTHX_ struct state *st);
     void *state_cb_data; /* free'd by free_state() after free_state_cb() call */
     /* this stuff wil be moved to state_cb_data later */
@@ -121,7 +121,12 @@ struct state {
     char *node_stream_name;
 };
 
-#define ADD_SIZE(st, leafname, bytes) (NPathAddSizeCb(st, leafname, bytes) (st)->total_size += (bytes))
+#define ADD_SIZE(st, leafname, bytes) \
+  STMT_START { \
+    NPathAddSizeCb(st, leafname, bytes); \
+    (st)->total_size += (bytes); \
+  } STMT_END
+
 
 #define PATH_TRACKING
 #ifdef PATH_TRACKING
@@ -177,16 +182,31 @@ struct state {
 #define NPattr_NOTE     0x05
 #define NPattr_PRE_ATTR 0x06
 
-#define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) (st->add_attr_cb && st->add_attr_cb(aTHX_ st, np, attr_type, attr_name, attr_value))
+#define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) \
+  STMT_START { \
+    if (st->add_attr_cb) { \
+      st->add_attr_cb(aTHX_ st, np, attr_type, attr_name, attr_value); \
+    } \
+  } STMT_END
+
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
-#define ADD_PRE_ATTR(st, attr_type, attr_name, attr_value) (assert(!attr_type), _ADD_ATTR_NP(st, NPattr_PRE_ATTR, attr_name, attr_value, NP-1))
+#define ADD_PRE_ATTR(st, attr_type, attr_name, attr_value)		\
+  STMT_START {								\
+    assert(!attr_type);							\
+    _ADD_ATTR_NP(st, NPattr_PRE_ATTR, attr_name, attr_value, NP-1);	\
+  } STMT_END;
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
 #define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
 /* add a link and a name node to the path - a special case for op_size */
 #define NPathLinkAndNode(nid, nid2)  (_NPathLink(NP, nid, NPtype_LINK), _NPathLink(NP+1, nid2, NPtype_NAME), ((NP+1)->prev=NP), (NP+1))
 #define NPathOpLink  (NPathArg)
-#define NPathAddSizeCb(st, name, bytes) (st->add_attr_cb && st->add_attr_cb(aTHX_ st, NP-1, NPattr_LEAFSIZE, (name), (bytes))),
+#define NPathAddSizeCb(st, name, bytes) \
+  STMT_START { \
+    if (st->add_attr_cb) { \
+      st->add_attr_cb(aTHX_ st, NP-1, NPattr_LEAFSIZE, (name), (bytes)); \
+    } \
+  } STMT_END
 
 #else
 
@@ -221,13 +241,11 @@ static const char *svtypenames[SVt_LAST] = {
 int
 np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
 {
-    char buf[1024]; /* XXX */
-
     switch (npath_node->type) {
     case NPtype_SV: { /* id is pointer to the SV sv_size was called on */
         const SV *sv = (SV*)npath_node->id;
         int type = SvTYPE(sv);
-        char *typename = (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
+        const char *typename = (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
         fprintf(fp, "SV(%s)", typename);
         switch(type) {  /* add some useful details */
         case SVt_PVAV: fprintf(fp, " fill=%d/%ld", av_len((AV*)sv), AvMAX((AV*)sv)); break;
@@ -247,10 +265,10 @@ np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
         break;
     }
     case NPtype_LINK:
-        fprintf(fp, "%s", npath_node->id);
+        fprintf(fp, "%s", (const char *)npath_node->id);
         break;
     case NPtype_NAME:
-        fprintf(fp, "%s", npath_node->id);
+        fprintf(fp, "%s", (const char *)npath_node->id);
         break;
     default:    /* assume id is a string pointer */
         fprintf(fp, "UNKNOWN(%d,%p)", npath_node->type, npath_node->id);
@@ -298,6 +316,8 @@ np_walk_new_nodes(pTHX_ struct state *st,
 
 int
 np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
+    PERL_UNUSED_ARG(st);
+    PERL_UNUSED_ARG(npath_node_deeper);
     if (0 && npath_node->type == NPtype_LINK)
         return 1;
     np_dump_indent(npath_node->depth);
@@ -309,11 +329,11 @@ np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_n
     return 0;
 }
 
-int
+void
 np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (attr_type == NPattr_LEAFSIZE && !attr_value)
-        return 0; /* ignore zero sized leaf items */
+        return; /* ignore zero sized leaf items */
     np_walk_new_nodes(aTHX_ st, npath_node, NULL, np_dump_formatted_node);
     np_dump_indent(npath_node->depth+1);
     switch (attr_type) {
@@ -336,11 +356,11 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
         break;
     }
     fprintf(stderr, "\n");
-    return 0;
 }
 
 int
 np_stream_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
+    PERL_UNUSED_ARG(npath_node_deeper);
     fprintf(st->node_stream_fh, "-%u %lu %u ",
         npath_node->type, npath_node->seqn, (unsigned)npath_node->depth
     );
@@ -349,11 +369,11 @@ np_stream_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath
     return 0;
 }
 
-int
+void
 np_stream_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (!attr_type && !attr_value)
-        return 0; /* ignore zero sized leaf items */
+        return; /* ignore zero sized leaf items */
     np_walk_new_nodes(aTHX_ st, npath_node, NULL, np_stream_formatted_node);
     if (attr_type) { /* Attribute type, name and value */
         fprintf(st->node_stream_fh, "%lu %lu ", attr_type, npath_node->seqn);
@@ -362,7 +382,6 @@ np_stream_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV at
         fprintf(st->node_stream_fh, "L %lu ", npath_node->seqn);
     }
     fprintf(st->node_stream_fh, "%lu %s\n", attr_value, attr_name);
-    return 0;
 }
 
 
@@ -394,6 +413,7 @@ check_new(struct state *st, const void *const p) {
     if (NULL == p) return FALSE;
     TRY_TO_CATCH_SEGV { 
         const char c = *(const char *)p;
+	PERL_UNUSED_VAR(c);
     }
     CAUGHT_EXCEPTION {
         if (st->dangle_whine) 
@@ -1328,6 +1348,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 static void
 free_memnode_state(pTHX_ struct state *st)
 {
+    PERL_UNUSED_ARG(aTHX);
     if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
         if (*st->node_stream_name == '|') {
             if (pclose(st->node_stream_fh))
@@ -1391,7 +1412,6 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 {
     dVAR;
     SV* sva;
-    I32 visited = 0;
     dNPathNodes(1, NPathArg);
 
     NPathPushNode("unseen", NPtype_NAME);
@@ -1438,7 +1458,6 @@ static void
 parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
 {
   dNPathNodes(2, NPathArg);
-  int i;
   if (!check_new(st, parser))
     return;
   NPathPushNode("parser_size", NPtype_NAME);
@@ -1449,7 +1468,7 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   //warn("total: %u", parser->stack_size);
   //warn("foo: %u", parser->ps - parser->stack);
   for (ps = parser->stack; ps <= parser->ps; ps++) {
-    ADD_PRE_ATTR(st, 0, "frame", i);
+    ADD_PRE_ATTR(st, 0, "frame", ps - parser->ps);
     ADD_SIZE(st, "yy_stack_frame", sizeof(yy_stack_frame));
     sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION);
   }
@@ -1459,8 +1478,8 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   sv_size(aTHX_ st, NPathLink("lex_stuff"), (SV*)parser->lex_stuff, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("linestr"), (SV*)parser->linestr, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("in_my_stash"), (SV*)parser->in_my_stash, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("rsfp_filters"), parser->rsfp_filters, TOTAL_SIZE_RECURSION);
+  //sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("rsfp_filters"), (SV*)parser->rsfp_filters, TOTAL_SIZE_RECURSION);
 #ifdef PERL_MAD
   sv_size(aTHX_ st, NPathLink("endwhite"), parser->endwhite, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("nextwhite"), parser->nextwhite, TOTAL_SIZE_RECURSION);
@@ -1568,8 +1587,8 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #endif
   }
   /* TODO PL_stashpad */
-  op_size_class(aTHX_ &PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
-  op_size_class(aTHX_ PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
+  op_size_class(aTHX_ (OP*)&PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
+  op_size_class(aTHX_ (OP*)PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
 
   parser_size(aTHX_ st, NPathLink("PL_parser"), PL_parser);
   /* TODO stacks: cur, main, tmps, mark, scope, save */
