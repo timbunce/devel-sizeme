@@ -1467,9 +1467,9 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   yy_stack_frame *ps;
   //warn("total: %u", parser->stack_size);
   //warn("foo: %u", parser->ps - parser->stack);
+  ADD_SIZE(st, "stack_frames", parser->stack_size * sizeof(yy_stack_frame));
   for (ps = parser->stack; ps <= parser->ps; ps++) {
     ADD_PRE_ATTR(st, 0, "frame", ps - parser->ps);
-    ADD_SIZE(st, "yy_stack_frame", sizeof(yy_stack_frame));
     sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION);
   }
   NPathPopNode;
