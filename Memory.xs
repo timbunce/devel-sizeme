@@ -1441,7 +1441,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_main_start"), (SV*)PL_main_start, TOTAL_SIZE_RECURSION);
   /* TODO PL_pidstatus */
   /* TODO PL_stashpad */
-  op_size(aTHX_ (OP *)&PL_compiling, st, NPathLink("PL_compiling"));
+  op_size_class(aTHX_ (OP *)&PL_compiling, OPc_COP, st, NPathLink("PL_compiling"));
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
