@@ -10,3 +10,4 @@ Makefile
 Makefile.old
 Memory.[co]
 Memory.bs
+refcounted_he.h
