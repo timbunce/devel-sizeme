@@ -1469,11 +1469,34 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_initav"), (SV*)PL_initav, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_isarev"), (SV*)PL_isarev, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_preambleav"), (SV*)PL_preambleav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_ors_sv"), (SV*)PL_ors_sv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_custom_op_names"), (SV*)PL_custom_op_names, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_custom_op_descs"), (SV*)PL_custom_op_descs, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_custom_ops"), (SV*)PL_custom_ops, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_compcv"), (SV*)PL_compcv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_DBcv"), (SV*)PL_DBcv, TOTAL_SIZE_RECURSION);
+#ifdef PERL_USES_PL_PIDSTATUS
+  sv_size(aTHX_ st, NPathLink("PL_pidstatus"), (SV*)PL_pidstatus, TOTAL_SIZE_RECURSION);
+#endif
   check_new_and_strlen(st, PL_origfilename, NPathLink("PL_origfilename"));
   check_new_and_strlen(st, PL_inplace, NPathLink("PL_inplace"));
-  /* TODO PL_pidstatus */
+  check_new_and_strlen(st, PL_osname, NPathLink("PL_osname"));
+  if (PL_op_mask && check_new(st, PL_op_mask))
+    ADD_SIZE(st, "PL_op_mask", PL_maxo);
+  if (PL_exitlistlen && check_new(st, PL_exitlist))
+    ADD_SIZE(st, "PL_exitlist", (PL_exitlistlen * sizeof(PerlExitListEntry *))
+                              + (PL_exitlistlen * sizeof(PerlExitListEntry)));
+  if (PL_my_cxt_size && check_new(st, PL_my_cxt_list)) {
+    ADD_SIZE(st, "PL_my_cxt_list", (PL_my_cxt_size * sizeof(void *)));
+#ifdef PERL_GLOBAL_STRUCT_PRIVATE
+    ADD_SIZE(st, "PL_my_cxt_keys", (PL_my_cxt_size * sizeof(char *)));
+#endif
+  }
   /* TODO PL_stashpad */
   op_size_class(aTHX_ &PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
+  op_size_class(aTHX_ PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
