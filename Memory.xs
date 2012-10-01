@@ -1439,6 +1439,24 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_main_cv"), (SV*)PL_main_cv, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_main_root"), (SV*)PL_main_root, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_main_start"), (SV*)PL_main_start, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_envgv"), (SV*)PL_envgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_hintgv"), (SV*)PL_hintgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_e_script"), (SV*)PL_e_script, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_encoding"), (SV*)PL_encoding, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_ofsgv"), (SV*)PL_ofsgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_argvout_stack"), (SV*)PL_argvout_stack, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_beginav"), (SV*)PL_beginav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_beginav_save"), (SV*)PL_beginav_save, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_checkav_save"), (SV*)PL_checkav_save, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_unitcheckav"), (SV*)PL_unitcheckav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_unitcheckav_save"), (SV*)PL_unitcheckav_save, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_checkav"), (SV*)PL_checkav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_initav"), (SV*)PL_initav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_isarev"), (SV*)PL_isarev, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
+  check_new_and_strlen(st, PL_origfilename, NPathLink("PL_origfilename"));
+  check_new_and_strlen(st, PL_inplace, NPathLink("PL_inplace"));
   /* TODO PL_pidstatus */
   /* TODO PL_stashpad */
   op_size_class(aTHX_ (OP *)&PL_compiling, OPc_COP, st, NPathLink("PL_compiling"));
