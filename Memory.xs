@@ -860,6 +860,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 	case OPc_COP: TAG;
         {
           COP *basecop;
+	  COPHH *hh;
           basecop = (COP *)baseop;
           ADD_SIZE(st, "cop", sizeof(struct cop));
 
@@ -882,6 +883,8 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv, SOME_RECURSION);
 #endif
 
+	  hh = CopHINTHASH_get(basecop);
+	  refcounted_he_size(aTHX_ st, hh, NPathLink("cop_hints_hash"));
         }
         TAG;break;
       default:
