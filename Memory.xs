@@ -763,16 +763,16 @@ refcounted_he_size(pTHX_ struct state *st, struct refcounted_he *he, pPATH)
     refcounted_he_size(aTHX_ st, he->refcounted_he_next, NPathLink("refcounted_he_next"));
 }
 
-static void op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st, pPATH);
+static void op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_struct, struct state *st, pPATH);
 
 static void
 op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 {
-  op_size_class(aTHX_ baseop, cc_opclass(baseop), st, NPathArg);
+  op_size_class(aTHX_ baseop, cc_opclass(baseop), 0, st, NPathArg);
 }
 
 static void
-op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st, pPATH)
+op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_struct, struct state *st, pPATH)
 {
     /* op_size recurses to follow the chain of opcodes.  For the node path we
      * don't want the chain to be 'nested' in the path so we use dNPathUseParent().
@@ -790,37 +790,44 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st,
 	TAG;
 	switch (op_class) {
 	case OPc_BASEOP: TAG;
-	    ADD_SIZE(st, "op", sizeof(struct op));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "op", sizeof(struct op));
 	    TAG;break;
 	case OPc_UNOP: TAG;
-	    ADD_SIZE(st, "unop", sizeof(struct unop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "unop", sizeof(struct unop));
 	    op_size(aTHX_ ((UNOP *)baseop)->op_first, st, NPathOpLink);
 	    TAG;break;
 	case OPc_BINOP: TAG;
-	    ADD_SIZE(st, "binop", sizeof(struct binop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "binop", sizeof(struct binop));
 	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st, NPathOpLink);
 	    op_size(aTHX_ ((BINOP *)baseop)->op_last, st, NPathOpLink);
 	    TAG;break;
 	case OPc_LOGOP: TAG;
-	    ADD_SIZE(st, "logop", sizeof(struct logop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "logop", sizeof(struct logop));
 	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st, NPathOpLink);
 	    op_size(aTHX_ ((LOGOP *)baseop)->op_other, st, NPathOpLink);
 	    TAG;break;
 #ifdef OA_CONDOP
 	case OPc_CONDOP: TAG;
-	    ADD_SIZE(st, "condop", sizeof(struct condop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "condop", sizeof(struct condop));
 	    op_size(aTHX_ ((BINOP *)baseop)->op_first, st, NPathOpLink);
 	    op_size(aTHX_ ((CONDOP *)baseop)->op_true, st, NPathOpLink);
 	    op_size(aTHX_ ((CONDOP *)baseop)->op_false, st, NPathOpLink);
 	    TAG;break;
 #endif
 	case OPc_LISTOP: TAG;
-	    ADD_SIZE(st, "listop", sizeof(struct listop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "listop", sizeof(struct listop));
 	    op_size(aTHX_ ((LISTOP *)baseop)->op_first, st, NPathOpLink);
 	    op_size(aTHX_ ((LISTOP *)baseop)->op_last, st, NPathOpLink);
 	    TAG;break;
 	case OPc_PMOP: TAG;
-	    ADD_SIZE(st, "pmop", sizeof(struct pmop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "pmop", sizeof(struct pmop));
 	    op_size(aTHX_ ((PMOP *)baseop)->op_first, st, NPathOpLink);
 	    op_size(aTHX_ ((PMOP *)baseop)->op_last, st, NPathOpLink);
 #if PERL_VERSION < 9 || (PERL_VERSION == 9 && PERL_SUBVERSION < 5)
@@ -836,7 +843,8 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st,
 #endif
 	    TAG;break;
 	case OPc_SVOP: TAG;
-	    ADD_SIZE(st, "svop", sizeof(struct svop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "svop", sizeof(struct svop));
 	    if (!(baseop->op_type == OP_AELEMFAST
 		  && baseop->op_flags & OPf_SPECIAL)) {
 		/* not an OP_PADAV replacement */
@@ -844,21 +852,24 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st,
 	    }
 	    TAG;break;
 #ifdef OA_PADOP
-      case OPc_PADOP: TAG;
-	  ADD_SIZE(st, "padop", sizeof(struct padop));
-	  TAG;break;
+	case OPc_PADOP: TAG;
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "padop", sizeof(struct padop));
+	    TAG;break;
 #endif
 #ifdef OA_GVOP
-      case OPc_GVOP: TAG;
-	  ADD_SIZE(st, "gvop", sizeof(struct gvop));
-	  sv_size(aTHX_ st, NPathLink("GVOP"), ((GVOP *)baseop)->op_gv, SOME_RECURSION);
-	  TAG;break;
+	case OPc_GVOP: TAG;
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "gvop", sizeof(struct gvop));
+	    sv_size(aTHX_ st, NPathLink("GVOP"), ((GVOP *)baseop)->op_gv, SOME_RECURSION);
+	    TAG;break;
 #endif
 	case OPc_PVOP: TAG;
 	    check_new_and_strlen(st, ((PVOP *)baseop)->op_pv, NPathLink("op_pv"));
 	    TAG;break;
 	case OPc_LOOP: TAG;
-	    ADD_SIZE(st, "loop", sizeof(struct loop));
+	    if (!skip_op_struct)
+		ADD_SIZE(st, "loop", sizeof(struct loop));
 	    op_size(aTHX_ ((LOOP *)baseop)->op_first, st, NPathOpLink);
 	    op_size(aTHX_ ((LOOP *)baseop)->op_last, st, NPathOpLink);
 	    op_size(aTHX_ ((LOOP *)baseop)->op_redoop, st, NPathOpLink);
@@ -870,7 +881,8 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st,
           COP *basecop;
 	  COPHH *hh;
           basecop = (COP *)baseop;
-          ADD_SIZE(st, "cop", sizeof(struct cop));
+	  if (!skip_op_struct)
+	    ADD_SIZE(st, "cop", sizeof(struct cop));
 
           /* Change 33656 by nicholas@mouse-mill on 2008/04/07 11:29:51
           Eliminate cop_label from struct cop by storing a label as the first
@@ -1459,7 +1471,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   check_new_and_strlen(st, PL_inplace, NPathLink("PL_inplace"));
   /* TODO PL_pidstatus */
   /* TODO PL_stashpad */
-  op_size_class(aTHX_ (OP *)&PL_compiling, OPc_COP, st, NPathLink("PL_compiling"));
+  op_size_class(aTHX_ &PL_compiling, OPc_COP, 0, st, NPathLink("PL_compiling"));
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
