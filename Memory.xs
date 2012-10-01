@@ -1421,7 +1421,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
 
   /* if(!check_new(st, interp)) return; */
   NPathPushNode("perl", NPtype_NAME);
-
+#if defined(MULTIPLICITY)
+  ADD_SIZE(st, "PerlInterpreter", sizeof(PerlInterpreter));
+#endif
 /*
  *      perl
  *          PL_defstash
