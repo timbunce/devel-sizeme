@@ -763,8 +763,16 @@ refcounted_he_size(pTHX_ struct state *st, struct refcounted_he *he, pPATH)
     refcounted_he_size(aTHX_ st, he->refcounted_he_next, NPathLink("refcounted_he_next"));
 }
 
+static void op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st, pPATH);
+
 static void
 op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
+{
+  op_size_class(aTHX_ baseop, cc_opclass(baseop), st, NPathArg);
+}
+
+static void
+op_size_class(pTHX_ const OP * const baseop, opclass op_class, struct state *st, pPATH)
 {
     /* op_size recurses to follow the chain of opcodes.  For the node path we
      * don't want the chain to be 'nested' in the path so we use dNPathUseParent().
@@ -780,7 +788,7 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 	TAG;
 	op_size(aTHX_ baseop->op_next, st, NPathOpLink);
 	TAG;
-	switch (cc_opclass(baseop)) {
+	switch (op_class) {
 	case OPc_BASEOP: TAG;
 	    ADD_SIZE(st, "op", sizeof(struct op));
 	    TAG;break;
