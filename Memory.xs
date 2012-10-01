@@ -787,6 +787,9 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_stru
 	    return;
 	TAG;
 	op_size(aTHX_ baseop->op_next, st, NPathOpLink);
+#ifdef PELR_MAD
+	madprop_size(aTHX_ st, NPathOpLink, baseop->op_madprop);
+#endif
 	TAG;
 	switch (op_class) {
 	case OPc_BASEOP: TAG;
@@ -1414,6 +1417,68 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
     }
 }
 
+#ifdef PERL_MAD
+static void
+madprop_size(pTHX_ struct state *const st, pPath, MADPROP *prop)
+{
+  dPathNodes(2, NPathArg);
+  if (!check_new(st, prop))
+    return;
+  NPathPushNode("madprop_size", NPtype_NAME);
+  ADD_SIZE(st, "MADPROP", sizeof(MADPROP));
+
+  NPathPushNode("val");
+  ADD_SIZE(st, "val", prop->mad_val);
+  if (prop->mad_next)
+    madprop_size(aTHX_ st, NPathLink("mad_next"), prop->mad_next);
+}
+#endif
+
+static void
+parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
+{
+  dNPathNodes(2, NPathArg);
+  int i;
+  if (!check_new(st, parser))
+    return;
+  NPathPushNode("parser_size", NPtype_NAME);
+  ADD_SIZE(st, "yy_parser", sizeof(yy_parser));
+
+  NPathPushNode("stack", NPtype_NAME);
+  yy_stack_frame *ps;
+  //warn("total: %u", parser->stack_size);
+  //warn("foo: %u", parser->ps - parser->stack);
+  for (ps = parser->stack; ps <= parser->ps; ps++) {
+    ADD_PRE_ATTR(st, 0, "frame", i);
+    ADD_SIZE(st, "yy_stack_frame", sizeof(yy_stack_frame));
+    sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION);
+  }
+  NPathPopNode;
+
+  sv_size(aTHX_ st, NPathLink("lex_repl"), (SV*)parser->lex_repl, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("lex_stuff"), (SV*)parser->lex_stuff, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("linestr"), (SV*)parser->linestr, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("in_my_stash"), (SV*)parser->in_my_stash, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("rsfp_filters"), parser->rsfp_filters, TOTAL_SIZE_RECURSION);
+#ifdef PERL_MAD
+  sv_size(aTHX_ st, NPathLink("endwhite"), parser->endwhite, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("nextwhite"), parser->nextwhite, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("skipwhite"), parser->skipwhite, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("thisclose"), parser->thisclose, TOTAL_SIZE_RECURSION);
+  madprop_size(aTHX_ st, NPathLink("thismad"), parser->thismad);
+  sv_size(aTHX_ st, NPathLink("thisopen"), parser->thisopen, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("thisstuff"), parser->thisstuff, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("thistoken"), parser->thistoken, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("thiswhite"), parser->thiswhite, TOTAL_SIZE_RECURSION);
+#endif
+  op_size_class(aTHX_ (OP*)parser->saved_curcop, OPc_COP, 0,
+		st, NPathLink("saved_curcop"));
+
+  if (parser->old_parser)
+    parser_size(aTHX_ st, NPathLink("old_parser"), parser->old_parser);
+}
+
 static void
 perl_size(pTHX_ struct state *const st, pPATH)
 {
@@ -1480,6 +1545,14 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #ifdef PERL_USES_PL_PIDSTATUS
   sv_size(aTHX_ st, NPathLink("PL_pidstatus"), (SV*)PL_pidstatus, TOTAL_SIZE_RECURSION);
 #endif
+  sv_size(aTHX_ st, NPathLink("PL_subname"), (SV*)PL_subname, TOTAL_SIZE_RECURSION);
+#ifdef USE_LOCALE_NUMERIC
+  sv_size(aTHX_ st, NPathLink("PL_numeric_radix_sv"), (SV*)PL_numeric_radix_sv, TOTAL_SIZE_RECURSION);
+  check_new_and_strlen(st, PL_numeric_name, NPathLink("PL_numeric_name"));
+#endif
+#ifdef USE_LOCALE_COLLATE
+  check_new_and_strlen(st, PL_collation_name, NPathLink("PL_collation_name"));
+#endif
   check_new_and_strlen(st, PL_origfilename, NPathLink("PL_origfilename"));
   check_new_and_strlen(st, PL_inplace, NPathLink("PL_inplace"));
   check_new_and_strlen(st, PL_osname, NPathLink("PL_osname"));
@@ -1498,6 +1571,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   op_size_class(aTHX_ &PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
   op_size_class(aTHX_ PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
 
+  parser_size(aTHX_ st, NPathLink("PL_parser"), PL_parser);
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
   /* TODO PL_reentrant_buffers etc */
