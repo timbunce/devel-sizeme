@@ -24,6 +24,8 @@
 #include "XSUB.h"
 #include "ppport.h"
 
+#include "refcounted_he.h"
+
 /* Not yet in ppport.h */
 #ifndef CvISXSUB
 #  define CvISXSUB(cv)  (CvXSUB(cv) ? TRUE : FALSE)
@@ -718,6 +720,50 @@ regex_size(pTHX_ const REGEXP * const baseregex, struct state *st, pPATH) {
 }
 
 static void
+hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
+{
+    dNPathNodes(1, NPathArg);
+
+    /* Hash keys can be shared. Have we seen this before? */
+    if (!check_new(st, hek))
+	return;
+    NPathPushNode("hek", NPtype_NAME);
+    ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
+#if PERL_VERSION < 8
+	+ 1 /* No hash key flags prior to 5.8.0  */
+#else
+	+ 2
+#endif
+	);
+    if (shared) {
+#if PERL_VERSION < 10
+	ADD_SIZE(st, "he", sizeof(struct he));
+#else
+	ADD_SIZE(st, "shared_he", STRUCT_OFFSET(struct shared_he, shared_he_hek));
+#endif
+    }
+}
+
+static void
+refcounted_he_size(pTHX_ struct state *st, struct refcounted_he *he, pPATH)
+{
+  dNPathNodes(1, NPathArg);
+  if (!check_new(st, he))
+    return;
+  NPathPushNode("refcounted_he_size", NPtype_NAME);
+  ADD_SIZE(st, "refcounted_he", sizeof(struct refcounted_he));
+
+#ifdef USE_ITHREADS
+  ADD_SIZE(st, "refcounted_he_data", NPtype_NAME);
+#else
+  hek_size(aTHX_ st, he->refcounted_he_hek, 0, NPathLink("refcounted_he_hek"));
+#endif
+
+  if (he->refcounted_he_next)
+    refcounted_he_size(aTHX_ st, he->refcounted_he_next, NPathLink("refcounted_he_next"));
+}
+
+static void
 op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
 {
     /* op_size recurses to follow the chain of opcodes.  For the node path we
@@ -847,32 +893,6 @@ op_size(pTHX_ const OP * const baseop, struct state *st, pPATH)
           warn( "Devel::Size: Encountered dangling pointer in opcode at: %p\n", baseop );
   }
 }
-
-static void
-hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
-{
-    dNPathNodes(1, NPathArg);
-
-    /* Hash keys can be shared. Have we seen this before? */
-    if (!check_new(st, hek))
-	return;
-    NPathPushNode("hek", NPtype_NAME);
-    ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
-#if PERL_VERSION < 8
-	+ 1 /* No hash key flags prior to 5.8.0  */
-#else
-	+ 2
-#endif
-	);
-    if (shared) {
-#if PERL_VERSION < 10
-	ADD_SIZE(st, "he", sizeof(struct he));
-#else
-	ADD_SIZE(st, "shared_he", STRUCT_OFFSET(struct shared_he, shared_he_hek));
-#endif
-    }
-}
-
 
 #if PERL_VERSION < 8 || PERL_SUBVERSION < 9
 #  define SVt_LAST 16
