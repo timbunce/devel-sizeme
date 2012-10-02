@@ -3,14 +3,7 @@
 /* TODO
  *
  * Refactor this to split out D:M code from Devel::Size code.
- *
  * Start migrating Devel::Size's Size.xs towards the new code.
- *
- * ADD_PRE_ATTR for index should check if the ptr is new first. Currently we're
- * generating lots of ADD_PRE_ATTR's for SVs that we've already seen via other paths.
- * That's wasteful and likely to cause subtle bugs.
- *
- * Give HE's their own node so keys and values can be tied together
  *
  */
 
@@ -174,14 +167,13 @@ struct state {
 #define NPtype_MAGIC    0x04
 #define NPtype_OP       0x05
 
-/* XXX these should probably be generalizes into flag bits */
+/* XXX these should probably be generalized into flag bits */
 #define NPattr_LEAFSIZE 0x00
 #define NPattr_NAME     0x01
 #define NPattr_PADFAKE  0x02
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
 #define NPattr_NOTE     0x05
-#define NPattr_PRE_ATTR 0x06 /* deprecated */
 
 #define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) \
   STMT_START { \
@@ -190,16 +182,13 @@ struct state {
     } \
   } STMT_END
 
-#define ADD_ATTR(st, attr_type, attr_name, attr_value) _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
+#define ADD_ATTR(st, attr_type, attr_name, attr_value) \
+    _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
+
 #define ADD_LINK_ATTR(st, attr_type, attr_name, attr_value)		\
   STMT_START {								\
     assert(NP->seqn);							\
     _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP); 		\
-  } STMT_END;
-#define ADD_PRE_ATTR(st, attr_type, attr_name, attr_value)		\
-  STMT_START {								\
-    assert(!attr_type);							\
-    _ADD_ATTR_NP(st, NPattr_PRE_ATTR, attr_name, attr_value, NP-1);	\
   } STMT_END;
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
@@ -763,14 +752,14 @@ regex_size(pTHX_ const REGEXP * const baseregex, struct state *st, pPATH) {
   }
 }
 
-static void
+static int
 hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 {
     dNPathNodes(1, NPathArg);
 
     /* Hash keys can be shared. Have we seen this before? */
     if (!check_new(st, hek))
-	return;
+	return 0;
     NPathPushNode("hek", NPtype_NAME);
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
 #if PERL_VERSION < 8
@@ -786,6 +775,7 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 	ADD_SIZE(st, "shared_he", STRUCT_OFFSET(struct shared_he, shared_he_hek));
 #endif
     }
+    return 1;
 }
 
 static void

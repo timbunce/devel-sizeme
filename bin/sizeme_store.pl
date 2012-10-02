@@ -208,7 +208,6 @@ sub leave_node {
 }
 
 my $indent = ":   ";
-my $pending_pre_attr = {};
 
 while (<>) {
     warn "\t\t\t\t== $_" if $opt_debug;
@@ -234,10 +233,8 @@ while (<>) {
         die "Depth out of sync\n" if $val != @stack;
         my $node = enter_node({
             id => $id, type => $type, name => $name, extra => $extra,
-            attr => { %$pending_pre_attr },
-            leaves => {}, depth => $val, self_size=>0, kids_size=>0
+            attr => { }, leaves => {}, depth => $val, self_size=>0, kids_size=>0
         });
-        %$pending_pre_attr = ();
         $stack[$val] = $node;
         $seqn2node{$id} = $node;
     }
@@ -256,12 +253,8 @@ while (<>) {
         my $node = $seqn2node{$id} || die;
         my $attr = $node->{attr} || die;
 
-        # attributes to queue up and apply to the next node
-        if (NPattr_PRE_ATTR == $type) {
-            $pending_pre_attr->{$name} = $val;
-        }
         # attributes where the string is a key (or always empty and the type is the key)
-        elsif ($type == NPattr_NAME or $type == NPattr_NOTE) {
+        if ($type == NPattr_NAME or $type == NPattr_NOTE) {
             printf "%s~%s(%s) %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
                 if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
@@ -341,7 +334,6 @@ while (<>) {
         }
         die "panic: seqn2node should be empty ". Dumper(\%seqn2node)
             if %seqn2node;
-        %$pending_pre_attr = ();
 
         if ($dot_fh) {
             print $dot_fh "}\n";
