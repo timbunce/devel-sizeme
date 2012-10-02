@@ -1,9 +1,37 @@
 #!/usr/bin/env perl
 
-# Read the raw memory data from Devel::Memory and process the tree
-# (as a stack, propagating data such as totals, up the tree).
-# Output completed nodes in the request formats.
-#
+=head1 NAME
+
+sizeme_store.pl - process and store the raw data stream from Devel::SizeMe
+
+=head1 SYNOPSIS
+
+    sizeme_store.pl [--text] [--dot=sizeme.dot] [--db=sizeme.db]
+
+Typically used via the C<SIZEME> env var:
+
+    export SIZEME='|./sizeme_store.pl --text'
+    export SIZEME='|./sizeme_store.pl --dot=sizeme.dot'
+    export SIZEME='|./sizeme_store.pl --db=sizeme.db'
+
+=head1 DESCRIPTION
+
+Reads the raw memory data from Devel::SizeMe and processes the tree
+via a stack, propagating data such as totals, up the tree nodes.
+Output completed nodes in the request formats.
+
+The --text output is similar to the textual representation output by the module
+when the SIZEME env var is set to an empty string.
+
+The --dot output is suitable for feeding to Graphviz. (On OSX the Graphviz
+application will be started automatically.)
+
+The --db output is a SQLite database. The db schema is very subject to change.
+This output is destined to be the primary one. The other output types will
+probably become separate programs that read the db.
+
+=pod
+
 # Needs to be generalized to support pluggable output formats.
 # Actually it needs to be split so sizeme_store.pl only does the store
 # and another program drives the output with plugins.

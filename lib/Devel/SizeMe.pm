@@ -32,12 +32,15 @@ $VERSION = '0.02';
 $warn = 1;
 $dangle = 0; ## Set true to enable warnings about dangling pointers
 
-$ENV{SIZEME} ||= "| sizeme_store.pl --showid --db=sizeme.db";
+if (not defined $ENV{SIZEME}) {
+    $ENV{SIZEME} = "| sizeme_store.pl --db=sizeme.db";
+    warn qq{SIZEME env var not set, defaulting to "$ENV{SIZEME}"\n};
+}
 
 XSLoader::load( __PACKAGE__);
 
 END {
-    Devel::SizeMe::perl_size() if $do_size_at_end;
+    Devel::SizeMe::perl_size() if $do_size_at_end; # heap_size()
 }
 
 1;
@@ -45,22 +48,32 @@ __END__
 
 =pod
 
-Devel::SizeMe - Perl extension for finding the memory usage of Perl variables
+Devel::SizeMe - Extension for extracting detailed memory usage information
 
 =head1 SYNOPSIS
 
-  use Devel::SizeMe qw(size total_size);
+Manual usage:
 
-  my $size = size("A string");
-  my @foo = (1, 2, 3, 4, 5);
-  my $other_size = size(\@foo);
+  use Devel::SizeMe qw(total_size perl_size);
+
   my $total_size = total_size( $ref_to_data );
+
+  my $perl_size = perl_size();
+
+Quick automatic usage:
+
+    perl -d:SizeMe ...
 
 =head1 DESCRIPTION
 
-Acts like Devel::Size 0.77 if the SIZEME env var is not set.
+NOTE: This is all rather alpha and anything may change.
 
-Except that it also provides perl_size() and heap_size() functions.
+The functions traverse memory structures and return the total memory size in
+bytes.  See L<Devel::Size> for more information.
+
+If the C<SIZEME> env var is set then the functions also stream out detailed
+information about the individual data structures. This data can be written to a
+file or piped to a program for further processing.
 
 If SIZEME env var is set to an empty string then all the *_size functions
 dump a textual representation of the memory data to stderr.
@@ -68,6 +81,7 @@ dump a textual representation of the memory data to stderr.
 If SIZEME env var is set to a string that starts with "|" then the
 remainder of the string is taken to be a command name and popen() is used to
 start the command and the raw memory data is piped to it.
+See L<sizeme_store.pl>.
 
 If SIZEME env var is set to anything else it is treated as the name of a
 file the raw memory data should be written to.
@@ -100,6 +114,12 @@ and then open http://127.0.0.1:3000
 Please report bugs to:
 
     http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-SizeMe
+
+=head2 Automatic Mode
+
+If loaded using the perl C<-d> option (i.e., C<perl -d:SizeMe ...>)
+then perl memory usage data will be written to a C<sizeme.db> file in the
+current directory when the script ends.
 
 =head1 COPYRIGHT
 

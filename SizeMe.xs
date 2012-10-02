@@ -1130,6 +1130,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
     if (AvMAX(thing) != -1) {
       /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
       ADD_SIZE(st, "av_max", sizeof(SV *) * (AvMAX(thing) + 1));
+      ADD_ATTR(st, NPattr_NOTE, "av_len", av_len((AV*)thing));
       dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
 
       if (recurse >= st->min_recurse_threshold) {

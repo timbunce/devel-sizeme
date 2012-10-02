@@ -1,26 +1,3 @@
-TODO
-
-    Devel::SizeMe::Core - loads XS and sets options
-    Devel::SizeMe - loads XS
-        -d:SizeMe=opts
-    Devel::SizeMe::Stream - parse raw stream
-    Devel::SizeMe::Store - db write
-    Devel::SizeMe::Data - db read / orlite?
-    Devel::SizeMe::Graph - data reading/processing for sizeme_graph
-    sizeme_store - script wrapper for Devel::SizeMe::Store
-    sizeme_graph - Mojolicious app wrapper using Devel::SizeMe::Graph
-    tests
-    Support multiple runs to same sizeme_store process, generating separate files
-    Name runs to allow total_size (for example) of multiple data structures
-
-Issues:
-    two cases where PERL_SUBVERSION is check with a plain || (marked XXX)
-Optimizations:
-    Remove depth from stream?
-Future
-    Add addr to leaf to visualize memory layout
-    Add token for ptr to node already seen (identified by addr I presume)
-        so we can move from a Tree to a DAG and see alternative name paths.
 
 
 =pod
@@ -118,5 +95,37 @@ Copyright (C) 2012 Tim Bunce.
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl v5.8.8.
+
+=head1 TODO
+
+Random notes...
+
+Refactoring:
+
+    Devel::SizeMe::Core - loads XS and sets options
+    Devel::SizeMe - loads Devel::SizeMe::Core
+        -d:SizeMe=opts?
+    Devel::SizeMe::Stream - parse raw stream
+    Devel::SizeMe::Store - db write
+    Devel::SizeMe::Data - db read / orlite?
+    Devel::SizeMe::Graph - data reading/processing for sizeme_graph
+    sizeme_store - script wrapper for Devel::SizeMe::Store
+    sizeme_graph - Mojolicious app wrapper using Devel::SizeMe::Graph
+    tests!
+    Support multiple runs to same sizeme_store process, generating separate files
+    Name runs to allow total_size (for example) of multiple data structures
+
+Issues:
+
+    two cases where PERL_SUBVERSION is checked with a plain || (marked XXX)
+
+Future
+
+
+    Add addr to leaf to enable visualization of memory layout
+
+    Add token for ptr to node already seen (identified by addr I presume)
+        so we can move from a Tree to a DAG and see alternative name paths
+        and reference loops
 
 =cut
