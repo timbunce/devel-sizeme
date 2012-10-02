@@ -34,6 +34,7 @@ use Devel::Dwarn;
 
 GetOptions(
     'db=s' => \(my $opt_db = '../sizeme.db'),
+    'showid!' => \my $opt_showid,
     'debug!' => \my $opt_debug,
 ) or exit 1;
 
@@ -43,7 +44,7 @@ GetOptions(
 # should be removed and replaced with plain DBI till we have an obvious need for it
 use ORLite {
     file => '../sizeme.db',
-    package => "MemView",
+    package => "SizeMe",
     #user_version => 1,
     readonly => 1,
     #unicode => 1,
@@ -80,7 +81,7 @@ get '/jit_tree/:id/:depth' => sub {
         $node->{'$area'} = ($logarea) ? log($area) : $area; # XXX move to jit js
         my $jit_node = {
             id   => $node->{id},
-            name => $node->{title} || $node->{name},
+            name => ($node->{title} || $node->{name}).($opt_showid ? " #$node->{id}" : ""),
             data => $node,
         };
         $jit_node->{children} = $children if $children;
@@ -101,7 +102,9 @@ get '/jit_tree/:id/:depth' => sub {
 sub _fetch_node_tree {
     my ($id, $depth) = @_;
 
-    my $node = MemView->selectrow_hashref("select * from node where id = ?", undef, $id)
+    warn "#$id fetching\n"
+        if $opt_debug;
+    my $node = SizeMe->selectrow_hashref("select * from node where id = ?", undef, $id)
         or die "Node '$id' not found"; # shouldn't die
     $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size));
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
@@ -115,12 +118,14 @@ sub _fetch_node_tree {
         # if this node has only one child then we merge that child into this node
         # this makes the treemap more usable
         if (@child_ids == 1
-            && $node->{type} == 2 # currently we only collapse links XXX
+            #        && $node->{type} == 2 # only collapse links XXX
         ) {
+            warn "#$id fetch only child $child_ids[0]\n"
+                if $opt_debug;
             my $child = _fetch_node_tree($child_ids[0], $depth); # same depth
             # merge node into child
             # XXX id, depth, parent_id
-            warn "Merged $node->{name} #$node->{id} with only child $child->{name} #$child->{id}\n"
+            warn "Merged $node->{name} (#$node->{id} d$node->{depth}) with only child $child->{name} #$child->{id}\n"
                 if $opt_debug;
             $child->{name} = "$node->{name} $child->{name}";
             $child->{$_} += $node->{$_} for (qw(self_size));
@@ -165,9 +170,7 @@ sub _fetch_node_tree {
 
             $node = $child; # use the merged child as this node
         }
-        # XXX this elsif() should possibly be a plain if(), maybe with tweaks to the above
-        # because we want to allow the recursion
-        elsif ($depth) { # recurse to required depth
+        if ($depth) { # recurse to required depth
             $children = [ map { _fetch_node_tree($_, $depth-1) } @child_ids ];
             $node->{children} = $children;
             $node->{child_count} = @$children;
