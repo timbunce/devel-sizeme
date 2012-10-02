@@ -8,5 +8,5 @@ MYMETA.json
 MYMETA.yml
 Makefile
 Makefile.old
-Memory.[co]
-Memory.bs
+SizeMe.[co]
+SizeMe.bs

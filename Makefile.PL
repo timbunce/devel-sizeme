@@ -10,8 +10,8 @@ my $ptr_bits = length $1;
 
 WriteMakefile(
     OPTIMIZE => "-g",
-    NAME => 'Devel::Memory',
-    VERSION_FROM => 'lib/Devel/Memory.pm',
+    NAME => 'Devel::SizeMe',
+    VERSION_FROM => 'lib/Devel/SizeMe.pm',
     DEFINE => "-DALIGN_BITS=$ptr_bits",
     PREREQ_PM => {
         'Test::More' => 0,

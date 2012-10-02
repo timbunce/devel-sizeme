@@ -5,12 +5,12 @@
 #
 # command.
 #
-^Devel-Memory.*\.tar\.gz
+^Devel-SizeMe.*\.tar\.gz
 ^Makefile.old
 ^Makefile\z
 ^pm_to_blib
 ^MANIFEST.(bak|old)
-^Memory.(c|o|bs)
+^SizeMe.(c|o|bs)
 ^blib.*
 tmon.out
 \.txt\z

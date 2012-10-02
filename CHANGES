@@ -1,5 +1,10 @@
 Revision history for Perl extension Devel::Memory.
 
+0.02 2012-10-02 Tim Bunce
+
+ * Renamed to Devel::SizeMe.
+ * Assorted fixes, cleanups and polish.
+
 0.01 2012-09-29 Tim Bunce
 
  * Created new Devel::Memory extension using a modified version of

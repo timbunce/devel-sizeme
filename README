@@ -1,6 +1,5 @@
 TODO
 
-    Rename to Devel::SizeMe
     Devel::SizeMe::Core - loads XS and sets options
     Devel::SizeMe - loads XS
         -d:SizeMe=opts
@@ -26,11 +25,11 @@ Future
 
 =pod
 
-Devel::Memory - Perl extension for finding the memory usage of Perl variables
+Devel::SizeMe - Perl extension for finding the memory usage of Perl variables
 
 =head1 SYNOPSIS
 
-  use Devel::Memory qw(size total_size);
+  use Devel::SizeMe qw(size total_size);
 
   my $size = size("A string");
   my @foo = (1, 2, 3, 4, 5);
@@ -107,12 +106,15 @@ On Windows:
 
 Please report bugs to:
 
-    http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-Memory
+    http://rt.cpan.org/NoAuth/Bugs.html?Dist=Devel-SizeMe
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005 Dan Sugalski, Copyright (C) 2007-2008 Tels,
-Copyright (C) 2011-2012 Nicholas Clark, Copyright 2012 (C) Tim Bunce.
+Copyright (C) 2005 Dan Sugalski,
+Copyright (C) 2007-2008 Tels,
+Copyright (C) 2008 BrowserUK,
+Copyright (C) 2011-2012 Nicholas Clark,
+Copyright (C) 2012 Tim Bunce.
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl v5.8.8.

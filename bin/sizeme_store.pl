@@ -100,8 +100,8 @@ sub enter_node {
 
         if ($x->{name} eq 'AVelem' and $parent->{name} eq 'SV(PVAV)') {
             my $index = $x->{attr}{+NPattr_NOTE}{i};
-            Dwarn $x->{attr};
-            Dwarn $index;
+            #Dwarn $x->{attr};
+            #Dwarn $index;
             # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
             if (@stack >= 4 and (my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
                 my $padnames = $cvpl->{_cached}{padnames} ||= do {
@@ -267,7 +267,7 @@ while (<>) {
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
                 if exists $attr->{$type}{$name};
             $attr->{$type}{$name} = $val;
-            Dwarn $attr;
+            #Dwarn $attr;
             $node->{title} = $name if $type == NPattr_NAME and !$val; # XXX hack
         }
         # attributes where the number is a key (or always zero)
@@ -324,11 +324,14 @@ while (<>) {
         my $top = $stack[0]; # grab top node before we pop all the nodes
         leave_node(pop @stack) while @stack;
 
+        # if nothing output (ie size(undef))
+        $top ||= { self_size=>0, kids_size=>0, kids_node_count=>0 };
+
         my $top_size = $top->{self_size}+$top->{kids_size};
 
-        printf "Stored %d nodes (${.}n) sizing %s (%d) in %.2fs\n",
-            $top->{kids_node_count}, fmt_size($top_size), $top_size,
-            $val;
+        printf "Stored %d nodes totalling %s [lines=%d size=%d write=%.2fs]\n",
+            1+$top->{kids_node_count}, fmt_size($top_size),
+            $., $top_size, $val;
         # the duration here ($val) is from Devel::SizeMe perspective
         # ie doesn't include time to read file/pipe and commit to database.
 

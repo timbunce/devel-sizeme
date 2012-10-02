@@ -1,11 +1,11 @@
 CHANGES
-lib/Devel/Memory.pm
+lib/Devel/SizeMe.pm
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 META.yml            Module meta-data (added by MakeMaker)
 README
-Memory.xs
+SizeMe.xs
 ppport.h
 t/basic.t
 t/code.t

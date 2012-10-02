@@ -21,7 +21,7 @@ SKIP:
     $@ ? 0 : 1;
     };
   for my $m (qw/
-    Devel::Memory
+    Devel::SizeMe
    /)
     {
     pod_coverage_ok( $m, "$m is covered" );

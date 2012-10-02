@@ -1482,7 +1482,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
 }
 
 
-MODULE = Devel::Memory        PACKAGE = Devel::Memory       
+MODULE = Devel::SizeMe        PACKAGE = Devel::SizeMe       
 
 PROTOTYPES: DISABLE
 

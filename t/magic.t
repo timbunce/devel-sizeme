@@ -2,7 +2,7 @@
 
 use strict;
 use Test::More tests => 18;
-use Devel::Memory ':all';
+use Devel::SizeMe ':all';
 require Tie::Scalar;
 
 {
