@@ -30,7 +30,7 @@ The --db output is a SQLite database. The db schema is very subject to change.
 This output is destined to be the primary one. The other output types will
 probably become separate programs that read the db.
 
-=pod
+=cut
 
 # Needs to be generalized to support pluggable output formats.
 # Actually it needs to be split so sizeme_store.pl only does the store

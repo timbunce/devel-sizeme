@@ -4,9 +4,8 @@ package Devel::SizeMe;
 # in an END block, and also set some $^P flags to get more detail.
 my $do_size_at_end; # set true below for "perl -d:SizeMe ..."
 BEGIN {
-    if ($^P) {
+    if ($^P and keys %INC == 1) {
         warn "Note: Devel::SizeMe currently disables perl debugger mode\n";
-    warn scalar keys %INC;
         # default $^P set by "perl -d" is 0x73f
         $^P = 0x10  # Keep info about source lines on which a sub is defined
             | 0x100 # Provide informative "file" names for evals
