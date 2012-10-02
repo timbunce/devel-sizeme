@@ -8,6 +8,7 @@ use JSON::XS;
 use Getopt::Long;
 use Storable qw(dclone);
 use Devel::Dwarn;
+use Devel::SizeMe::Graph;
 
 require ORLite;
 
@@ -51,6 +52,11 @@ ORLite->import({
     #user_version => 1, # XXX
     #unicode => 1, # XXX
 });
+
+my $static_dir = $INC{'Devel/SizeMe/Graph.pm'} or die 'panic';
+$static_dir =~ s:\.pm$:/static:;
+die "panic $static_dir" unless -d $static_dir;
+push @{ app->static->paths}, $static_dir;
 
 
 # Documentation browser under "/perldoc"

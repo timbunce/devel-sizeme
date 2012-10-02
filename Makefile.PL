@@ -28,7 +28,7 @@ WriteMakefile(
         XSLoader => 0,
         ORLite => 0,
     },
-    EXE_FILES => [ 'bin/sizeme_store.pl' ],
+    EXE_FILES => [ 'bin/sizeme_store.pl', 'bin/sizeme_graph.pl' ],
     clean => {
         FILES => 'refcounted_he.h',
     },
