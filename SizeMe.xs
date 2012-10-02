@@ -187,7 +187,7 @@ struct state {
 
 #define ADD_LINK_ATTR(st, attr_type, attr_name, attr_value)		\
   STMT_START {								\
-    assert(NP->seqn);							\
+    if (st->add_attr_cb) assert(NP->seqn);				\
     _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP); 		\
   } STMT_END;
 
@@ -1108,7 +1108,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
       warn("Devel::Size: Unknown variable type: %d encountered\n", type);
-      return 1;
+      return 0;
   }
   NPathPushNode(thing, NPtype_SV);
   ADD_SIZE(st, "sv_head", sizeof(SV));

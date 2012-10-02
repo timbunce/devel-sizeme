@@ -13,6 +13,11 @@ BEGIN {
             | 0x200 # Provide informative names to anonymous subroutines;
             ;
         $do_size_at_end = 1;
+
+        if (not defined $ENV{SIZEME}) {
+            $ENV{SIZEME} = "| sizeme_store.pl --db=sizeme.db";
+            warn qq{SIZEME env var not set, defaulting to "$ENV{SIZEME}"\n};
+        }
     }
 }
 
@@ -31,11 +36,6 @@ $VERSION = '0.02';
 
 $warn = 1;
 $dangle = 0; ## Set true to enable warnings about dangling pointers
-
-if (not defined $ENV{SIZEME}) {
-    $ENV{SIZEME} = "| sizeme_store.pl --db=sizeme.db";
-    warn qq{SIZEME env var not set, defaulting to "$ENV{SIZEME}"\n};
-}
 
 XSLoader::load( __PACKAGE__);
 
