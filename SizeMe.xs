@@ -1452,8 +1452,8 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 
     /* by this point we should have visited all the SVs
      * so now we'll run through all the SVs via the arenas
-     * in order to find any thet we've missed for some reason.
-     * Once the rest of the code is finding all the SVs then any
+     * in order to find any that we've missed for some reason.
+     * Once the rest of the code is finding ALL the SVs then any
      * found here will be leaks.
      */
     for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
@@ -1503,8 +1503,8 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   //warn("foo: %u", parser->ps - parser->stack);
   ADD_SIZE(st, "stack_frames", parser->stack_size * sizeof(yy_stack_frame));
   for (ps = parser->stack; ps <= parser->ps; ps++) {
-    ADD_PRE_ATTR(st, 0, "frame", ps - parser->ps);
-    sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION);
+    if (sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION))
+        ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
   }
   NPathPopNode;
 

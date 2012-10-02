@@ -14,7 +14,7 @@ use Devel::Dwarn;
     Needs to be run from the static/. directory.
     For example:
 
-        ./dmemview.pl daemon
+        ./sizeme_graph.pl daemon
 
 =pod TODO
 
@@ -33,7 +33,7 @@ use Devel::Dwarn;
 =cut
 
 GetOptions(
-    'db=s' => \(my $opt_db = '../dmemtree.db'),
+    'db=s' => \(my $opt_db = '../sizeme.db'),
     'debug!' => \my $opt_debug,
 ) or exit 1;
 
@@ -42,7 +42,7 @@ GetOptions(
 # XXX currently uses ORLite but doesn't actually make use of it in any useful way
 # should be removed and replaced with plain DBI till we have an obvious need for it
 use ORLite {
-    file => '../dmemtree.db',
+    file => '../sizeme.db',
     package => "MemView",
     #user_version => 1,
     readonly => 1,
@@ -207,11 +207,11 @@ Welcome to the Mojolicious real-time web framework!
 <!--[if IE]><script language="javascript" type="text/javascript" src="excanvas.js"></script><![endif]-->
 
 <!-- JIT Library File -->
-<script language="javascript" type="text/javascript" src="jit.js"></script>
+<script language="javascript" type="text/javascript" src="jit-yc.js"></script>
 <script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
 
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
-<script language="javascript" type="text/javascript" src="dmemtreemap.js"></script>
+<script language="javascript" type="text/javascript" src="treemap.js"></script>
 </head>
 
 <body onload="init();">
