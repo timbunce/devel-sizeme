@@ -14,8 +14,9 @@ TODO
     Support multiple runs to same sizeme_store process, generating separate files
     Name runs to allow total_size (for example) of multiple data structures
 
+Issues:
+    two cases where PERL_SUBVERSION is check with a plain || (marked XXX)
 Optimizations:
-    Smarter array index output - only if node not seen before, so split check_new
     Remove depth from stream?
 Future
     Add addr to leaf to visualize memory layout

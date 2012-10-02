@@ -3,7 +3,10 @@
 # Read the raw memory data from Devel::Memory and process the tree
 # (as a stack, propagating data such as totals, up the tree).
 # Output completed nodes in the request formats.
+#
 # Needs to be generalized to support pluggable output formats.
+# Actually it needs to be split so sizeme_store.pl only does the store
+# and another program drives the output with plugins.
 # Making nodes into (lightweight fast) objects would be smart.
 # Tests would be even smarter!
 #
@@ -144,6 +147,9 @@ sub leave_node {
         $parent->{kids_size} += $self_size + $x->{kids_size};
         push @{$parent->{child_id}}, $x->{id};
     }
+    else {
+        $x->{kids_node_count} ||= 0;
+    }
 
     # output
     # ...
@@ -171,13 +177,14 @@ sub leave_node {
             printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
         }
         else { # NPtype_LINK
-            my @kids = @{$x->{child_id}};
+            my @kids = @{$x->{child_id}||[]};
             die "panic: NPtype_LINK has more than one child: @kids"
                 if @kids > 1;
             for my $child_id (@kids) { # wouldn't work right, eg id= attr
                 #die Dwarn $x;
                 my @link_attr = ("id=$x->{id}");
                 (my $link_name = $x->{name}) =~ s/->$//;
+                $link_name .= " #$x->{id}" if $opt_showid;
                 push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
                 printf $dot_fh qq{n%d -> n%d [%s];\n},
                     $x->{parent_id}, $child_id, join(",", @link_attr);
@@ -204,7 +211,7 @@ my $indent = ":   ";
 my $pending_pre_attr = {};
 
 while (<>) {
-    warn "== $_" if $opt_debug;
+    warn "\t\t\t\t== $_" if $opt_debug;
     chomp;
 
     my ($type, $id, $val, $name, $extra) = split / /, $_, 5;
