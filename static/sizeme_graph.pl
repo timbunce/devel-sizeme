@@ -9,20 +9,20 @@ use Getopt::Long;
 use Storable qw(dclone);
 use Devel::Dwarn;
 
+require ORLite;
+
 =pod NOTE
 
     Needs to be run from the static/. directory.
     For example:
 
-        ./sizeme_graph.pl daemon
+        sizeme_graph.pl daemon
 
 =pod TODO
 
     Move all the static files into the DATA section of ths script so the script
     is entirely self-contained and doesn't need any static files installed.
     Or, work out how to install the static files and reference them from the script.
-
-    Remove ORLite (for now)
 
     Make the treemap resize to fit the browser window (as NYTProf does).
 
@@ -32,25 +32,26 @@ use Devel::Dwarn;
 
 =cut
 
+my $j = JSON::XS->new;
+
 GetOptions(
-    'db=s' => \(my $opt_db = '../sizeme.db'),
+    'db=s' => \(my $opt_db = 'sizeme.db'),
     'showid!' => \my $opt_showid,
     'debug!' => \my $opt_debug,
 ) or exit 1;
 
-#warn "Reading from $opt_db\n";
+die "Can't open $opt_db: $!\n" unless -r $opt_db;
+warn "Reading $opt_db\n";
 
 # XXX currently uses ORLite but doesn't actually make use of it in any useful way
-# should be removed and replaced with plain DBI till we have an obvious need for it
-use ORLite {
-    file => '../sizeme.db',
+ORLite->import({
+    file => $opt_db,
     package => "SizeMe",
-    #user_version => 1,
     readonly => 1,
-    #unicode => 1,
-};
+    #user_version => 1, # XXX
+    #unicode => 1, # XXX
+});
 
-my $j = JSON::XS->new;
 
 # Documentation browser under "/perldoc"
 plugin 'PODRenderer';
@@ -212,25 +213,22 @@ Welcome to the Mojolicious real-time web framework!
 <!-- JIT Library File -->
 <script language="javascript" type="text/javascript" src="jit-yc.js"></script>
 <script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
-
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
 <script language="javascript" type="text/javascript" src="treemap.js"></script>
 </head>
 
 <body onload="init();">
+
 <div id="container">
 
 <div id="left-container">
 
 <div class="text">
-<h4>
-Perl Memory TreeMap
-</h4> 
+<h4> Perl Memory TreeMap </h4> 
     Click on a node to zoom in.<br /><br />            
 </div>
 
 <a id="back" href="#" class="theme button white">Go to Parent</a>
-
 <br />
 <form name=params>
 <label for="logarea">&nbsp;Logarithmic scale
@@ -240,13 +238,11 @@ Perl Memory TreeMap
 </div>
 
 <div id="center-container">
-    <div id="infovis"></div>    
+    <div id="infovis"></div>
 </div>
 
 <div id="right-container">
-
-<div id="inner-details"></div>
-
+    <div id="inner-details"></div>
 </div>
 
 <div id="log"></div>
