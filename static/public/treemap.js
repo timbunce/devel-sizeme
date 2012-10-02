@@ -157,7 +157,8 @@ function init(){
             html += sprintf("Child use:  %s<br />", bytesToSize(data.kids_size,2));
         }
         if (data.self_size) {
-            html += sprintf("Own use:    %s<br />", bytesToSize(data.self_size,2));
+            if (data.kids_size)
+                html += sprintf("Own use:    %s<br />", bytesToSize(data.self_size,2));
             html += sprintf("<div style=\"color:grey\">");
             bySortedValue(data.leaves,
                 function(a, b) { return a[1] - b[1] },
@@ -167,8 +168,9 @@ function init(){
         }
         html += "<br />";
 
+        html += sprintf("<div style=\"color:grey\">");
 
-    if (0) {
+    if (1) {
         html += sprintf("Attributes:<br />");
         bySortedValue(data.attr,
             function(a, b) { return a[0] > b[0] ? 1 : a[0] < b[0] ? -1 : 0 },
@@ -177,7 +179,6 @@ function init(){
         html += "<br />";
     }
 
-        html += sprintf("<div style=\"color:grey\">");
         if (data.child_count) {
             //html += sprintf("Children: %d of %d<br />", data.child_count, data.kids_node_count);
             html += sprintf("Children: %d<br />", data.kids_node_count);
@@ -186,7 +187,7 @@ function init(){
         html += sprintf("Depth: %d<br />", data.depth);
         html += sprintf("Parent: %d<br />", data.parent_id);
 
-        //html += JSON.stringify(data.attr, undefined, 4);
+        html += JSON.stringify(data.attr, undefined, 4);
         //html += JSON.stringify(data, undefined, 4);
         html += sprintf("</div>");
 
