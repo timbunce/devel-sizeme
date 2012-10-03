@@ -15,6 +15,9 @@
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+
+#define DPPP_PL_parser_NO_DUMMY
+#define NEED_PL_parser
 #include "ppport.h"
 
 #include "refcounted_he.h"
@@ -1163,9 +1166,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 
   case SVt_PVHV: TAG;
     /* Now the array of buckets */
-    if (HvENAME(thing)) {
-        ADD_ATTR(st, NPattr_NAME, HvENAME(thing), 0);
-    }
+#ifdef HvENAME
+    if (HvENAME(thing)) { ADD_ATTR(st, NPattr_NAME, HvENAME(thing), 0); }
+#else
+    if (HvNAME(thing))  { ADD_ATTR(st, NPattr_NAME, HvNAME(thing), 0); }
+#endif
     ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
     /* Now walk the bucket chain */
     if (HvARRAY(thing)) {
@@ -1392,10 +1397,10 @@ new_state(pTHX)
     Newxz(st, 1, struct state);
     st->go_yell = TRUE;
     st->min_recurse_threshold = TOTAL_SIZE_RECURSION;
-    if (NULL != (warn_flag = perl_get_sv("Devel::Size::warn", FALSE))) {
+    if (NULL != (warn_flag = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(warn_flag) ? TRUE : FALSE;
     }
-    if (NULL != (warn_flag = perl_get_sv("Devel::Size::dangle", FALSE))) {
+    if (NULL != (warn_flag = get_sv("Devel::Size::dangle", FALSE))) {
 	st->dangle_whine = SvIV(warn_flag) ? TRUE : FALSE;
     }
     st->start_time_nv = gettimeofday_nv();
@@ -1490,8 +1495,8 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
 
   NPathPushNode("stack", NPtype_NAME);
   yy_stack_frame *ps;
-  //warn("total: %u", parser->stack_size);
-  //warn("foo: %u", parser->ps - parser->stack);
+  /*warn("total: %u", parser->stack_size); */
+  /*warn("foo: %u", parser->ps - parser->stack); */
   ADD_SIZE(st, "stack_frames", parser->stack_size * sizeof(yy_stack_frame));
   for (ps = parser->stack; ps <= parser->ps; ps++) {
     if (sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION))
@@ -1503,7 +1508,7 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   sv_size(aTHX_ st, NPathLink("lex_stuff"), (SV*)parser->lex_stuff, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("linestr"), (SV*)parser->linestr, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("in_my_stash"), (SV*)parser->in_my_stash, TOTAL_SIZE_RECURSION);
-  //sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp, TOTAL_SIZE_RECURSION);
+  /*sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp, TOTAL_SIZE_RECURSION); */
   sv_size(aTHX_ st, NPathLink("rsfp_filters"), (SV*)parser->rsfp_filters, TOTAL_SIZE_RECURSION);
 #ifdef PERL_MAD
   sv_size(aTHX_ st, NPathLink("endwhite"), parser->endwhite, TOTAL_SIZE_RECURSION);
