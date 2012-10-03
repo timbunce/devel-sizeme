@@ -1319,7 +1319,11 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 #ifdef GvFILE_HEK
 	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK"));
 #elif defined(GvFILE)
-#  if !defined(USE_ITHREADS) || (PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 8))
+/* XXX this coredumped for me in t/recurse.t with a non-threaded 5.8.9
+ * so I've changed the condition to be more restricive
+ *#  if !defined(USE_ITHREADS) || (PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 8))
+ */
+#  if (PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 9))
 	/* With itreads, before 5.8.9, this can end up pointing to freed memory
 	   if the GV was created in an eval, as GvFILE() points to CopFILE(),
 	   and the relevant COP has been freed on scope cleanup after the eval.
