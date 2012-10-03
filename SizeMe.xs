@@ -46,6 +46,12 @@
 #ifndef CopHINTHASH_get
 #define CopHINTHASH_get(c)  ((COPHH*)((c)->cop_hints_hash))
 #endif
+#ifndef MUTABLE_AV
+#define MUTABLE_AV(p) ((AV*)p)
+#endif
+#ifndef MUTABLE_SV
+#define MUTABLE_SV(p) ((SV*)p)
+#endif
 
 #if PERL_VERSION < 6
 #  define PL_opargs opargs
@@ -784,6 +790,7 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     return 1;
 }
 
+#if (PERL_BCDVERSION >= 0x5009004)
 static void
 refcounted_he_size(pTHX_ struct state *st, struct refcounted_he *he, pPATH)
 {
@@ -802,6 +809,7 @@ refcounted_he_size(pTHX_ struct state *st, struct refcounted_he *he, pPATH)
   if (he->refcounted_he_next)
     refcounted_he_size(aTHX_ st, he->refcounted_he_next, NPathLink("refcounted_he_next"));
 }
+#endif
 
 static void op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_struct, struct state *st, pPATH);
 
@@ -944,7 +952,9 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_stru
             sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv, SOME_RECURSION);
 #endif
+#if (PERL_BCDVERSION >= 0x5009004)
 	  refcounted_he_size(aTHX_ st, CopHINTHASH_get(basecop), NPathLink("cop_hints_hash"));
+#endif
         }
         TAG;break;
       default:
@@ -1361,7 +1371,8 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   if (type >= SVt_PVMG) {
     if (SvMAGICAL(thing))
       magic_size(aTHX_ thing, st, NPathLink("MG"));
-    if (SvPAD_OUR(thing) && SvOURSTASH(thing))
+    /* SVpad_OUR shares same flag bit as SVpbm_VALID and others */
+    if (type == SVt_PVGV && SvPAD_OUR(thing) && SvOURSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing), SOME_RECURSION);
     if (SvSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
@@ -1484,6 +1495,7 @@ madprop_size(pTHX_ struct state *const st, pPath, MADPROP *prop)
 }
 #endif
 
+#if (PERL_BCDVERSION >= 0x5009005)
 static void
 parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
 {
@@ -1532,6 +1544,7 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   if (parser->old_parser)
     parser_size(aTHX_ st, NPathLink("old_parser"), parser->old_parser);
 }
+#endif
 
 static void
 perl_size(pTHX_ struct state *const st, pPATH)
@@ -1564,7 +1577,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #ifdef PL_apiversion
   sv_size(aTHX_ st, NPathLink("PL_apiversion"), (SV*)PL_apiversion, TOTAL_SIZE_RECURSION);
 #endif
+#ifdef PL_registered_mros
   sv_size(aTHX_ st, NPathLink("PL_registered_mros"), (SV*)PL_registered_mros, TOTAL_SIZE_RECURSION);
+#endif
 #ifdef USE_ITHREADS
   sv_size(aTHX_ st, NPathLink("PL_regex_padav"), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
 #endif
@@ -1585,12 +1600,18 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_beginav"), (SV*)PL_beginav, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_beginav_save"), (SV*)PL_beginav_save, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_checkav_save"), (SV*)PL_checkav_save, TOTAL_SIZE_RECURSION);
+#ifdef PL_unitcheckav
   sv_size(aTHX_ st, NPathLink("PL_unitcheckav"), (SV*)PL_unitcheckav, TOTAL_SIZE_RECURSION);
+#endif
+#ifdef PL_unitcheckav_save
   sv_size(aTHX_ st, NPathLink("PL_unitcheckav_save"), (SV*)PL_unitcheckav_save, TOTAL_SIZE_RECURSION);
+#endif
   sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_checkav"), (SV*)PL_checkav, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_initav"), (SV*)PL_initav, TOTAL_SIZE_RECURSION);
+#ifdef PL_isarev
   sv_size(aTHX_ st, NPathLink("PL_isarev"), (SV*)PL_isarev, TOTAL_SIZE_RECURSION);
+#endif
   sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_preambleav"), (SV*)PL_preambleav, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_ors_sv"), (SV*)PL_ors_sv, TOTAL_SIZE_RECURSION);
@@ -1633,7 +1654,10 @@ perl_size(pTHX_ struct state *const st, pPATH)
   op_size_class(aTHX_ (OP*)&PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
   op_size_class(aTHX_ (OP*)PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
 
+#if (PERL_BCDVERSION >= 0x5009005)
   parser_size(aTHX_ st, NPathLink("PL_parser"), PL_parser);
+#endif
+
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
   /* TODO PL_reentrant_buffers etc */
