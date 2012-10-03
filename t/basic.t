@@ -10,7 +10,7 @@ can_ok ('Devel::SizeMe', qw/
   /);
 
 die ("Uhoh, test uses an outdated version of Devel::SizeMe")
-    unless is ($Devel::SizeMe::VERSION, '0.02', 'VERSION MATCHES');
+    unless is ($Devel::SizeMe::VERSION, '0.020_080', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:
