@@ -1499,8 +1499,13 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   /*warn("foo: %u", parser->ps - parser->stack); */
   ADD_SIZE(st, "stack_frames", parser->stack_size * sizeof(yy_stack_frame));
   for (ps = parser->stack; ps <= parser->ps; ps++) {
+#if (PERL_BCDVERSION >= 0x5011001) /* roughly */
     if (sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION))
         ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
+#else /* prior to perl 8c63ea58  Dec 8 2009 */
+    if (sv_size(aTHX_ st, NPathLink("comppad"), (SV*)ps->comppad, TOTAL_SIZE_RECURSION))
+        ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
+#endif
   }
   NPathPopNode;
 
