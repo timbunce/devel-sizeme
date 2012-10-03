@@ -938,7 +938,7 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_stru
 #endif
 #ifdef USE_ITHREADS
           check_new_and_strlen(st, basecop->cop_file, NPathLink("cop_file"));
-          check_new_and_strlen(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));
+          /*check_new_and_strlen(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));  XXX */
 #else
           if (SvREFCNT(basecop->cop_stash) == 1) /* XXX hack? */
             sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
@@ -1561,7 +1561,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_errors"), (SV*)PL_errors, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_stashcache"), (SV*)PL_stashcache, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_patchlevel"), (SV*)PL_patchlevel, TOTAL_SIZE_RECURSION);
+#ifdef PL_apiversion
   sv_size(aTHX_ st, NPathLink("PL_apiversion"), (SV*)PL_apiversion, TOTAL_SIZE_RECURSION);
+#endif
   sv_size(aTHX_ st, NPathLink("PL_registered_mros"), (SV*)PL_registered_mros, TOTAL_SIZE_RECURSION);
 #ifdef USE_ITHREADS
   sv_size(aTHX_ st, NPathLink("PL_regex_padav"), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
@@ -1576,7 +1578,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_hintgv"), (SV*)PL_hintgv, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_e_script"), (SV*)PL_e_script, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_encoding"), (SV*)PL_encoding, TOTAL_SIZE_RECURSION);
+#ifdef PL_ofsgv
   sv_size(aTHX_ st, NPathLink("PL_ofsgv"), (SV*)PL_ofsgv, TOTAL_SIZE_RECURSION);
+#endif
   sv_size(aTHX_ st, NPathLink("PL_argvout_stack"), (SV*)PL_argvout_stack, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_beginav"), (SV*)PL_beginav, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_beginav_save"), (SV*)PL_beginav_save, TOTAL_SIZE_RECURSION);
@@ -1593,7 +1597,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_custom_op_names"), (SV*)PL_custom_op_names, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_custom_op_descs"), (SV*)PL_custom_op_descs, TOTAL_SIZE_RECURSION);
+#ifdef PL_custom_ops
   sv_size(aTHX_ st, NPathLink("PL_custom_ops"), (SV*)PL_custom_ops, TOTAL_SIZE_RECURSION);
+#endif
   sv_size(aTHX_ st, NPathLink("PL_compcv"), (SV*)PL_compcv, TOTAL_SIZE_RECURSION);
   sv_size(aTHX_ st, NPathLink("PL_DBcv"), (SV*)PL_DBcv, TOTAL_SIZE_RECURSION);
 #ifdef PERL_USES_PL_PIDSTATUS
