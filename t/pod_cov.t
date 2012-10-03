@@ -3,28 +3,18 @@
 use Test::More;
 use strict;
 
-my $tests;
+plan skip_all => "Test::Pod::Coverage 1.08 required for testing POD coverage"
+    unless eval "use Test::Pod::Coverage 1.08; 1";
 
-BEGIN
-   {
-   $tests = 1;
-   plan tests => $tests;
-   chdir 't' if -d 't';
-   use lib '../lib';
-   };
+my $tests = 1;
+plan tests => $tests;
+chdir 't' if -d 't';
 
-SKIP:
-  {
-  skip("Test::Pod::Coverage 1.08 required for testing POD coverage", $tests)
-    unless do {
-    eval "use Test::Pod::Coverage 1.08";
-    $@ ? 0 : 1;
-    };
-  for my $m (qw/
+use lib '../lib';
+
+for my $m (qw(
     Devel::SizeMe
-   /)
-    {
+)) {
     pod_coverage_ok( $m, "$m is covered" );
-    }
-  }
+}
 
