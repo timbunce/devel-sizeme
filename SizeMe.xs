@@ -43,6 +43,9 @@
 #  define SvSHARED_HEK_FROM_PV(pvx) \
         ((struct hek*)(pvx - STRUCT_OFFSET(struct hek, hek_key)))
 #endif
+#ifndef CopHINTHASH_get
+#define CopHINTHASH_get(c)  ((COPHH*)((c)->cop_hints_hash))
+#endif
 
 #if PERL_VERSION < 6
 #  define PL_opargs opargs
@@ -919,7 +922,6 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_stru
 	case OPc_COP: TAG;
         {
           COP *basecop;
-	  COPHH *hh;
           basecop = (COP *)baseop;
 	  if (!skip_op_struct)
 	    ADD_SIZE(st, "cop", sizeof(struct cop));
@@ -942,9 +944,7 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_stru
             sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv, SOME_RECURSION);
 #endif
-
-	  hh = CopHINTHASH_get(basecop);
-	  refcounted_he_size(aTHX_ st, hh, NPathLink("cop_hints_hash"));
+	  refcounted_he_size(aTHX_ st, CopHINTHASH_get(basecop), NPathLink("cop_hints_hash"));
         }
         TAG;break;
       default:
