@@ -831,6 +831,12 @@ op_size_class(pTHX_ const OP * const baseop, opclass op_class, bool skip_op_stru
 	if(!check_new(st, baseop))
 	    return;
 	TAG;
+
+/* segv on OPc_LISTOP op_size(baseop->op_last) is, I suspect, the first symptom of need to handle slabbed allocation of OPs */
+#if (PERL_BCDVERSION >= 0x5017000)
+if(0)do_op_dump(0, Perl_debug_log, baseop);
+#endif
+
 	op_size(aTHX_ baseop->op_next, st, NPathOpLink);
 #ifdef PELR_MAD
 	madprop_size(aTHX_ st, NPathOpLink, baseop->op_madprop);
@@ -1283,7 +1289,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
     if (CvISXSUB(thing)) {
 	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing), recurse);
     } else {
-	if(1)op_size(aTHX_ CvSTART(thing), st, NPathLinkAndNode("CvSTART", "OPs")); /* XXX ? */
+	/* Note that we don't chase CvSTART */
 	op_size(aTHX_ CvROOT(thing), st, NPathLinkAndNode("CvROOT", "OPs"));
     }
     goto freescalar;
