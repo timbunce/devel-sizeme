@@ -15,8 +15,11 @@ my $swoosh_size = total_size(\&swoosh);
 my $crunch_size = total_size(\&crunch);
 
 cmp_ok($whack_size, '>', 0, 'CV generated at runtime has a size');
-cmp_ok($zwapp_size, '>', $whack_size,
-       'CV stubbed at compiletime is larger (CvOUTSIDE is set and followed)');
+if ($] < 5.017) { # blead 186a5ba82d5844e9713475c494fcd6682968609f
+    cmp_ok($zwapp_size, '>', $whack_size,
+        'CV stubbed at compiletime is larger (CvOUTSIDE is set and followed)');
+}
+else { pass() }
 cmp_ok(length prototype \&swoosh, '>', 0, 'prototype has a length');
 cmp_ok($swoosh_size, '>', $zwapp_size + length prototype \&swoosh,
        'prototypes add to the size');
