@@ -1,5 +1,15 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    die qq{$0 requires Mojolicious::Lite, which isn't installed.
+
+    Currently requires Mojolicious::Lite which isn't available for perl 5.8.
+    If this affects you you can run Devel::SizeMe with your normal perl and
+    run sizeme_graph.pl with a different perl, perhaps on a different machine.
+    \n}
+        unless eval "require Mojolicious::Lite";
+}
+
 =head1 NAME
 
 sizeme_graph.pl - web server providing an interactive treemap of Devel::SizeMe data
@@ -16,6 +26,10 @@ Then open a web browser on http://127.0.0.1:3000
 
 Reads a database created by sizeme_store.pl and provides a web interface with
 an interactive treemap of the data.
+
+Currently requires Mojolicious::Lite which isn't available for perl 5.8.
+If this affects you you can run Devel::SizeMe with your normal perl and
+run sizeme_graph.pl with a different perl, perhaps on a different machine.
 
 =head2 TODO
 
@@ -216,6 +230,11 @@ sub _transform_node_tree {  # recurse depth first
 
 
 app->start;
+
+{   # just to reserve the namespace for future use
+    package Devel::SizeMe::Graph;
+    1;
+}
 
 __DATA__
 @@ index.html.ep

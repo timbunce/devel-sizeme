@@ -23,7 +23,9 @@ WriteMakefile(
         'Test::More' => 0,
         'JSON::XS' => 0,
         'HTML::Entities' => 0,
-        'Mojolicious::Lite' => 0,
+        # Removed for now as it stops people using SizeMe with 5.8
+        # sizeme_graph.pl will eventually become a separate module
+        #'Mojolicious::Lite' => 0,
         'Devel::Dwarn' => 0,
         XSLoader => 0,
         ORLite => 0,
@@ -58,7 +60,7 @@ sub write_header {
     open my $fh, '>', $filename or die $!;
     print { $fh } "#ifndef ${guard_name}\n";
     print { $fh } "#define ${guard_name}\n";
-    print { $fh } $contents or die $!;
+    print { $fh } $contents if defined $contents;
     print { $fh } "#endif /* ${guard_name} */\n";
     close $fh or die $!;
 }

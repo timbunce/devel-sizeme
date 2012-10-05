@@ -1,5 +1,10 @@
 Revision history for Perl extension Devel::SizeMe.
 
+0.04 2012-10-05 Tim Bunce
+
+ * Removed Mojolicious::Lite as a prerequisite as it was stoping people
+    using SizeMe with perl 5.8.
+
 0.03 2012-10-04 Tim Bunce
 
  * Fixup logic and tests to be portable across more perl versions.
