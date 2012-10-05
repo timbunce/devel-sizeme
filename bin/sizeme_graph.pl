@@ -1,5 +1,45 @@
 #!/usr/bin/env perl
 
+=head1 NAME
+
+sizeme_graph.pl - web server providing an interactive treemap of Devel::SizeMe data
+
+=head1 SYNOPSIS
+
+    sizeme_graph.pl --db sizeme.db daemon
+
+    sizeme_graph.pl daemon # same as above
+
+Then open a web browser on http://127.0.0.1:3000
+
+=head1 DESCRIPTION
+
+Reads a database created by sizeme_store.pl and provides a web interface with
+an interactive treemap of the data.
+
+=head2 TODO
+
+Current implementation is all very alpha and rather hackish.
+
+Split out the db and tree code into a separate module.
+
+Use a history management library so the back button works and we can have
+links to specific nodes.
+
+Better tool-tip and/or add a scrollable information area below the treemap
+that could contain details and links.
+
+Make the treemap resize to fit the browser window (as NYTProf does).
+
+Protect against nodes with thousands of children
+    perhaps replace all with single merged child that has no children itself
+    but just a warning as a title.
+
+Implement other visualizations, such as a space-tree
+http://thejit.org/static/v20/Jit/Examples/Spacetree/example2.html
+
+=cut
+
 use strict;
 use warnings;
 
@@ -11,27 +51,6 @@ use Devel::Dwarn;
 use Devel::SizeMe::Graph;
 
 require ORLite;
-
-=pod NOTE
-
-    Needs to be run from the static/. directory.
-    For example:
-
-        sizeme_graph.pl daemon
-
-=pod TODO
-
-    Move all the static files into the DATA section of ths script so the script
-    is entirely self-contained and doesn't need any static files installed.
-    Or, work out how to install the static files and reference them from the script.
-
-    Make the treemap resize to fit the browser window (as NYTProf does).
-
-    Protect against nodes with thousands of children
-        perhaps replace all with single merged child that has no children itself
-        but just a warning as a title.
-
-=cut
 
 my $j = JSON::XS->new;
 

@@ -27,7 +27,7 @@ require 5.005;
 require Exporter;
 require XSLoader;
 
-$VERSION = '0.020_082';
+$VERSION = '0.03';
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw(size total_size perl_size heap_size);
@@ -117,8 +117,8 @@ Please report bugs to:
 =head2 Automatic Mode
 
 If loaded using the perl C<-d> option (i.e., C<perl -d:SizeMe ...>)
-then perl memory usage data will be written to a C<sizeme.db> file in the
-current directory when the script ends.
+and it's the first module loaded then perl memory usage data will be written to
+a C<sizeme.db> file in the current directory when the script ends.
 
 =head1 FUNCTIONS
 
@@ -146,9 +146,16 @@ to calling C<total_size( \%main:: )> but also includes all the perl internals.
 
     $size_in_bytes = heap_size();
 
-Measures and returns the size of the entire process heap space.
+Measures and returns the size of the entire process heap space, with nodes
+within that representing things like free space within malloc (if the malloc
+implementation can report that).
 
-Not accurate yet.
+The goal here is for the returned 'total heap size' to be taken directly from
+the operating system and for a subnode called "unknown" to 'contain' the
+difference between everything we can measure and the total heap size reported
+by the operating system.
+
+Far from accurate yet.
 
 =head1 COPYRIGHT
 
@@ -163,6 +170,6 @@ under the same terms as Perl v5.8.8.
 
 =head1 SEE ALSO
 
-perl(1), L<Devel::Size>.
+L<sizeme_store.pl>, L<sizeme_graph.pl>, perl(1), L<Devel::Size>.
 
 =cut

@@ -8,7 +8,7 @@ sizeme_store.pl - process and store the raw data stream from Devel::SizeMe
 
     sizeme_store.pl [--text] [--dot=sizeme.dot] [--db=sizeme.db]
 
-Typically used via the C<SIZEME> env var:
+Typically used with Devel::SizeMe via the C<SIZEME> env var:
 
     export SIZEME='|./sizeme_store.pl --text'
     export SIZEME='|./sizeme_store.pl --dot=sizeme.dot'
@@ -17,8 +17,8 @@ Typically used via the C<SIZEME> env var:
 =head1 DESCRIPTION
 
 Reads the raw memory data from Devel::SizeMe and processes the tree
-via a stack, propagating data such as totals, up the tree nodes.
-Output completed nodes in the request formats.
+via a stack, propagating data such as totals, up the tree nodes
+as the data streams through.  Output completed nodes in the request formats.
 
 The --text output is similar to the textual representation output by the module
 when the SIZEME env var is set to an empty string.
@@ -29,6 +29,17 @@ application will be started automatically.)
 The --db output is a SQLite database. The db schema is very subject to change.
 This output is destined to be the primary one. The other output types will
 probably become separate programs that read the db.
+
+=head1 TODO
+
+Current implementation is all very alpha and rather hackish.
+
+Refactor to separate the core code into a module.
+
+Move the output formats into separate modules, which should probably read from
+the db so the db becomes the canonical source of data.
+
+Import constants from XS.
 
 =cut
 
