@@ -243,7 +243,7 @@ static const char *svtypenames[SVt_LAST] = {
 };
 
 static NV
-gettimeofday_nv(void)
+gettimeofday_nv(pTHX_)
 {
 #ifdef HAS_GETTIMEOFDAY
     struct timeval when;
@@ -300,7 +300,7 @@ np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
 }
 
 void
-np_dump_indent(int depth) {
+np_dump_indent(pTHX_ int depth) {
     while (depth-- > 0)
         fprintf(stderr, ":   ");
 }
@@ -342,7 +342,7 @@ np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_n
     PERL_UNUSED_ARG(npath_node_deeper);
     if (0 && npath_node->type == NPtype_LINK)
         return 1;
-    np_dump_indent(npath_node->depth);
+    np_dump_indent(aTHX_ npath_node->depth);
     np_print_node_name(aTHX_ stderr, npath_node);
     if (npath_node->type == NPtype_LINK)
         fprintf(stderr, "->"); /* cosmetic */
@@ -357,7 +357,7 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
     if (attr_type == NPattr_LEAFSIZE && !attr_value)
         return; /* ignore zero sized leaf items */
     np_walk_new_nodes(aTHX_ st, npath_node, NULL, np_dump_formatted_node);
-    np_dump_indent(npath_node->depth+1);
+    np_dump_indent(aTHX_ npath_node->depth+1);
     switch (attr_type) {
     case NPattr_LEAFSIZE:
         fprintf(stderr, "+%ld %s =%ld", attr_value, attr_name, attr_value+st->total_size);
@@ -1398,10 +1398,9 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 static void
 free_memnode_state(pTHX_ struct state *st)
 {
-    /* PERL_UNUSED_ARG(aTHX); fails for non-threaded perl */
     if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
         fprintf(st->node_stream_fh, "E %d %f %s\n",
-            getpid(), gettimeofday_nv()-st->start_time_nv, "unnamed");
+            getpid(), gettimeofday_nv(aTHX)-st->start_time_nv, "unnamed");
         if (*st->node_stream_name == '|') {
             if (pclose(st->node_stream_fh))
                 warn("%s exited with an error status\n", st->node_stream_name);
@@ -1428,7 +1427,7 @@ new_state(pTHX)
     if (NULL != (warn_flag = get_sv("Devel::Size::dangle", FALSE))) {
 	st->dangle_whine = SvIV(warn_flag) ? TRUE : FALSE;
     }
-    st->start_time_nv = gettimeofday_nv();
+    st->start_time_nv = gettimeofday_nv(aTHX);
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
