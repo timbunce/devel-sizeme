@@ -1493,7 +1493,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 
 #ifdef PERL_MAD
 static void
-madprop_size(pTHX_ struct state *const st, pPath, MADPROP *prop)
+madprop_size(pTHX_ struct state *const st, pPATH, MADPROP *prop)
 {
   dPathNodes(2, NPathArg);
   if (!check_new(st, prop))
