@@ -57,7 +57,7 @@ http://thejit.org/static/v20/Jit/Examples/Spacetree/example2.html
 use strict;
 use warnings;
 
-use Mojolicious::Lite;
+use Mojolicious::Lite; # possibly needs v3
 use JSON::XS;
 use Getopt::Long;
 use Storable qw(dclone);
@@ -128,11 +128,10 @@ get '/jit_tree/:id/:depth' => sub {
         return $jit_node;
     });
 
-    if(1){ # debug
-        use Devel::Dwarn;
-        use Data::Dump qw(pp);
+    if (1){ # debug
+        #use Data::Dump qw(pp);
         local $jit_tree->{children};
-        pp(dclone($jit_tree)); # dclone to avoid stringification
+        Dwarn(dclone($jit_tree)); # dclone to avoid stringification
     }
 
     $self->render_json($jit_tree);

@@ -27,8 +27,8 @@ WriteMakefile(
         # sizeme_graph.pl will eventually become a separate module
         #'Mojolicious::Lite' => 0,
         'Devel::Dwarn' => 0,
-        XSLoader => 0,
-        ORLite => 0,
+        'XSLoader' => 0,
+        'ORLite' => 0,
     },
     EXE_FILES => [ 'bin/sizeme_store.pl', 'bin/sizeme_graph.pl' ],
     clean => {
