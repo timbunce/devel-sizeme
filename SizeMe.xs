@@ -977,7 +977,7 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
   }
 }
 
-#if PERL_VERSION < 8 || PERL_SUBVERSION < 9 /* XXX plain || seems like a bug */
+#if (PERL_BCDVERSION <= 0x5008008)
 #  define SVt_LAST 16
 #endif
 
