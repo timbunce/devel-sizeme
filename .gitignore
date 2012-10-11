@@ -2,6 +2,7 @@
 *.swp
 *.db
 *.dot
+*.bak
 blib/
 pm_to_blib
 MYMETA.json
@@ -11,4 +12,5 @@ Makefile.old
 SizeMe.[co]
 SizeMe.bs
 refcounted_he.h
+Devel-SizeMe-*.tar
 Devel-SizeMe-*.tar.gz
