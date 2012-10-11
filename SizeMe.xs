@@ -270,7 +270,7 @@ np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
         const char *typename = (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
         fprintf(fp, "SV(%s)", typename);
         switch(type) {  /* add some useful details */
-        case SVt_PVAV: fprintf(fp, " fill=%d/%ld", av_len((AV*)sv), AvMAX((AV*)sv)); break;
+        case SVt_PVAV: fprintf(fp, " fill=%ld/%ld", av_len((AV*)sv), AvMAX((AV*)sv)); break;
         case SVt_PVHV: fprintf(fp, " fill=%ld/%ld", HvFILL((HV*)sv), HvMAX((HV*)sv)); break;
         }
         break;
@@ -1130,7 +1130,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
-      warn("Devel::Size: Unknown variable type: %d encountered\n", type);
+      warn("Devel::Size: Unknown variable type: %u encountered\n", type);
       return 0;
   }
   NPathPushNode(thing, NPtype_SV);
