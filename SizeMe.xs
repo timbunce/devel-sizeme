@@ -1656,12 +1656,14 @@ perl_size(pTHX_ struct state *const st, pPATH)
     ADD_SIZE(st, "PL_exitlist", (PL_exitlistlen * sizeof(PerlExitListEntry *))
                               + (PL_exitlistlen * sizeof(PerlExitListEntry)));
 #ifdef PERL_IMPLICIT_CONTEXT
+#ifdef PL_my_cxt_size
   if (PL_my_cxt_size && check_new(st, PL_my_cxt_list)) {
     ADD_SIZE(st, "PL_my_cxt_list", (PL_my_cxt_size * sizeof(void *)));
 #ifdef PERL_GLOBAL_STRUCT_PRIVATE
     ADD_SIZE(st, "PL_my_cxt_keys", (PL_my_cxt_size * sizeof(char *)));
 #endif
   }
+#endif
 #endif
   /* TODO PL_stashpad */
   op_size_class(aTHX_ (OP*)&PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
