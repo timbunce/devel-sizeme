@@ -243,7 +243,7 @@ static const char *svtypenames[SVt_LAST] = {
 };
 
 static NV
-gettimeofday_nv(pTHX_)
+gettimeofday_nv(pTHX)
 {
 #ifdef HAS_GETTIMEOFDAY
     struct timeval when;
