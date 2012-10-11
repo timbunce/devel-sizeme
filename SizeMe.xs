@@ -756,7 +756,7 @@ regex_size(pTHX_ const REGEXP * const baseregex, struct state *st, pPATH) {
   /*ADD_SIZE(st, strlen(SvANY(baseregex)->subbeg));*/
 #endif
   if (st->go_yell && !st->regex_whine) {
-    carp("Devel::Size: Calculated sizes for compiled regexes are incompatible, and probably always will be");
+    carp("Devel::Size: Calculated sizes for compiled regexes are incomplete");
     st->regex_whine = 1;
   }
 }
