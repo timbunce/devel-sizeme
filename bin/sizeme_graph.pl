@@ -89,7 +89,11 @@ ORLite->import({
 my $static_dir = $INC{'Devel/SizeMe/Graph.pm'} or die 'panic';
 $static_dir =~ s:\.pm$:/static:;
 die "panic $static_dir" unless -d $static_dir;
-push @{ app->static->paths}, $static_dir;
+if ( $Mojolicious::VERSION >= 2.49 ) {
+    push @{ app->static->paths }, $static_dir;
+} else {
+    app->static->root($static_dir);
+}
 
 
 # Documentation browser under "/perldoc"
