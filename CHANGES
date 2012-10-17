@@ -1,5 +1,11 @@
 Revision history for Perl extension Devel::SizeMe.
 
+0.06 2012-10-17 Tim Bunce
+
+ * fix madprop_size, hopefully (untested)
+ * fix pod NAME, thanks to Moritz
+ * fix to work with Mojolocious < v2.49, thanks to Peter (Stig) Edwards.
+
 0.05 2012-10-11 Tim Bunce
 
  * Assorted version portability and compiler warning fixes.
