@@ -1495,14 +1495,13 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 static void
 madprop_size(pTHX_ struct state *const st, pPATH, MADPROP *prop)
 {
-  dPathNodes(2, NPathArg);
+  dNPathNodes(2, NPathArg);
   if (!check_new(st, prop))
     return;
-  NPathPushNode("madprop_size", NPtype_NAME);
+  NPathPushNode("madprop", NPtype_NAME);
   ADD_SIZE(st, "MADPROP", sizeof(MADPROP));
-
-  NPathPushNode("val");
-  ADD_SIZE(st, "val", prop->mad_val);
+  ADD_SIZE(st, "val", prop->mad_vlen);
+  /* XXX recurses, so should perhaps be handled like op_size to avoid the chain */
   if (prop->mad_next)
     madprop_size(aTHX_ st, NPathLink("mad_next"), prop->mad_next);
 }
