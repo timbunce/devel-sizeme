@@ -45,7 +45,7 @@ END {
 1;
 __END__
 
-=pod
+=head1 NAME
 
 Devel::SizeMe - Extension for extracting detailed memory usage information
 
