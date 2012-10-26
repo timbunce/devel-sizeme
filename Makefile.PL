@@ -14,7 +14,8 @@ write_header(
     extract_refcounted_he(catfile($Config{archlib}, 'CORE', 'hv.h'))
 );
 
-WriteMakefile(
+
+WriteMakefile1(
     OPTIMIZE => "-g",
     NAME => 'Devel::SizeMe',
     VERSION_FROM => 'lib/Devel/SizeMe.pm',
@@ -34,9 +35,90 @@ WriteMakefile(
     clean => {
         FILES => 'refcounted_he.h',
     },
-    (eval $ExtUtils::MakeMaker::VERSION >= 6.47 ? (MIN_PERL_VERSION => '5.005') : ()),
-    (eval $ExtUtils::MakeMaker::VERSION >= 6.31 ? (LICENSE => 'perl') : ()),
+    META_MERGE => {
+        resources => {
+            repository  => {
+                type => 'git',
+                url => 'git://github.com/timbunce/devel-sizeme.git',
+                web => 'https://github.com/timbunce/devel-sizeme',
+            },
+            bugtracker => {
+                web => 'https://github.com/timbunce/devel-sizeme/issues',
+            },
+            homepage    => 'https://github.com/timbunce/devel-sizeme',
+        },
+    },
+    MIN_PERL_VERSION => '5.008',
+    LICENSE => 'perl',
 );
+
+
+sub WriteMakefile1 {
+    #Written by Alexandr Ciornii, version 0.21. Added by eumm-upgrade.
+    my %params       = @_;
+    my $eumm_version = $ExtUtils::MakeMaker::VERSION;
+    $eumm_version = eval $eumm_version;
+    die "EXTRA_META is deprecated" if ( exists( $params{EXTRA_META} ) );
+    die "License not specified"    if ( !exists( $params{LICENSE} ) );
+    if ( $params{BUILD_REQUIRES} and ( $eumm_version < 6.5503 ) ) {
+        #EUMM 6.5502 has problems with BUILD_REQUIRES
+        $params{PREREQ_PM} = { %{ $params{PREREQ_PM} || {} }, %{ $params{BUILD_REQUIRES} } };
+        delete $params{BUILD_REQUIRES};
+    }
+
+    # more or less taken from Moose' Makefile.PL
+    if ( $params{CONFLICTS} ) {
+        my $ok = CheckConflicts(%params);
+        exit(0) if ( $params{PREREQ_FATAL} and not $ok );
+        my $cpan_smoker = grep { $_ =~ m/(?:CR_SMOKER|CPAN_REPORTER|AUTOMATED_TESTING)/ } keys %ENV;
+        unless ( $cpan_smoker || $ENV{PERL_MM_USE_DEFAULT} ) {
+            sleep 4 unless ($ok);
+        }
+        %{$params{META_MERGE}{conflicts}} = %{$params{CONFLICTS}};
+        delete $params{CONFLICTS};
+    }
+
+    delete $params{CONFIGURE_REQUIRES} if ( $eumm_version < 6.52 );
+    delete $params{MIN_PERL_VERSION}   if ( $eumm_version < 6.48 );
+    delete $params{META_MERGE}         if ( $eumm_version < 6.46 );
+    delete $params{META_ADD}           if ( $eumm_version < 6.46 );
+    delete $params{LICENSE}            if ( $eumm_version < 6.31 );
+
+    WriteMakefile(%params);
+}
+
+
+my $conflictMsg = <<EOCM;
+***
+    This version of Devel::SizeMe conflicts with the version of
+    module %s (%s) you have installed.
+
+    It's strongly recommended that you update it after
+    installing this version of Devel::SizeMe.
+***
+EOCM
+
+sub CheckConflicts {
+    my %params    = @_;
+    my %conflicts = %{ $params{CONFLICTS} };
+    my $found     = 0;
+
+    while ( my ( $module, $version ) = each(%conflicts) ) {
+        undef $@;
+        eval "require $module";
+        next if $@;
+        my $installed = eval "\$" . $module . "::VERSION";
+        if ( $installed le $version ) {
+            ++$found;
+            my $msg = $conflictMsg;
+            my $warning = sprintf( $msg, $module, $installed );
+            warn $warning;
+        }
+    }
+
+    return !$found;
+}
+
 
 sub extract_refcounted_he {
     my ($header) = @_;
