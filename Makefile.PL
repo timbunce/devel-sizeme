@@ -146,3 +146,17 @@ sub write_header {
     print { $fh } "#endif /* ${guard_name} */\n";
     close $fh or die $!;
 }
+
+
+# =====================================================================
+
+package MY;
+
+sub postamble {
+    return qq{
+
+ptest:  all
+\t prove --blib --jobs 4 --shuffle
+
+    \n};
+}
