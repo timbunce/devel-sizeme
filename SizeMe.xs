@@ -437,7 +437,7 @@ check_new(struct state *st, const void *const p) {
 
     if (NULL == p) return FALSE;
     TRY_TO_CATCH_SEGV { 
-        const char c = *(const char *)p;
+        char c = *(const char *)p;
 	PERL_UNUSED_VAR(c);
     }
     CAUGHT_EXCEPTION {
