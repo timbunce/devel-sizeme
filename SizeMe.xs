@@ -224,6 +224,9 @@ struct state {
 #endif /* PATH_TRACKING */
 
 
+#if (PERL_BCDVERSION <= 0x5008008)
+#  define SVt_LAST 16
+#endif
 
 
 #ifdef PATH_TRACKING
@@ -976,10 +979,6 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
           warn( "Devel::Size: Encountered dangling pointer in opcode at: %p\n", baseop );
   }
 }
-
-#if (PERL_BCDVERSION <= 0x5008008)
-#  define SVt_LAST 16
-#endif
 
 #ifdef PURIFY
 #  define MAYBE_PURIFY(normal, pure) (pure)
