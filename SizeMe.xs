@@ -1324,7 +1324,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 #else	
 	ADD_SIZE(st, "GvNAMELEN", GvNAMELEN(thing));
 #endif
-        ADD_ATTR(st, NPattr_NAME, GvNAME_get(thing), 0);
+        ADD_ATTR(st, NPattr_NAME, GvNAME(thing), 0);
 #ifdef GvFILE_HEK
 	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK"));
 #elif defined(GvFILE)
