@@ -224,6 +224,9 @@ struct state {
 #endif /* PATH_TRACKING */
 
 
+#if (PERL_BCDVERSION <= 0x5008008)
+#  define SVt_LAST 16
+#endif
 
 
 #ifdef PATH_TRACKING
@@ -434,7 +437,7 @@ check_new(struct state *st, const void *const p) {
 
     if (NULL == p) return FALSE;
     TRY_TO_CATCH_SEGV { 
-        const char c = *(const char *)p;
+        char c = *(const char *)p;
 	PERL_UNUSED_VAR(c);
     }
     CAUGHT_EXCEPTION {
@@ -977,10 +980,6 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
   }
 }
 
-#if (PERL_BCDVERSION <= 0x5008008)
-#  define SVt_LAST 16
-#endif
-
 #ifdef PURIFY
 #  define MAYBE_PURIFY(normal, pure) (pure)
 #  define MAYBE_OFFSET(struct_name, member) 0
@@ -1325,7 +1324,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 #else	
 	ADD_SIZE(st, "GvNAMELEN", GvNAMELEN(thing));
 #endif
-        ADD_ATTR(st, NPattr_NAME, GvNAME_get(thing), 0);
+        ADD_ATTR(st, NPattr_NAME, GvNAME(thing), 0);
 #ifdef GvFILE_HEK
 	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK"));
 #elif defined(GvFILE)
@@ -1385,9 +1384,11 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   if (type >= SVt_PVMG) {
     if (SvMAGICAL(thing))
       magic_size(aTHX_ thing, st, NPathLink("MG"));
+#ifdef SvOURSTASH
     /* SVpad_OUR shares same flag bit as SVpbm_VALID and others */
     if (type == SVt_PVGV && SvPAD_OUR(thing) && SvOURSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing), SOME_RECURSION);
+#endif
     if (SvSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
   }
