@@ -1384,9 +1384,11 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   if (type >= SVt_PVMG) {
     if (SvMAGICAL(thing))
       magic_size(aTHX_ thing, st, NPathLink("MG"));
+#ifdef SvOURSTASH
     /* SVpad_OUR shares same flag bit as SVpbm_VALID and others */
     if (type == SVt_PVGV && SvPAD_OUR(thing) && SvOURSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing), SOME_RECURSION);
+#endif
     if (SvSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
   }
