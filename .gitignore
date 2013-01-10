@@ -12,5 +12,4 @@ Makefile.old
 SizeMe.[co]
 SizeMe.bs
 refcounted_he.h
-Devel-SizeMe-*.tar
-Devel-SizeMe-*.tar.gz
+Devel-SizeMe-*
