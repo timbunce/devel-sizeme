@@ -14,31 +14,31 @@ Current implementation is alpha and rather hackish.
 For more info see http://blog.timbunce.org/2012/10/05/introducing-develsizeme-visualizing-perl-memory-use/
 and http://blog.timbunce.org/tag/sizeme/
 
-Random TODOs:
+*** Random TODOs:
 
-    Integrate changes back into Devel::Size so we can share a common core.
+See https://github.com/timbunce/devel-sizeme/issues
 
-    Add ref count handling, per https://rt.cpan.org/Ticket/Display.html?id=79789
-    Output addr as a leaf of a link node for items not scanned due to ref cnt
-        render those as dotted lines on the graph visualization
-        (and thus change from a tree to a DAG) so we can see alternate paths.
-    Optionally add addr to all nodes to enable visualization of memory layout
-    Two cases where PERL_SUBVERSION is checked with a plain || (marked XXX)
+Integrate changes back into Devel::Size so we can share a common core.
 
-    Restructure:
-        Devel::SizeMe::Core - loads XS and sets options
-        Devel::SizeMe - loads Devel::SizeMe::Core
-            -d:SizeMe=opts?
-        Devel::SizeMe::Stream - parse raw stream
-        Devel::SizeMe::Store - db write
-        Devel::SizeMe::Data - db read / orlite?
-        Devel::SizeMe::Graph - data reading/processing for sizeme_graph
-        sizeme_store - script wrapper for Devel::SizeMe::Store
-        sizeme_graph - Mojolicious app wrapper using Devel::SizeMe::Graph
-    Move Devel::SizeMe::Graph and co out to separate distro.
+Add ref count handling, per https://rt.cpan.org/Ticket/Display.html?id=79789
+Output addr as a leaf of a link node for items not scanned due to ref cnt
+    render those as dotted lines on the graph visualization
+    (and thus change from a tree to a DAG) so we can see alternate paths.
 
-    Tests!
-    Remove log scale checkbox from the treemp as it doesn't work yet
-    Support multiple runs to same sizeme_store process, generating separate files
-    Name runs to allow total_size (for example) of multiple data structures
+Optionally add addr to all nodes to enable visualization of actual memory layout
 
+Restructure:
+    Devel::SizeMe::Core - loads XS and sets options
+    Devel::SizeMe - loads Devel::SizeMe::Core
+        -d:SizeMe=opts?
+    Devel::SizeMe::Stream - parse raw stream
+    Devel::SizeMe::Store - db write
+    Devel::SizeMe::Data - db read / orlite?
+    Devel::SizeMe::Graph - data reading/processing for sizeme_graph
+    sizeme_store - script wrapper for Devel::SizeMe::Store
+    sizeme_graph - Mojolicious app wrapper using Devel::SizeMe::Graph
+Move Devel::SizeMe::Graph and co out to separate distro.
+
+Tests!
+
+Remove log scale checkbox from the treemp as it doesn't work yet
