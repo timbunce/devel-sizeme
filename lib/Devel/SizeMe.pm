@@ -27,7 +27,7 @@ require 5.005;
 require Exporter;
 require XSLoader;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw(size total_size perl_size heap_size);

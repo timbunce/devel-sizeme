@@ -1,5 +1,14 @@
 Revision history for Perl extension Devel::SizeMe.
 
+0.07 2013-01-10 Tim Bunce
+
+ *  Updated README
+ *  Added ptest target for parallel testing
+ *  Modernize Makefile.PL and add META info, including repo and bug tracker.
+ *  Fixed to work on Perl 5.8 thanks to Rafael Garcia-Suarez
+ *  Enabled travis-ci.org CI thanks to Jonathan "Duke" Leto.
+ *  Pod fix thanks to Olivier Mengué
+
 0.06 2012-10-17 Tim Bunce
 
  * fix madprop_size, hopefully (untested)
