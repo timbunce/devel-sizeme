@@ -1,5 +1,9 @@
 Revision history for Perl extension Devel::SizeMe.
 
+0.08
+
+ * Don't follow method cache entries, thanks to Rafael Garcia-Suarez.
+
 0.07 2013-01-10 Tim Bunce
 
  *  Updated README

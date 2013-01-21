@@ -1349,9 +1349,12 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 	    sv_size(aTHX_ st, NPathLink("gp_sv"), (SV *)(GvGP(thing)->gp_sv), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_av"), (SV *)(GvGP(thing)->gp_av), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_hv"), (SV *)(GvGP(thing)->gp_hv), recurse);
-            /* Do not follow CVs in the method cache */
-            if (!GvGP(thing)->gp_cvgen)
-                sv_size(aTHX_ st, NPathLink("gp_cv"), (SV *)(GvGP(thing)->gp_cv), recurse);
+	    /* Do not follow CVs in the method cache - for now we assume we'll find
+	     * them via another path with a better name. (Once we have proper
+	     * refcnt handling then special cases like this can all be removed.)
+	     */
+	    if (!GvGP(thing)->gp_cvgen)
+		sv_size(aTHX_ st, NPathLink("gp_cv"), (SV *)(GvGP(thing)->gp_cv), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_egv"), (SV *)(GvGP(thing)->gp_egv), recurse);
 	    sv_size(aTHX_ st, NPathLink("gp_form"), (SV *)(GvGP(thing)->gp_form), recurse);
 	}
