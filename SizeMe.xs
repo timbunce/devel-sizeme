@@ -104,8 +104,9 @@ struct npath_node_st {
 
 struct state {
     UV total_size;
-    bool regex_whine;
-    bool fm_whine;
+    UV regex_whine;
+    UV fm_whine;
+    UV perlio_whine;
     bool dangle_whine;
     bool go_yell;
     /* My hunch (not measured) is that for most architectures pointers will
@@ -507,6 +508,11 @@ static void
 free_state(pTHX_ struct state *st)
 {
     const int top_level = (sizeof(void *) * 8 - LEAF_BITS - BYTE_BITS) / 8;
+    if (st->go_yell) {
+        if (st->regex_whine + st->fm_whine + st->perlio_whine)
+            fprintf(stderr, "Devel::Size: Calculated sizes are incomplete for regex (%d seen), FMs (%d seen), perlio layers (%d seen)\n",
+                st->regex_whine, st->fm_whine, st->perlio_whine);
+    }
     if (st->free_state_cb)
         st->free_state_cb(aTHX_ st);
     if (st->state_cb_data)
@@ -758,10 +764,7 @@ regex_size(pTHX_ const REGEXP * const baseregex, struct state *st, pPATH) {
   ADD_SIZE(st, "nparens", sizeof(I32) * SvANY(baseregex)->nparens * 2);
   /*ADD_SIZE(st, strlen(SvANY(baseregex)->subbeg));*/
 #endif
-  if (st->go_yell && !st->regex_whine) {
-    carp("Devel::Size: Calculated sizes for compiled regexes are incomplete");
-    st->regex_whine = 1;
-  }
+  ++st->regex_whine;
 }
 
 static int
@@ -1272,11 +1275,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   case SVt_PVFM: TAG;
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
     sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), SOME_RECURSION);
-
-    if (st->go_yell && !st->fm_whine) {
-      carp("Devel::Size: Calculated sizes for FMs are incomplete");
-      st->fm_whine = 1;
-    }
+    ++st->fm_whine;
     goto freescalar;
 
   case SVt_PVCV: TAG;
@@ -1307,8 +1306,8 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
        trottable. If USE_PERLIO is defined we can do this. If
        not... we can't, so we don't even try */
 #ifdef USE_PERLIO
-    /* Dig into xio_ifp and xio_ofp here */
-    warn("Devel::Size: Can't size up perlio layers yet\n");
+    /* TODO Dig into xio_ifp and xio_ofp here */
+    ++st->perlio_whine;
 #endif
     goto freescalar;
 
