@@ -146,14 +146,47 @@ sub _set_node_queue {
 sub _get_node {
     my $id = shift;
 
-    $node = delete $node_cache{$id};
+    my $node = delete $node_cache{$id};
     return $node if ref $node;
 
-    $select_node_by_id_sth->execute($id);
-    my %node;
-    @node{@$select_node_by_id_fields} = $select_node_by_id_sth->fetchrow_array
-        or die "Node '$id' not found"; # shouldn't die
-    return \%node;
+    my @ids;
+    # ensure the one the caller wanted is actually in the batch
+    push @ids, $id;
+    delete $node_queue{$id};
+
+    while ( $_ = scalar each %node_queue ) {
+        delete $node_queue{$_};
+        push @ids, $_;
+        last if @ids > 10_000; # batch size
+    }
+    
+    # optimize for single node
+    if (@ids == 1) {
+        $select_node_by_id_sth->execute($id);
+        my %node;
+        @node{@$select_node_by_id_fields} = $select_node_by_id_sth->fetchrow_array
+            or die "Node '$id' not found"; # should not happen
+        $node = \%node;
+    }
+    else {
+
+        my $sql = "select * from node where id in (".join(",",@ids).")";
+        my $sth = $dbh->prepare($sql);
+        $sth->execute;
+
+        our $NAME ||= $sth->FETCH('NAME');
+        my @row = (undef) x @$NAME;
+        $sth->bind_columns(\(@row));
+        while ($sth->fetch) {
+            my $row_hash = {};
+            @{$row_hash}{@$NAME} = @row;
+            $node_cache{ $row_hash->{id} } = $row_hash;
+        }
+
+        $node = delete($node_cache{$id}) || die "panic $id";
+    }
+
+    return $node;
 }
 
 sub _fetch_node_tree {
@@ -229,8 +262,7 @@ sub _fetch_node_tree {
 
         if (@child_ids > 10_000) {
             warn "Node $id ($node->{name}) has ".scalar(@child_ids)." children\n";
-            # XXX merge/prune/something? or just get a better treemap :)
-            splice @child_ids, 0, 10_000;
+            # XXX merge/prune/something?
         }
 
         if ($depth) { # recurse to required depth
