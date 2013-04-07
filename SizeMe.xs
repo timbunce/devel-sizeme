@@ -81,6 +81,7 @@
 #define TAG /* printf( "# %s(%d)\n", __FILE__, __LINE__ ) */
 #define carp puts
 
+
 /* The idea is to have a tree structure to store 1 bit per possible pointer
    address. The lowest 16 bits are stored in a block of 8092 bytes.
    The blocks are in a 256-way tree, indexed by the reset of the pointer.
@@ -108,6 +109,7 @@ struct state {
     bool fm_whine;
     bool dangle_whine;
     bool go_yell;
+    int trace_level;
     /* My hunch (not measured) is that for most architectures pointers will
        start with 0 bits, hence the start of this array will be hot, and the
        end unused. So put the flags next to the hot end.  */
@@ -1421,17 +1423,20 @@ free_memnode_state(pTHX_ struct state *st)
 static struct state *
 new_state(pTHX)
 {
-    SV *warn_flag;
+    SV *sv;
     struct state *st;
 
     Newxz(st, 1, struct state);
     st->go_yell = TRUE;
     st->min_recurse_threshold = TOTAL_SIZE_RECURSION;
-    if (NULL != (warn_flag = get_sv("Devel::Size::warn", FALSE))) {
-	st->dangle_whine = st->go_yell = SvIV(warn_flag) ? TRUE : FALSE;
+    if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
+	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
-    if (NULL != (warn_flag = get_sv("Devel::Size::dangle", FALSE))) {
-	st->dangle_whine = SvIV(warn_flag) ? TRUE : FALSE;
+    if (NULL != (sv = get_sv("Devel::Size::dangle", FALSE))) {
+	st->dangle_whine = SvIV(sv) ? TRUE : FALSE;
+    }
+    if (NULL != (sv = get_sv("Devel::Size::trace", FALSE))) {
+	st->trace_level = SvIV(sv);
     }
     st->start_time_nv = gettimeofday_nv(aTHX);
     check_new(st, &PL_sv_undef);
@@ -1472,28 +1477,53 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 {
     dVAR;
     SV* sva;
-    dNPathNodes(1, NPathArg);
+    U32 arena_count;
+    dNPathNodes(3, NPathArg);
 
     NPathPushNode("unseen", NPtype_NAME);
+    NPathPushNode("dummy", NPtype_NAME);
 
     /* by this point we should have visited all the SVs
      * so now we'll run through all the SVs via the arenas
      * in order to find any that we've missed for some reason.
      * Once the rest of the code is finding ALL the SVs then any
      * found here will be leaks.
+     * Meanwhile, this can find many thousands...
      */
     for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
+        char path_link_group[40];
+        char path_link_name[40];
         const SV * const svend = &sva[SvREFCNT(sva)];
         SV* sv;
+
+/* XXX break this down in some way because sometimes there
+ * are vast numbers of SVs here and that stresses the UI
+ */
+        ++arena_count;
+        sprintf(path_link_group, "arena-group-%d", (arena_count >> 8));
+        NPathSetNode(path_link_group, NPtype_NAME);
+
+        sprintf(path_link_name, "arena-%p", sva);
+        NPathPushNode(path_link_name, NPtype_NAME);
+
+        if (st->trace_level)
+            fprintf(stderr, "%s start: %ld\n", path_link_name, st->total_size);
+
         for (sv = sva + 1; sv < svend; ++sv) {
             if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
                 sv_size(aTHX_ st, NPathLink("arena"), sv, TOTAL_SIZE_RECURSION);
             }
             else if (check_new(st, sv)) { /* sanity check */
+                fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
+                np_print_node_name(aTHX_ stderr, NP);
+                fprintf(stderr, ":");
                 sv_dump(sv);
-                warn("unseen_sv_size encountered freed SV unexpectedly"); /* XXX warn uses an SV, I think */
             }
         }
+
+        if (st->trace_level)
+            fprintf(stderr, "%s   end: %ld\n", path_link_name, st->total_size);
+        NPathPopNode;
     }
 }
 
