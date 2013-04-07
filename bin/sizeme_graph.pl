@@ -60,11 +60,10 @@ use warnings;
 use Mojolicious::Lite; # possibly needs v3
 use JSON::XS;
 use Getopt::Long;
-use Storable qw(dclone);
 use Devel::Dwarn;
 use Devel::SizeMe::Graph;
+use DBI;
 
-require ORLite;
 
 my $j = JSON::XS->new;
 
@@ -77,14 +76,10 @@ GetOptions(
 die "Can't open $opt_db: $!\n" unless -r $opt_db;
 warn "Reading $opt_db\n";
 
-# XXX currently uses ORLite but doesn't actually make use of it in any useful way
-ORLite->import({
-    file => $opt_db,
-    package => "SizeMe",
-    readonly => 1,
-    #user_version => 1, # XXX
-    #unicode => 1, # XXX
-});
+my $dbh = DBI->connect("dbi:SQLite:$opt_db");
+my $select_node_by_id_sth = $dbh->prepare("select * from node where id = ?");
+my $select_node_by_id_fields = $select_node_by_id_sth->{NAME} or die;
+
 
 my $static_dir = $INC{'Devel/SizeMe/Graph.pm'} or die 'panic';
 $static_dir =~ s:\.pm$:/static:;
@@ -135,28 +130,46 @@ get '/jit_tree/:id/:depth' => sub {
     if (1){ # debug
         #use Data::Dump qw(pp);
         local $jit_tree->{children};
-        Dwarn(dclone($jit_tree)); # dclone to avoid stringification
+        require Storable;
+        Dwarn(Storable::dclone($jit_tree)); # dclone to avoid stringification
     }
 
     $self->render_json($jit_tree);
 };
 
+my %node_queue;
+my %node_cache;
+sub _set_node_queue {
+    my $nodes = shift;
+    ++$node_queue{$_} for @$nodes;
+}
+sub _get_node {
+    my $id = shift;
+
+    $node = delete $node_cache{$id};
+    return $node if ref $node;
+
+    $select_node_by_id_sth->execute($id);
+    my %node;
+    @node{@$select_node_by_id_fields} = $select_node_by_id_sth->fetchrow_array
+        or die "Node '$id' not found"; # shouldn't die
+    return \%node;
+}
 
 sub _fetch_node_tree {
     my ($id, $depth) = @_;
 
     warn "#$id fetching\n"
         if $opt_debug;
-    my $node = SizeMe->selectrow_hashref("select * from node where id = ?", undef, $id)
-        or die "Node '$id' not found"; # shouldn't die
-    $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size));
+
+    my $node = _get_node($id);
+    $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size)); # numify
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
     $node->{attr}   = $j->decode(delete $node->{attr_json});
     $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
-        my $children;
 
         # if this node has only one child then we merge that child into this node
         # this makes the treemap more usable
@@ -213,10 +226,17 @@ sub _fetch_node_tree {
 
             $node = $child; # use the merged child as this node
         }
+
+        if (@child_ids > 10_000) {
+            warn "Node $id ($node->{name}) has ".scalar(@child_ids)." children\n";
+            # XXX merge/prune/something? or just get a better treemap :)
+            splice @child_ids, 0, 10_000;
+        }
+
         if ($depth) { # recurse to required depth
-            $children = [ map { _fetch_node_tree($_, $depth-1) } @child_ids ];
-            $node->{children} = $children;
-            $node->{child_count} = @$children;
+            _set_node_queue(\@child_ids);
+            $node->{children} = [ map { _fetch_node_tree($_, $depth-1) } @child_ids ];
+            $node->{child_count} = @{ $node->{children} };
         }
     }
     return $node;
