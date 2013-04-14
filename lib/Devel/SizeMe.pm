@@ -157,13 +157,22 @@ by the operating system.
 
 Far from accurate yet.
 
+=head1 GETTING HELP
+
+There's an #sizeme IRC channel on irc.perl.org and the devel-size@googlegroups.com
+mailing list (also at https://groups.google.com/d/forum/devel-size)
+
+=head1 CONTRIBUTING
+
+The source code is at https://github.com/timbunce/devel-sizeme
+
 =head1 COPYRIGHT
 
 Copyright (C) 2005 Dan Sugalski,
 Copyright (C) 2007-2008 Tels,
 Copyright (C) 2008 BrowserUK,
 Copyright (C) 2011-2012 Nicholas Clark,
-Copyright (C) 2012 Tim Bunce.
+Copyright (C) 2012-2013 Tim Bunce.
 
 This module is free software; you can redistribute it and/or modify it
 under the same terms as Perl v5.8.8.
