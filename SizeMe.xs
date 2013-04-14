@@ -115,6 +115,7 @@ struct state {
        end unused. So put the flags next to the hot end.  */
     void *tracking[256];
     NV start_time_nv;
+    UV multi_refcnt;
     int min_recurse_threshold;
     /* callback hooks and data */
     void (*add_attr_cb)(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
@@ -483,6 +484,19 @@ check_new(struct state *st, const void *const p) {
     return TRUE;
 }
 
+
+static bool
+check_new_sv(struct state *st, const SV *const sv) {
+    if (!check_new(st, sv))
+        return 0;   /* seen before */
+    if (SvREFCNT(sv) == 1)
+        return 1;   /* not seen before but we 'own' the ref */
+    /* */
+    ++st->multi_refcnt;
+    return 1;
+}
+
+
 static void
 free_tracking_at(void **tv, int level)
 {
@@ -513,6 +527,8 @@ free_state(pTHX_ struct state *st)
         st->free_state_cb(aTHX_ st);
     if (st->state_cb_data)
         Safefree(st->state_cb_data);
+    if (st->multi_refcnt && st->trace_level);
+        warn("multi_refcnt: %lu\n", st->multi_refcnt);
     free_tracking_at((void **)st->tracking, top_level);
     Safefree(st);
 }
@@ -1092,7 +1108,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
 
     if (!padlist)
         return;
-    if( 0 && !check_new(st, padlist))
+    if( 0 && !check_new(st, padlist)) /* XXX ? */
         return;
 
     pad_name = MUTABLE_AV(*av_fetch(MUTABLE_AV(padlist), 0, FALSE));
@@ -1126,12 +1142,12 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
   dNPathNodes(3, NPathArg);
   U32 type;
 
-  if(!check_new(st, orig_thing))
+  if(!check_new_sv(st, orig_thing))
       return 0;
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
-      warn("Devel::Size: Unknown variable type: %u encountered\n", type);
+      warn("Devel::Size: Unknown variable type: %u encountered\n", type); /* TODO report path */
       return 0;
   }
   NPathPushNode(thing, NPtype_SV);
@@ -1513,7 +1529,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
             if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
                 sv_size(aTHX_ st, NPathLink("arena"), sv, TOTAL_SIZE_RECURSION);
             }
-            else if (check_new(st, sv)) { /* sanity check */
+            else if (check_new_sv(st, sv)) { /* sanity check */
                 fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
                 np_print_node_name(aTHX_ stderr, NP);
                 fprintf(stderr, ":");
