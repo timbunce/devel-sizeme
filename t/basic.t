@@ -53,10 +53,12 @@ cmp_ok($size_1, '<', $size_2, ' ."" makes string longer');
 #############################################################################
 # check that the tracking_hash is working
 
-my($a,$b) = (1,2);
-my @ary1 = (\$a, \$a);
-my @ary2 = (\$a, \$b);
-
+my($a,$b) = ([],[]);
+my @ary1 = ($a, $a); # $a twice
+my @ary2 = ($a, $b);
+# remove the extra reference from the lexical
+undef $a;
+undef $b;
 cmp_ok(total_size(\@ary1), '<', total_size(\@ary2),
        'the tracking hash is working');
 
