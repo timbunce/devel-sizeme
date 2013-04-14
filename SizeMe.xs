@@ -734,9 +734,9 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
   }
 }
 
-#define check_new_and_strlen(st, p, ppath) S_check_new_and_strlen(aTHX_ st, p, ppath)
+#define str_size(st, p, ppath) S_str_size(aTHX_ st, p, ppath)
 static void
-S_check_new_and_strlen(pTHX_ struct state *st, const char *const p, pPATH) {
+S_str_size(pTHX_ struct state *st, const char *const p, pPATH) {
     dNPathNodes(1, NPathArg->prev);
     if(check_new(st, p)) {
         NPathPushNode(NPathArg->id, NPtype_NAME);
@@ -924,7 +924,7 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
 	    TAG;break;
 #endif
 	case OPc_PVOP: TAG;
-	    check_new_and_strlen(st, ((PVOP *)baseop)->op_pv, NPathLink("op_pv"));
+	    str_size(st, ((PVOP *)baseop)->op_pv, NPathLink("op_pv"));
 	    TAG;break;
 	case OPc_LOOP: TAG;
 	    if (!skip_op_struct)
@@ -950,11 +950,11 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
           before 5.11 @33656, but later than 5.10, producing slightly too
           small memory sizes on these Perls. */
 #if (PERL_VERSION < 11)
-          check_new_and_strlen(st, basecop->cop_label, NPathLink("cop_label"));
+          str_size(st, basecop->cop_label, NPathLink("cop_label"));
 #endif
 #ifdef USE_ITHREADS
-          check_new_and_strlen(st, basecop->cop_file, NPathLink("cop_file"));
-          /*check_new_and_strlen(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));  XXX */
+          str_size(st, basecop->cop_file, NPathLink("cop_file"));
+          /*str_size(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));  XXX */
 #else
           if (SvREFCNT(basecop->cop_stash) == 1) /* XXX hack? */
             sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
@@ -1266,7 +1266,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 	}
     }
 #else
-    check_new_and_strlen(st, HvNAME_get(thing), NPathLink("HvNAME"));
+    str_size(st, HvNAME_get(thing), NPathLink("HvNAME"));
 #endif
     TAG;break;
 
@@ -1297,9 +1297,9 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 
   case SVt_PVIO: TAG;
     /* Some embedded char pointers */
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_top_name, NPathLink("xio_top_name"));
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_fmt_name, NPathLink("xio_fmt_name"));
-    check_new_and_strlen(st, ((XPVIO *) SvANY(thing))->xio_bottom_name, NPathLink("xio_bottom_name"));
+    str_size(st, ((XPVIO *) SvANY(thing))->xio_top_name, NPathLink("xio_top_name"));
+    str_size(st, ((XPVIO *) SvANY(thing))->xio_fmt_name, NPathLink("xio_fmt_name"));
+    str_size(st, ((XPVIO *) SvANY(thing))->xio_bottom_name, NPathLink("xio_bottom_name"));
     /* Throw the GVs on the list to be walked if they're not-null */
     sv_size(aTHX_ st, NPathLink("xio_top_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
     sv_size(aTHX_ st, NPathLink("xio_bottom_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
@@ -1342,7 +1342,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 	   of cases. 5.9.something added a proper fix, by converting the GP to
 	   use a shared hash key (porperly reference counted), instead of a
 	   char * (owned by who knows? possibly no-one now) */
-	check_new_and_strlen(st, GvFILE(thing), NPathLink("GvFILE"));
+	str_size(st, GvFILE(thing), NPathLink("GvFILE"));
 #  endif
 #endif
 	/* Is there something hanging off the glob? */
@@ -1677,14 +1677,14 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_subname"), (SV*)PL_subname, TOTAL_SIZE_RECURSION);
 #ifdef USE_LOCALE_NUMERIC
   sv_size(aTHX_ st, NPathLink("PL_numeric_radix_sv"), (SV*)PL_numeric_radix_sv, TOTAL_SIZE_RECURSION);
-  check_new_and_strlen(st, PL_numeric_name, NPathLink("PL_numeric_name"));
+  str_size(st, PL_numeric_name, NPathLink("PL_numeric_name"));
 #endif
 #ifdef USE_LOCALE_COLLATE
-  check_new_and_strlen(st, PL_collation_name, NPathLink("PL_collation_name"));
+  str_size(st, PL_collation_name, NPathLink("PL_collation_name"));
 #endif
-  check_new_and_strlen(st, PL_origfilename, NPathLink("PL_origfilename"));
-  check_new_and_strlen(st, PL_inplace, NPathLink("PL_inplace"));
-  check_new_and_strlen(st, PL_osname, NPathLink("PL_osname"));
+  str_size(st, PL_origfilename, NPathLink("PL_origfilename"));
+  str_size(st, PL_inplace, NPathLink("PL_inplace"));
+  str_size(st, PL_osname, NPathLink("PL_osname"));
   if (PL_op_mask && check_new(st, PL_op_mask))
     ADD_SIZE(st, "PL_op_mask", PL_maxo);
   if (PL_exitlistlen && check_new(st, PL_exitlist))
