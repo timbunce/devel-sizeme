@@ -114,6 +114,16 @@ struct state {
        start with 0 bits, hence the start of this array will be hot, and the
        end unused. So put the flags next to the hot end.  */
     void *tracking[256];
+
+    /* we use a pointer table to record the count of the number of times we've
+     * seen an SV (for SVs with refcnt > 1) so that we only recurse into it
+     * once we've 'seen' and thus accounted for all the refs to it */
+    PTR_TBL_t *sv_refcnt_ptr_table;
+    /* the initial SV the size func was called for is given a free pass
+     * so it's counted regardless of it's ref count. TODO find a more elegant
+     * way to do this, perhps by pre-loading the pointer table */
+    SV *sv_refcnt_to_ignore;
+
     NV start_time_nv;
     UV multi_refcnt;
     int min_recurse_threshold;
@@ -487,12 +497,31 @@ check_new(struct state *st, const void *const p) {
 
 static bool
 check_new_sv(struct state *st, const SV *const sv) {
+    UV seen_cnt;
+
     if (!check_new(st, sv))
         return 0;   /* seen before */
-    if (SvREFCNT(sv) == 1)
+    if (SvREFCNT(sv) <= 1) /* XXX treat refcnt 0 as 'owned' */
         return 1;   /* not seen before but we 'own' the ref */
-    /* */
+
+    /* we only do refcnt accounting for SVs with refcnt > 1 */
     ++st->multi_refcnt;
+
+    /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
+    seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
+    ptr_table_store(st->sv_refcnt_ptr_table, sv, (void*)seen_cnt);
+    if (st->trace_level >= 9)
+        warn("check_new_sv %p refcnt %lu seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
+    if (seen_cnt < SvREFCNT(sv)) {
+        if (sv == st->sv_refcnt_to_ignore)
+            return 1;
+        return 0;   /* pretend we've seen this sv before */
+    }
+    else if (seen_cnt > SvREFCNT(sv)) {
+        /* XXX temp - reconsider for weak refs */
+        warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
+        return 0;
+    }
     return 1;
 }
 
@@ -523,13 +552,18 @@ static void
 free_state(pTHX_ struct state *st)
 {
     const int top_level = (sizeof(void *) * 8 - LEAF_BITS - BYTE_BITS) / 8;
+    if (st->trace_level) {
+        warn("free_state %p: total_size %ld\n", st, st->total_size);
+        if (st->multi_refcnt)
+            warn("multi_refcnt: %lu\n", st->multi_refcnt);
+    }
     if (st->free_state_cb)
         st->free_state_cb(aTHX_ st);
     if (st->state_cb_data)
         Safefree(st->state_cb_data);
-    if (st->multi_refcnt && st->trace_level);
-        warn("multi_refcnt: %lu\n", st->multi_refcnt);
     free_tracking_at((void **)st->tracking, top_level);
+    if (st->sv_refcnt_ptr_table)
+        ptr_table_free(st->sv_refcnt_ptr_table);
     Safefree(st);
 }
 
@@ -1437,7 +1471,7 @@ free_memnode_state(pTHX_ struct state *st)
 }
 
 static struct state *
-new_state(pTHX)
+new_state(pTHX_ SV *root_sv)
 {
     SV *sv;
     struct state *st;
@@ -1461,6 +1495,9 @@ new_state(pTHX)
 #if PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 0)
     check_new(st, &PL_sv_placeholder);
 #endif
+
+    st->sv_refcnt_to_ignore = root_sv;
+    st->sv_refcnt_ptr_table = ptr_table_new();
 
 #ifdef PATH_TRACKING
     /* XXX quick hack */
@@ -1771,7 +1808,7 @@ ALIAS:
 CODE:
 {
   SV *thing = orig_thing;
-  struct state *st = new_state(aTHX);
+  struct state *st;
   
   /* If they passed us a reference then dereference it. This is the
      only way we can check the sizes of arrays and hashes */
@@ -1779,6 +1816,7 @@ CODE:
     thing = SvRV(thing);
   }
 
+  st = new_state(aTHX_ thing);
   sv_size(aTHX_ st, NULL, thing, ix);
   RETVAL = st->total_size;
   free_state(aTHX_ st);
@@ -1791,7 +1829,7 @@ perl_size()
 CODE:
 {
   /* just the current perl interpreter */
-  struct state *st = new_state(aTHX);
+  struct state *st = new_state(aTHX_ NULL);
   st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
@@ -1812,7 +1850,7 @@ CODE:
   /* some systems have the SVID2/XPG mallinfo structure and function */
   struct mstats ms = mstats(); /* mstats() first */
 # endif
-  struct state *st = new_state(aTHX);
+  struct state *st = new_state(aTHX_ NULL);
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
 

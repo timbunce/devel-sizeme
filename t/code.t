@@ -2,6 +2,7 @@
 
 use strict;
 use Test::More tests => 12;
+use Devel::Peek qw(Dump);
 use Devel::SizeMe ':all';
 
 sub zwapp;
@@ -16,8 +17,9 @@ my $crunch_size = total_size(\&crunch);
 
 cmp_ok($whack_size, '>', 0, 'CV generated at runtime has a size');
 if ($] < 5.017) { # blead 186a5ba82d5844e9713475c494fcd6682968609f
-    cmp_ok($zwapp_size, '>', $whack_size,
-        'CV stubbed at compiletime is larger (CvOUTSIDE is set and followed)');
+    cmp_ok($zwapp_size, '==', $whack_size,
+        'CV stubbed at compiletime is same size (CvOUTSIDE is set but not followed)')
+            or do { Dump(\&zwapp); Dump(\&whack) };
 }
 else { pass() }
 cmp_ok(length prototype \&swoosh, '>', 0, 'prototype has a length');

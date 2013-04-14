@@ -26,7 +26,7 @@ $SIG{__WARN__} = sub {
 
     my $with_one = total_size(\@array);
     is($with_one, $array_overhead + $real_gv_size,
-       'agregate size is overhead plus GV');
+       "agregate size is overhead ($array_overhead) plus GV ($real_gv_size)");
 
     $array[1] = \*CHOMP;
 
