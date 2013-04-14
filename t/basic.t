@@ -56,7 +56,7 @@ cmp_ok($size_1, '<', $size_2, ' ."" makes string longer');
 my($a,$b) = ([],[]);
 my @ary1 = ($a, $a); # $a twice
 my @ary2 = ($a, $b);
-# remove the extra reference from the lexical
+# remove the extra references held by the lexicals
 undef $a;
 undef $b;
 cmp_ok(total_size(\@ary1), '<', total_size(\@ary2),
