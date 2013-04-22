@@ -126,7 +126,6 @@ struct state {
 
     NV start_time_nv;
     UV multi_refcnt;
-    int min_recurse_threshold;
     /* callback hooks and data */
     void (*add_attr_cb)(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *name, UV value);
     void (*free_state_cb)(pTHX_ struct state *st);
@@ -580,6 +579,8 @@ free_state(pTHX_ struct state *st)
 #define NO_RECURSION 0
 #define SOME_RECURSION 1
 #define TOTAL_SIZE_RECURSION 2
+
+#define INCLUDE_CONTENTS_OF_AGGREGATES 1 /* temp placeholder */
 
 static bool sv_size(pTHX_ struct state *, pPATH, const SV *const, const int recurse);
 
@@ -1207,7 +1208,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
       ADD_ATTR(st, NPattr_NOTE, "av_len", av_len((AV*)thing));
       dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
 
-      if (recurse >= st->min_recurse_threshold) {
+      if (INCLUDE_CONTENTS_OF_AGGREGATES) {
 	  SSize_t i = AvFILLp(thing) + 1;
 
 	  while (i--) {
@@ -1255,7 +1256,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
           NPathPushNode("he+hek", NPtype_NAME);
           ADD_SIZE(st, "he", sizeof(HE));
 	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
-	  if (recurse >= st->min_recurse_threshold) {
+	  if (INCLUDE_CONTENTS_OF_AGGREGATES) {
             if (orig_thing == (SV*)PL_strtab) {
                 /* For PL_strtab the HeVAL is used as a refcnt */
                 ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
@@ -1478,7 +1479,6 @@ new_state(pTHX_ SV *root_sv)
 
     Newxz(st, 1, struct state);
     st->go_yell = TRUE;
-    st->min_recurse_threshold = TOTAL_SIZE_RECURSION;
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
@@ -1830,7 +1830,6 @@ CODE:
 {
   /* just the current perl interpreter */
   struct state *st = new_state(aTHX_ NULL);
-  st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
   free_state(aTHX_ st);
@@ -1853,8 +1852,6 @@ CODE:
   struct state *st = new_state(aTHX_ NULL);
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
-
-  st->min_recurse_threshold = NO_RECURSION; /* so always recurse */
 
   perl_size(aTHX_ st, NPathLink("perl_interp"));
 # ifdef HAS_MSTATS
