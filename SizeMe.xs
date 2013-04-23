@@ -105,6 +105,7 @@ struct npath_node_st {
 
 struct state {
     UV total_size;
+    int recurse;
     bool regex_whine;
     bool fm_whine;
     bool dangle_whine;
@@ -576,13 +577,13 @@ free_state(pTHX_ struct state *st)
    implementation of total_size() didn't report "everything", and changing the
    only available size to "everything" doesn't feel at all useful.  */
 
-#define NO_RECURSION 0
-#define SOME_RECURSION 1
-#define TOTAL_SIZE_RECURSION 2
+#define RECURSE_INTO_NONE 0
+#define RECURSE_INTO_OWNED 1
+#define RECURSE_INTO_WEAK 2
 
 #define INCLUDE_CONTENTS_OF_AGGREGATES 1 /* temp placeholder */
 
-static bool sv_size(pTHX_ struct state *, pPATH, const SV *const, const int recurse);
+static bool sv_size(pTHX_ struct state *, pPATH, const SV *const);
 
 typedef enum {
     OPc_NULL,   /* 0 */
@@ -756,9 +757,9 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
 
     TRY_TO_CATCH_SEGV {
         /* XXX only chase mg_obj if mg->mg_flags & MGf_REFCOUNTED ? */
-	sv_size(aTHX_ st, NPathLink("mg_obj"), magic_pointer->mg_obj, TOTAL_SIZE_RECURSION);
+	sv_size(aTHX_ st, NPathLink("mg_obj"), magic_pointer->mg_obj);
 	if (magic_pointer->mg_len == HEf_SVKEY) {
-	    sv_size(aTHX_ st, NPathLink("mg_ptr"), (SV *)magic_pointer->mg_ptr, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mg_ptr"), (SV *)magic_pointer->mg_ptr);
 	}
 #if defined(PERL_MAGIC_utf8) && defined (PERL_MAGIC_UTF8_CACHESIZE)
 	else if (magic_pointer->mg_type == PERL_MAGIC_utf8) {
@@ -958,7 +959,7 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
 	    if (!(baseop->op_type == OP_AELEMFAST
 		  && baseop->op_flags & OPf_SPECIAL)) {
 		/* not an OP_PADAV replacement */
-		sv_size(aTHX_ st, NPathLink("SVOP"), ((SVOP *)baseop)->op_sv, SOME_RECURSION);
+		sv_size(aTHX_ st, NPathLink("SVOP"), ((SVOP *)baseop)->op_sv);
 	    }
 	    TAG;break;
 #ifdef OA_PADOP
@@ -971,7 +972,7 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
 	case OPc_GVOP: TAG;
 	    if (!skip_op_struct)
 		ADD_SIZE(st, "gvop", sizeof(struct gvop));
-	    sv_size(aTHX_ st, NPathLink("GVOP"), ((GVOP *)baseop)->op_gv, SOME_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("GVOP"), ((GVOP *)baseop)->op_gv);
 	    TAG;break;
 #endif
 	case OPc_PVOP: TAG;
@@ -1008,8 +1009,8 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
           /*str_size(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));  XXX */
 #else
           if (SvREFCNT(basecop->cop_stash) == 1) /* XXX hack? */
-            sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash, SOME_RECURSION);
-	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv, SOME_RECURSION);
+            sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash);
+	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv);
 #endif
 
 #if (PERL_BCDVERSION >= 0x5009004)
@@ -1133,8 +1134,7 @@ const U8 body_sizes[SVt_LAST] = {
 
 /* based on Perl_do_dump_pad() - wraps sv_size and adds ADD_ATTR calls for the pad names */
 static void
-padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
-	const int recurse)
+padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist)
 {
     dNPathUseParent(NPathArg);
     const AV *pad_name;
@@ -1166,13 +1166,13 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist,
         }
 
     }
-    sv_size(aTHX_ st, NPathArg, (SV*)padlist, recurse);
+    sv_size(aTHX_ st, NPathArg, (SV*)padlist);
 }
 
 
 static bool
-sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
-	const int recurse) {
+sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
+{
   const SV *thing = orig_thing;
   dNPathNodes(3, NPathArg);
   U32 type;
@@ -1196,8 +1196,14 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 #else
   case SVt_IV: TAG;
 #endif
-    if(recurse && SvROK(thing)) /* XXX maybe don't follow weakrefs */
-	sv_size(aTHX_ st, (SvWEAKREF(thing) ? NPathLink("weakRV") : NPathLink("RV")), SvRV_const(thing), recurse);
+    if(st->recurse && SvROK(thing)) {
+        if (!SvWEAKREF(thing)) {
+            sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing));
+        }
+        else if (st->recurse >= RECURSE_INTO_WEAK) {
+            sv_size(aTHX_ st, NPathLink("weakRV"), SvRV_const(thing));
+        }
+    }
     TAG;break;
 
   case SVt_PVAV: TAG;
@@ -1212,7 +1218,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
 	  SSize_t i = AvFILLp(thing) + 1;
 
 	  while (i--) {
-	      if (sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i], recurse))
+	      if (sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i]))
                 ADD_LINK_ATTR(st, NPattr_NOTE, "i", i);
           }
       }
@@ -1232,7 +1238,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
        Post 5.9.something this is stored in magic, so will be found there,
        and Perl_av_arylen_p() takes a non-const AV*, hence compilers rightly
        complain about AvARYLEN() passing thing to it.  */
-    sv_size(aTHX_ st, NPathLink("ARYLEN"), AvARYLEN(thing), recurse);
+    sv_size(aTHX_ st, NPathLink("ARYLEN"), AvARYLEN(thing));
 #endif
     TAG;break;
 
@@ -1268,7 +1274,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing,
  * so we protect against that here, but I'd like to know the cause.
  */
 if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
-	      sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry), recurse);
+	      sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
 else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
             }
 	  }
@@ -1303,16 +1309,16 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 	ADD_SIZE(st, "xpvhv_aux", sizeof(struct xpvhv_aux));
 	if (meta) {
 	    ADD_SIZE(st, "mro_meta", sizeof(struct mro_meta));
-	    sv_size(aTHX_ st, NPathLink("mro_nextmethod"), (SV *)meta->mro_nextmethod, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_nextmethod"), (SV *)meta->mro_nextmethod);
 #if PERL_VERSION > 10 || (PERL_VERSION == 10 && PERL_SUBVERSION > 0)
-	    sv_size(aTHX_ st, NPathLink("isa"), (SV *)meta->isa, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("isa"), (SV *)meta->isa);
 #endif
 #if PERL_VERSION > 10
-	    sv_size(aTHX_ st, NPathLink("mro_linear_all"), (SV *)meta->mro_linear_all, TOTAL_SIZE_RECURSION);
-	    sv_size(aTHX_ st, NPathLink("mro_linear_current"), meta->mro_linear_current, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_all"), (SV *)meta->mro_linear_all);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_current"), meta->mro_linear_current);
 #else
-	    sv_size(aTHX_ st, NPathLink("mro_linear_dfs"), (SV *)meta->mro_linear_dfs, TOTAL_SIZE_RECURSION);
-	    sv_size(aTHX_ st, NPathLink("mro_linear_c3"), (SV *)meta->mro_linear_c3, TOTAL_SIZE_RECURSION);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_dfs"), (SV *)meta->mro_linear_dfs);
+	    sv_size(aTHX_ st, NPathLink("mro_linear_c3"), (SV *)meta->mro_linear_c3);
 #endif
 	}
     }
@@ -1323,8 +1329,8 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 
 
   case SVt_PVFM: TAG;
-    padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), SOME_RECURSION);
+    padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing));
+    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing));
 
     if (st->go_yell && !st->fm_whine) {
       carp("Devel::Size: Calculated sizes for FMs are incomplete");
@@ -1335,11 +1341,11 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   case SVt_PVCV: TAG;
     /* not CvSTASH, per https://rt.cpan.org/Ticket/Display.html?id=79366 */
     ADD_ATTR(st, NPattr_NAME, CvGV(thing) ? GvNAME(CvGV(thing)) : "UNDEFINED", 0);
-    sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing), SOME_RECURSION);
-    padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing), recurse);
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing), SOME_RECURSION);
+    sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing));
+    padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing));
+    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing));
     if (CvISXSUB(thing)) {
-	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing), recurse);
+	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing));
     } else {
 	/* Note that we don't chase CvSTART */
 	op_size(aTHX_ CvROOT(thing), st, NPathLinkAndNode("CvROOT", "OPs"));
@@ -1352,9 +1358,9 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
     str_size(st, ((XPVIO *) SvANY(thing))->xio_fmt_name, NPathLink("xio_fmt_name"));
     str_size(st, ((XPVIO *) SvANY(thing))->xio_bottom_name, NPathLink("xio_bottom_name"));
     /* Throw the GVs on the list to be walked if they're not-null */
-    sv_size(aTHX_ st, NPathLink("xio_top_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_top_gv, recurse);
-    sv_size(aTHX_ st, NPathLink("xio_bottom_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv, recurse);
-    sv_size(aTHX_ st, NPathLink("xio_fmt_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv, recurse);
+    sv_size(aTHX_ st, NPathLink("xio_top_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_top_gv);
+    sv_size(aTHX_ st, NPathLink("xio_bottom_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_bottom_gv);
+    sv_size(aTHX_ st, NPathLink("xio_fmt_gv"), (SV *)((XPVIO *) SvANY(thing))->xio_fmt_gv);
 
     /* Only go trotting through the IO structures if they're really
        trottable. If USE_PERLIO is defined we can do this. If
@@ -1399,17 +1405,17 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 	/* Is there something hanging off the glob? */
 	if (check_new(st, GvGP(thing))) {
 	    ADD_SIZE(st, "GP", sizeof(GP));
-	    sv_size(aTHX_ st, NPathLink("gp_sv"), (SV *)(GvGP(thing)->gp_sv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_av"), (SV *)(GvGP(thing)->gp_av), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_hv"), (SV *)(GvGP(thing)->gp_hv), recurse);
+	    sv_size(aTHX_ st, NPathLink("gp_sv"), (SV *)(GvGP(thing)->gp_sv));
+	    sv_size(aTHX_ st, NPathLink("gp_av"), (SV *)(GvGP(thing)->gp_av));
+	    sv_size(aTHX_ st, NPathLink("gp_hv"), (SV *)(GvGP(thing)->gp_hv));
 	    /* Do not follow CVs in the method cache - for now we assume we'll find
 	     * them via another path with a better name. (Once we have proper
 	     * refcnt handling then special cases like this can all be removed.)
 	     */
 	    if (!GvGP(thing)->gp_cvgen)
-		sv_size(aTHX_ st, NPathLink("gp_cv"), (SV *)(GvGP(thing)->gp_cv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_egv"), (SV *)(GvGP(thing)->gp_egv), recurse);
-	    sv_size(aTHX_ st, NPathLink("gp_form"), (SV *)(GvGP(thing)->gp_form), recurse);
+		sv_size(aTHX_ st, NPathLink("gp_cv"), (SV *)(GvGP(thing)->gp_cv));
+	    sv_size(aTHX_ st, NPathLink("gp_egv"), (SV *)(GvGP(thing)->gp_egv));
+	    sv_size(aTHX_ st, NPathLink("gp_form"), (SV *)(GvGP(thing)->gp_form));
 	}
 #if (PERL_VERSION >= 9)
 	TAG; break;
@@ -1423,8 +1429,8 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   case SVt_PVIV: TAG;
   case SVt_PV: TAG;
   freescalar:
-    if(recurse && SvROK(thing))
-	sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing), recurse);
+    if(st->recurse && SvROK(thing))
+	sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing));
     else if (SvIsCOW_shared_hash(thing))
 	hek_size(aTHX_ st, SvSHARED_HEK_FROM_PV(SvPVX(thing)), 1, NPathLink("SvSHARED_HEK_FROM_PV"));
     else
@@ -1445,10 +1451,10 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
 #ifdef SvOURSTASH
     /* SVpad_OUR shares same flag bit as SVpbm_VALID and others */
     if (type == SVt_PVGV && SvPAD_OUR(thing) && SvOURSTASH(thing))
-      sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing), SOME_RECURSION);
+      sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing));
 #endif
     if (SvSTASH(thing))
-      sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing), SOME_RECURSION);
+      sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing));
   }
 
   return 1;
@@ -1564,7 +1570,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 
         for (sv = sva + 1; sv < svend; ++sv) {
             if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
-                sv_size(aTHX_ st, NPathLink("arena"), sv, TOTAL_SIZE_RECURSION);
+                sv_size(aTHX_ st, NPathLink("arena"), sv);
             }
             else if (check_new_sv(st, sv)) { /* sanity check */
                 fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
@@ -1613,31 +1619,31 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   ADD_SIZE(st, "stack_frames", parser->stack_size * sizeof(yy_stack_frame));
   for (ps = parser->stack; ps <= parser->ps; ps++) {
 #if (PERL_BCDVERSION >= 0x5011002) /* roughly */
-    if (sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv, TOTAL_SIZE_RECURSION))
+    if (sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv))
         ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
 #else /* prior to perl 8c63ea58  Dec 8 2009 */
-    if (sv_size(aTHX_ st, NPathLink("comppad"), (SV*)ps->comppad, TOTAL_SIZE_RECURSION))
+    if (sv_size(aTHX_ st, NPathLink("comppad"), (SV*)ps->comppad))
         ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
 #endif
   }
   NPathPopNode;
 
-  sv_size(aTHX_ st, NPathLink("lex_repl"), (SV*)parser->lex_repl, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("lex_stuff"), (SV*)parser->lex_stuff, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("linestr"), (SV*)parser->linestr, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("in_my_stash"), (SV*)parser->in_my_stash, TOTAL_SIZE_RECURSION);
-  /*sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp, TOTAL_SIZE_RECURSION); */
-  sv_size(aTHX_ st, NPathLink("rsfp_filters"), (SV*)parser->rsfp_filters, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("lex_repl"), (SV*)parser->lex_repl);
+  sv_size(aTHX_ st, NPathLink("lex_stuff"), (SV*)parser->lex_stuff);
+  sv_size(aTHX_ st, NPathLink("linestr"), (SV*)parser->linestr);
+  sv_size(aTHX_ st, NPathLink("in_my_stash"), (SV*)parser->in_my_stash);
+  /*sv_size(aTHX_ st, NPathLink("rsfp"), parser->rsfp); */
+  sv_size(aTHX_ st, NPathLink("rsfp_filters"), (SV*)parser->rsfp_filters);
 #ifdef PERL_MAD
-  sv_size(aTHX_ st, NPathLink("endwhite"), parser->endwhite, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("nextwhite"), parser->nextwhite, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("skipwhite"), parser->skipwhite, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("thisclose"), parser->thisclose, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("endwhite"), parser->endwhite);
+  sv_size(aTHX_ st, NPathLink("nextwhite"), parser->nextwhite);
+  sv_size(aTHX_ st, NPathLink("skipwhite"), parser->skipwhite);
+  sv_size(aTHX_ st, NPathLink("thisclose"), parser->thisclose);
   madprop_size(aTHX_ st, NPathLink("thismad"), parser->thismad);
-  sv_size(aTHX_ st, NPathLink("thisopen"), parser->thisopen, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("thisstuff"), parser->thisstuff, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("thistoken"), parser->thistoken, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("thiswhite"), parser->thiswhite, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("thisopen"), parser->thisopen);
+  sv_size(aTHX_ st, NPathLink("thisstuff"), parser->thisstuff);
+  sv_size(aTHX_ st, NPathLink("thistoken"), parser->thistoken);
+  sv_size(aTHX_ st, NPathLink("thiswhite"), parser->thiswhite);
 #endif
   op_size_class(aTHX_ (OP*)parser->saved_curcop, OPc_COP, 0,
 		st, NPathLink("saved_curcop"));
@@ -1664,72 +1670,72 @@ perl_size(pTHX_ struct state *const st, pPATH)
  *      unknown <== = O/S Heap size - perl - free_malloc_space
  */
   /* start with PL_defstash to get everything reachable from \%main:: */
-  sv_size(aTHX_ st, NPathLink("PL_defstash"), (SV*)PL_defstash, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_defstash"), (SV*)PL_defstash);
 
   NPathPushNode("others", NPtype_NAME); /* group these (typically much smaller) items */
-  sv_size(aTHX_ st, NPathLink("PL_defgv"), (SV*)PL_defgv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_incgv"), (SV*)PL_incgv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_rs"), (SV*)PL_rs, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_errors"), (SV*)PL_errors, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_stashcache"), (SV*)PL_stashcache, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_patchlevel"), (SV*)PL_patchlevel, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_defgv"), (SV*)PL_defgv);
+  sv_size(aTHX_ st, NPathLink("PL_incgv"), (SV*)PL_incgv);
+  sv_size(aTHX_ st, NPathLink("PL_rs"), (SV*)PL_rs);
+  sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid);
+  sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal);
+  sv_size(aTHX_ st, NPathLink("PL_errors"), (SV*)PL_errors);
+  sv_size(aTHX_ st, NPathLink("PL_stashcache"), (SV*)PL_stashcache);
+  sv_size(aTHX_ st, NPathLink("PL_patchlevel"), (SV*)PL_patchlevel);
 #ifdef PL_apiversion
-  sv_size(aTHX_ st, NPathLink("PL_apiversion"), (SV*)PL_apiversion, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_apiversion"), (SV*)PL_apiversion);
 #endif
 #ifdef PL_registered_mros
-  sv_size(aTHX_ st, NPathLink("PL_registered_mros"), (SV*)PL_registered_mros, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_registered_mros"), (SV*)PL_registered_mros);
 #endif
 #ifdef USE_ITHREADS
-  sv_size(aTHX_ st, NPathLink("PL_regex_padav"), (SV*)PL_regex_padav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_regex_padav"), (SV*)PL_regex_padav);
 #endif
-  sv_size(aTHX_ st, NPathLink("PL_warnhook"), (SV*)PL_warnhook, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_diehook"), (SV*)PL_diehook, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_main_cv"), (SV*)PL_main_cv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_main_root"), (SV*)PL_main_root, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_main_start"), (SV*)PL_main_start, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_envgv"), (SV*)PL_envgv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_hintgv"), (SV*)PL_hintgv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_e_script"), (SV*)PL_e_script, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_encoding"), (SV*)PL_encoding, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_warnhook"), (SV*)PL_warnhook);
+  sv_size(aTHX_ st, NPathLink("PL_diehook"), (SV*)PL_diehook);
+  sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav);
+  sv_size(aTHX_ st, NPathLink("PL_main_cv"), (SV*)PL_main_cv);
+  sv_size(aTHX_ st, NPathLink("PL_main_root"), (SV*)PL_main_root);
+  sv_size(aTHX_ st, NPathLink("PL_main_start"), (SV*)PL_main_start);
+  sv_size(aTHX_ st, NPathLink("PL_envgv"), (SV*)PL_envgv);
+  sv_size(aTHX_ st, NPathLink("PL_hintgv"), (SV*)PL_hintgv);
+  sv_size(aTHX_ st, NPathLink("PL_e_script"), (SV*)PL_e_script);
+  sv_size(aTHX_ st, NPathLink("PL_encoding"), (SV*)PL_encoding);
 #ifdef PL_ofsgv
-  sv_size(aTHX_ st, NPathLink("PL_ofsgv"), (SV*)PL_ofsgv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_ofsgv"), (SV*)PL_ofsgv);
 #endif
-  sv_size(aTHX_ st, NPathLink("PL_argvout_stack"), (SV*)PL_argvout_stack, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_beginav"), (SV*)PL_beginav, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_beginav_save"), (SV*)PL_beginav_save, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_checkav_save"), (SV*)PL_checkav_save, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_argvout_stack"), (SV*)PL_argvout_stack);
+  sv_size(aTHX_ st, NPathLink("PL_beginav"), (SV*)PL_beginav);
+  sv_size(aTHX_ st, NPathLink("PL_beginav_save"), (SV*)PL_beginav_save);
+  sv_size(aTHX_ st, NPathLink("PL_checkav_save"), (SV*)PL_checkav_save);
 #ifdef PL_unitcheckav
-  sv_size(aTHX_ st, NPathLink("PL_unitcheckav"), (SV*)PL_unitcheckav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_unitcheckav"), (SV*)PL_unitcheckav);
 #endif
 #ifdef PL_unitcheckav_save
-  sv_size(aTHX_ st, NPathLink("PL_unitcheckav_save"), (SV*)PL_unitcheckav_save, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_unitcheckav_save"), (SV*)PL_unitcheckav_save);
 #endif
-  sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_checkav"), (SV*)PL_checkav, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_initav"), (SV*)PL_initav, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav);
+  sv_size(aTHX_ st, NPathLink("PL_checkav"), (SV*)PL_checkav);
+  sv_size(aTHX_ st, NPathLink("PL_initav"), (SV*)PL_initav);
 #ifdef PL_isarev
-  sv_size(aTHX_ st, NPathLink("PL_isarev"), (SV*)PL_isarev, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_isarev"), (SV*)PL_isarev);
 #endif
-  sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_preambleav"), (SV*)PL_preambleav, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_ors_sv"), (SV*)PL_ors_sv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_custom_op_names"), (SV*)PL_custom_op_names, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_custom_op_descs"), (SV*)PL_custom_op_descs, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_fdpid"), (SV*)PL_fdpid);
+  sv_size(aTHX_ st, NPathLink("PL_preambleav"), (SV*)PL_preambleav);
+  sv_size(aTHX_ st, NPathLink("PL_ors_sv"), (SV*)PL_ors_sv);
+  sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal);
+  sv_size(aTHX_ st, NPathLink("PL_custom_op_names"), (SV*)PL_custom_op_names);
+  sv_size(aTHX_ st, NPathLink("PL_custom_op_descs"), (SV*)PL_custom_op_descs);
 #ifdef PL_custom_ops
-  sv_size(aTHX_ st, NPathLink("PL_custom_ops"), (SV*)PL_custom_ops, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_custom_ops"), (SV*)PL_custom_ops);
 #endif
-  sv_size(aTHX_ st, NPathLink("PL_compcv"), (SV*)PL_compcv, TOTAL_SIZE_RECURSION);
-  sv_size(aTHX_ st, NPathLink("PL_DBcv"), (SV*)PL_DBcv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_compcv"), (SV*)PL_compcv);
+  sv_size(aTHX_ st, NPathLink("PL_DBcv"), (SV*)PL_DBcv);
 #ifdef PERL_USES_PL_PIDSTATUS
-  sv_size(aTHX_ st, NPathLink("PL_pidstatus"), (SV*)PL_pidstatus, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_pidstatus"), (SV*)PL_pidstatus);
 #endif
-  sv_size(aTHX_ st, NPathLink("PL_subname"), (SV*)PL_subname, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_subname"), (SV*)PL_subname);
 #ifdef USE_LOCALE_NUMERIC
-  sv_size(aTHX_ st, NPathLink("PL_numeric_radix_sv"), (SV*)PL_numeric_radix_sv, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_numeric_radix_sv"), (SV*)PL_numeric_radix_sv);
   str_size(st, PL_numeric_name, NPathLink("PL_numeric_name"));
 #endif
 #ifdef USE_LOCALE_COLLATE
@@ -1772,7 +1778,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   /* --- by this point we should have seen all reachable SVs --- */
 
   /* in theory we shouldn't have any elements in PL_strtab that haven't been seen yet */
-  sv_size(aTHX_ st, NPathLink("PL_strtab-unseen"), (SV*)PL_strtab, TOTAL_SIZE_RECURSION);
+  sv_size(aTHX_ st, NPathLink("PL_strtab-unseen"), (SV*)PL_strtab);
 
   /* unused space in sv head arenas */
   if (PL_sv_root) {
@@ -1804,7 +1810,7 @@ UV
 size(orig_thing)
      SV *orig_thing
 ALIAS:
-    total_size = TOTAL_SIZE_RECURSION
+    total_size = RECURSE_INTO_OWNED
 CODE:
 {
   SV *thing = orig_thing;
@@ -1817,7 +1823,8 @@ CODE:
   }
 
   st = new_state(aTHX_ thing);
-  sv_size(aTHX_ st, NULL, thing, ix);
+  st->recurse = ix;
+  sv_size(aTHX_ st, NULL, thing);
   RETVAL = st->total_size;
   free_state(aTHX_ st);
 }
