@@ -496,33 +496,37 @@ check_new(struct state *st, const void *const p) {
 
 
 static bool
-check_new_sv(struct state *st, const SV *const sv) {
-    UV seen_cnt;
+check_new_sv(struct state *st, const SV *const sv)
+{
+    if (NULL == sv)
+        return FALSE;
 
-    if (!check_new(st, sv))
-        return 0;   /* seen before */
-    if (SvREFCNT(sv) <= 1) /* XXX treat refcnt 0 as 'owned' */
-        return 1;   /* not seen before but we 'own' the ref */
+    /* For SVs we defer calling check_new() until we've 'seen' the SV
+     * at least as often as the reference count. 
+     */
+    if (SvREFCNT(sv) > 1 && sv != st->sv_refcnt_to_ignore) {
+        UV seen_cnt;
 
-    /* we only do refcnt accounting for SVs with refcnt > 1 */
-    ++st->multi_refcnt;
+        /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
+        seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
+        ptr_table_store(st->sv_refcnt_ptr_table, sv, (void*)seen_cnt);
 
-    /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
-    seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
-    ptr_table_store(st->sv_refcnt_ptr_table, sv, (void*)seen_cnt);
-    if (st->trace_level >= 9)
-        warn("check_new_sv %p refcnt %lu seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
-    if (seen_cnt < SvREFCNT(sv)) {
-        if (sv == st->sv_refcnt_to_ignore)
-            return 1;
-        return 0;   /* pretend we've seen this sv before */
+        ++st->multi_refcnt;
+        if (st->trace_level >= 9)
+            warn("check_new_sv %p refcnt %lu seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
+
+        if (seen_cnt < SvREFCNT(sv)) {
+            return FALSE;   /* pretend we've seen this sv before */
+        }
+        if (seen_cnt > SvREFCNT(sv)) {
+            if (st->trace_level >= 2)
+                warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
+            if (st->trace_level >= 9)
+                sv_dump(sv);
+        }
     }
-    else if (seen_cnt > SvREFCNT(sv)) {
-        /* XXX temp - reconsider for weak refs */
-        warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
-        return 0;
-    }
-    return 1;
+
+    return check_new(st, sv);
 }
 
 
