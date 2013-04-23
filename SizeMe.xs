@@ -494,39 +494,43 @@ check_new(struct state *st, const void *const p) {
     return TRUE;
 }
 
+#define FOLLOW_SINGLE_NOW   1 /* refcnt=1, follow now */
+#define FOLLOW_SINGLE_DONE  2 /* refcnt=1, already followed */
+#define FOLLOW_MULTI_LATER  3 /* refcnt>1, follow later */
+#define FOLLOW_MULTI_NOW    4 /* refcnt>1, follow now */
+#define FOLLOW_MULTI_DONE   5 /* refcnt>1, already followed */
 
-static bool
-check_new_sv(struct state *st, const SV *const sv)
+static int
+get_sv_follow_state(struct state *st, const SV *const sv)
 {
-    if (NULL == sv)
-        return FALSE;
+    UV seen_cnt;
 
     /* For SVs we defer calling check_new() until we've 'seen' the SV
      * at least as often as the reference count. 
      */
-    if (SvREFCNT(sv) > 1 && sv != st->sv_refcnt_to_ignore) {
-        UV seen_cnt;
-
-        /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
-        seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
-        ptr_table_store(st->sv_refcnt_ptr_table, sv, (void*)seen_cnt);
-
-        ++st->multi_refcnt;
-        if (st->trace_level >= 9)
-            warn("check_new_sv %p refcnt %lu seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
-
-        if (seen_cnt < SvREFCNT(sv)) {
-            return FALSE;   /* pretend we've seen this sv before */
-        }
-        if (seen_cnt > SvREFCNT(sv)) {
-            if (st->trace_level >= 2)
-                warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
-            if (st->trace_level >= 9)
-                sv_dump(sv);
-        }
+    if (SvREFCNT(sv) <= 1 || sv == st->sv_refcnt_to_ignore) {
+        return (check_new(st, sv)) ? FOLLOW_SINGLE_NOW : FOLLOW_SINGLE_DONE;
     }
 
-    return check_new(st, sv);
+    /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
+    seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
+    ptr_table_store(st->sv_refcnt_ptr_table, sv, (void*)seen_cnt);
+
+    ++st->multi_refcnt;
+    if (st->trace_level >= 9)
+        warn("get_sv_follow_state %p refcnt %u seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
+
+    if (seen_cnt < SvREFCNT(sv)) {
+        return FOLLOW_MULTI_LATER;   /* pretend we've seen this sv before */
+    }
+    if (seen_cnt > SvREFCNT(sv)) {
+        if (st->trace_level >= 2)
+            warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
+        if (st->trace_level >= 4)
+            sv_dump((SV*)sv);
+    }
+
+    return (check_new(st, sv)) ? FOLLOW_MULTI_NOW : FOLLOW_MULTI_DONE;
 }
 
 
@@ -1180,9 +1184,25 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   const SV *thing = orig_thing;
   dNPathNodes(3, NPathArg);
   U32 type;
+  int do_NPathNoteAddr = 0;
 
-  if(!check_new_sv(st, orig_thing))
+  if (NULL == thing)
       return 0;
+
+  switch (get_sv_follow_state(st, orig_thing)) {
+  case FOLLOW_SINGLE_DONE:
+        return 0;
+  case FOLLOW_SINGLE_NOW:
+        break;
+  case FOLLOW_MULTI_LATER: /*FALLTHRU*/
+  case FOLLOW_MULTI_DONE:
+        if (1) { dNPathUseParent(NPathArg); ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
+        return 0;
+  case FOLLOW_MULTI_NOW:
+        if (1) { dNPathUseParent(NPathArg); ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
+        do_NPathNoteAddr=1;
+        break;
+  }
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
@@ -1190,6 +1210,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
       return 0;
   }
   NPathPushNode(thing, NPtype_SV);
+  if (do_NPathNoteAddr)
+    ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing));
   ADD_SIZE(st, "sv_head", sizeof(SV));
   ADD_SIZE(st, "sv_body", body_sizes[type]);
 
@@ -1574,9 +1596,12 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 
         for (sv = sva + 1; sv < svend; ++sv) {
             if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
+                /* is a live SV */
                 sv_size(aTHX_ st, NPathLink("arena"), sv);
+                continue;
             }
-            else if (check_new_sv(st, sv)) { /* sanity check */
+            /* dead SV */
+            if (check_new(st, sv)) { /* sanity check */
                 fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
                 np_print_node_name(aTHX_ stderr, NP);
                 fprintf(stderr, ":");
