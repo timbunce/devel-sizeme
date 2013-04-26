@@ -501,7 +501,7 @@ check_new(struct state *st, const void *const p) {
 #define FOLLOW_MULTI_DONE   5 /* refcnt>1, already followed */
 
 static int
-get_sv_follow_state(struct state *st, const SV *const sv)
+get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
 {
     UV seen_cnt;
 
@@ -1142,39 +1142,64 @@ const U8 body_sizes[SVt_LAST] = {
 
 /* based on Perl_do_dump_pad() - wraps sv_size and adds ADD_ATTR calls for the pad names */
 static void
-padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padlist)
+padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
 {
+#ifdef PadlistNAMES
+    dNPathNodes(2, NPathArg);
+#else
     dNPathUseParent(NPathArg);
+#endif
     const AV *pad_name;
     SV **pname;
-    I32 ix;              
+    I32 i;
 
-    if (!padlist)
+    if (!padl)
         return;
-    if( 0 && !check_new(st, padlist)) /* XXX ? */
+    if( 0 && !check_new(st, padl)) /* XXX ? */
         return;
 
-    pad_name = MUTABLE_AV(*av_fetch(MUTABLE_AV(padlist), 0, FALSE));
+#ifdef PadlistNAMES
+
+    NPathPushNode("padlist", NPtype_NAME);
+
+    /* This relies on PADNAMELIST and PAD being typedefed to AV.  If that
+       ever changes, this code will need an update. */
+
+    ADD_SIZE(st, "PADLIST", sizeof(PADLIST));
+    sv_size(aTHX_ st, NPathLink("PadlistNAMES"), (SV*)PadlistNAMES(padl));
+
+    i = PadlistMAX(padl) + 1;
+    ADD_SIZE(st, "PADs", sizeof(PAD*) * i);
+
+    while (--i) {
+	if (sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[i]))
+            ADD_LINK_ATTR(st, NPattr_NOTE, "i", i);
+    }
+
+#else
+    /* XXX rework this to have the same node structure as above? */
+    pad_name = MUTABLE_AV(*av_fetch(MUTABLE_AV(padl), 0, FALSE));
     pname = AvARRAY(pad_name);
 
-    for (ix = 1; ix <= AvFILLp(pad_name); ix++) {
-        const SV *namesv = pname[ix];
+    for (i = 1; i <= AvFILLp(pad_name); i++) {
+        const SV *namesv = pname[i];
         if (namesv && namesv == &PL_sv_undef) {
             namesv = NULL;
         }
         if (namesv) {
             /* SvFAKE: On a pad name SV, that slot in the frame AV is a REFCNT'ed reference to a lexical from "outside" */
             if (SvFAKE(namesv))
-                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), ix);
+                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), i);
             else
-                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), ix);
+                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), i);
         }
         else {
-            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", ix);
+            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", i);
         }
 
     }
-    sv_size(aTHX_ st, NPathArg, (SV*)padlist);
+    sv_size(aTHX_ st, NPathArg, (SV*)padl);
+#endif
 }
 
 
@@ -1189,7 +1214,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   if (NULL == thing)
       return 0;
 
-  switch (get_sv_follow_state(st, orig_thing)) {
+  switch (get_sv_follow_state(aTHX_ st, orig_thing)) {
   case FOLLOW_SINGLE_DONE:
         return 0;
   case FOLLOW_SINGLE_NOW:
