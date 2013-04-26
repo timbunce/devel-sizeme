@@ -10,9 +10,9 @@ sizeme_store.pl - process and store the raw data stream from Devel::SizeMe
 
 Typically used with Devel::SizeMe via the C<SIZEME> env var:
 
-    export SIZEME='|./sizeme_store.pl --text'
-    export SIZEME='|./sizeme_store.pl --dot=sizeme.dot'
-    export SIZEME='|./sizeme_store.pl --db=sizeme.db'
+    export SIZEME='|sizeme_store.pl --text'
+    export SIZEME='|sizeme_store.pl --dot=sizeme.dot'
+    export SIZEME='|sizeme_store.pl --db=sizeme.db'
 
 =head1 DESCRIPTION
 
@@ -111,6 +111,7 @@ if ($opt_db) {
 
 my @stack;
 my %seqn2node;
+my %links_for_addr;
 
 my $dotnode = sub {
     my $name = encode_entities(shift);
@@ -167,7 +168,7 @@ sub leave_node {
     my $x = shift;
     confess unless defined $x->{id};
     warn "<< leave_node $x->{id}\n" if $opt_debug;
-    delete $seqn2node{$x->{id}};
+    #delete $seqn2node{$x->{id}};
 
     my $self_size = 0; $self_size += $_ for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
@@ -214,21 +215,39 @@ sub leave_node {
                 "id=$x->{id}",
             );
             printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
+
+            if (my $addr = $x->{attr}{+NPattr_NOTE}{addr}) {
+                my @links = map { $seqn2node{$_} } @{$links_for_addr{$addr} || []};
+                for my $link_node (@links) {
+                    # skip link if it's the one that's the actual parent
+                    # (because that'll get its own link drawn later)
+                    # current that's identified by not having a parent_id (yet)
+                    next if not $link_node->{parent_id};
+                    _dot_link($link_node, $x->{id}, ['color="grey"', 'style="dashed"']);
+                }
+            }
         }
         else { # NPtype_LINK
             my @kids = @{$x->{child_id}||[]};
             die "panic: NPtype_LINK has more than one child: @kids"
                 if @kids > 1;
             for my $child_id (@kids) { # wouldn't work right, eg id= attr
-                #die Dwarn $x;
-                my @link_attr = ("id=$x->{id}");
-                (my $link_name = $x->{name}) =~ s/->$//;
-                $link_name .= " #$x->{id}" if $opt_showid;
-                push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
-                printf $dot_fh qq{n%d -> n%d [%s];\n},
-                    $x->{parent_id}, $child_id, join(",", @link_attr);
+                _dot_link($x, $child_id);
             }
         }
+
+sub _dot_link {
+    my ($link_node, $child, $link_attr) = @_;
+    my $child_id = (ref $child) ? $child->{id} : $child;
+    #die Dwarn $link_node;
+    my @link_attr = ("id=$link_node->{id}");
+    push @link_attr, @$link_attr if $link_attr;
+    (my $link_name = $link_node->{name}) =~ s/->$//;
+    $link_name .= " #$link_node->{id}" if $opt_showid;
+    push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
+    printf $dot_fh qq{n%d -> n%d [%s];\n},
+        $link_node->{parent_id}, $child_id, join(",", @link_attr);
+}
 
     }
     if ($dbh) {
@@ -300,7 +319,19 @@ while (<>) {
                 if exists $attr->{$type}{$name};
             $attr->{$type}{$name} = $val;
             #Dwarn $attr;
-            $node->{title} = $name if $type == NPattr_NAME and !$val; # XXX hack
+            if ($type == NPattr_NOTE) {
+                if ($name eq 'addr') {
+                    if ($node->{type} == NPtype_LINK) {
+                        push @{ $links_for_addr{$val} }, $id;
+                    }
+                    else {
+                        Dwarn { node => $id, links => $links_for_addr{$val} };
+                    }
+                }
+            }
+            elsif ($type == NPattr_NAME) {
+                $node->{title} = $name if !$val; # XXX hack
+            }
         }
         # attributes where the number is a key (or always zero)
         elsif (NPattr_PADFAKE==$type or NPattr_PADTMP==$type or NPattr_PADNAME==$type) {
@@ -371,13 +402,13 @@ while (<>) {
             warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
             warn Dumper($top);
         }
-        die "panic: seqn2node should be empty ". Dumper(\%seqn2node)
-            if %seqn2node;
+        #die "panic: seqn2node should be empty ". Dumper(\%seqn2node) if %seqn2node;
 
         if ($dot_fh) {
             print $dot_fh "}\n";
             close $dot_fh;
             system("open -a Graphviz $opt_dot") if $^O eq 'darwin'; # OSX
+            system("cat $opt_dot") if $opt_debug;
         }
 
         $dbh->commit if $dbh;
