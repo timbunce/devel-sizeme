@@ -9,6 +9,7 @@
 use Test::More;
 use strict;
 use Devel::SizeMe ':all';
+use Devel::Peek;
 
 my %types = (
     NULL => undef,
@@ -255,6 +256,7 @@ sub cmp_array_ro {
 
 {
     my %sizes;
+    my $n = 1024; # not a constant to avoid constant folding
     # reverse sort ensures that PVIV, PVNV and RV are processed before
     # IV, NULL, or NV :-)
     foreach my $type (reverse sort keys %types) {
@@ -268,7 +270,7 @@ sub cmp_array_ro {
 
 	my $expect = $sizes{$type} = size(\$a->[0]);
 
-	$a->[0] = \('x' x 1024);
+	$a->[0] = \('x' x $n);
 
 	$expect = $sizes{RV} if $type eq 'NULL';
 	$expect = $sizes{PVNV} if $type eq 'NV';
