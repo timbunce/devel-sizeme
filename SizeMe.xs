@@ -158,13 +158,14 @@ struct state {
 #define dNPathNodes(nodes, prev_np) \
             npath_node_t name_path_nodes[nodes+1]; /* +1 for NPathLink */ \
             npath_node_t *NP = &name_path_nodes[0]; \
+            if(st->trace_level>=9)fprintf(stderr,"dNPathNodes (%d, %p)\n", nodes, prev_np);\
             NP->seqn = NP->type = 0; NP->id = Nullch; /* safety/debug */ \
             NP->prev = prev_np
 #define NPathPushNode(nodeid, nodetype) \
             NP->id = nodeid; \
             NP->type = nodetype; \
             NP->seqn = 0; \
-            if(0)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %s]\n", NP->prev, NP, nodetype,(char*)nodeid);\
+            if(st->trace_level>=9)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %s]\n", NP->prev, NP, nodetype,(char*)nodeid);\
             NP++; \
             NP->id = Nullch; /* safety/debug */ \
             NP->seqn = 0; \
@@ -172,7 +173,7 @@ struct state {
 #define NPathSetNode(nodeid, nodetype) \
             (NP-1)->id = nodeid; \
             (NP-1)->type = nodetype; \
-            if(0)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %s]\n", (NP-1)->prev, (NP-1), nodetype,(char*)nodeid);\
+            if(st->trace_level>=9)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %s]\n", (NP-1)->prev, (NP-1), nodetype,(char*)nodeid);\
             (NP-1)->seqn = 0;
 #define NPathPopNode \
             --NP
@@ -209,7 +210,7 @@ struct state {
 
 #define ADD_LINK_ATTR(st, attr_type, attr_name, attr_value)		\
   STMT_START {								\
-    if (st->add_attr_cb) assert(NP->seqn);				\
+    if (0 && st->add_attr_cb) assert(NP->seqn);				\
     _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP); 		\
   } STMT_END;
 
@@ -496,7 +497,7 @@ check_new(struct state *st, const void *const p) {
 
 #define FOLLOW_SINGLE_NOW   1 /* refcnt=1, follow now */
 #define FOLLOW_SINGLE_DONE  2 /* refcnt=1, already followed */
-#define FOLLOW_MULTI_LATER  3 /* refcnt>1, follow later */
+#define FOLLOW_MULTI_DEFER  3 /* refcnt>1, follow later */
 #define FOLLOW_MULTI_NOW    4 /* refcnt>1, follow now */
 #define FOLLOW_MULTI_DONE   5 /* refcnt>1, already followed */
 
@@ -521,7 +522,7 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
         warn("get_sv_follow_state %p refcnt %u seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
 
     if (seen_cnt < SvREFCNT(sv)) {
-        return FOLLOW_MULTI_LATER;   /* pretend we've seen this sv before */
+        return FOLLOW_MULTI_DEFER;   /* pretend we've seen this sv before */
     }
     if (seen_cnt > SvREFCNT(sv)) {
         if (st->trace_level >= 2)
@@ -1217,15 +1218,15 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   switch (get_sv_follow_state(aTHX_ st, orig_thing)) {
   case FOLLOW_SINGLE_DONE:
         return 0;
-  case FOLLOW_SINGLE_NOW:
-        break;
-  case FOLLOW_MULTI_LATER: /*FALLTHRU*/
+  case FOLLOW_MULTI_DEFER: /*FALLTHRU*/
   case FOLLOW_MULTI_DONE:
-        if (1) { dNPathUseParent(NPathArg); ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
+        if (1) { ADD_LINK_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
         return 0;
   case FOLLOW_MULTI_NOW:
-        if (1) { dNPathUseParent(NPathArg); ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
+        if (1) { ADD_LINK_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
         do_NPathNoteAddr=1;
+        break;
+  case FOLLOW_SINGLE_NOW:
         break;
   }
 
