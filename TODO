@@ -24,5 +24,15 @@ Restructure:
 Move Devel::SizeMe::Graph and co out to separate distro.
 
 Tests!
+hv placeholders
 
 Remove log scale checkbox from the treemp as it doesn't work yet
+
+Reduce data volume to optimize usage and visualizations
+    ideally as an optional post-processing on the db tables
+    drop he+hek detail?
+        perhaps by adding a size to links to represent the hidden sizes
+    drop SV(RV) detail
+        for cases where there's only a single ref to the SV(RV)
+    prune
+        bottom up delete nodes below a certain size
