@@ -1504,7 +1504,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
     if (type == SVt_PVGV && SvPAD_OUR(thing) && SvOURSTASH(thing))
       sv_size(aTHX_ st, NPathLink("SvOURSTASH"), (SV *)SvOURSTASH(thing));
 #endif
-    if (SvSTASH(thing))
+    if (SvOBJECT(thing))
       sv_size(aTHX_ st, NPathLink("SvSTASH"), (SV *)SvSTASH(thing));
   }
 
