@@ -180,6 +180,7 @@ struct state {
 #define dNPathNodes(nodes, prev_np) \
             npath_node_t name_path_nodes[nodes+1]; /* +1 for NPathLink */ \
             npath_node_t *NP = &name_path_nodes[0]; \
+            memzero(name_path_nodes, sizeof(name_path_nodes)); /* safety/debug */ \
             if(st->trace_level>=9)fprintf(stderr,"dNPathNodes (%d, %p)\n", nodes, prev_np);\
             NP->seqn = NP->type = 0; NP->id = Nullch; /* safety/debug */ \
             NP->prev = prev_np
@@ -187,18 +188,20 @@ struct state {
             NP->id = nodeid; \
             NP->type = nodetype; \
             NP->seqn = 0; \
-            if(st->trace_level>=9)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %s]\n", NP->prev, NP, nodetype,(char*)nodeid);\
+            if(st->trace_level>=9)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %p]\n", NP->prev, NP, nodetype,nodeid);\
             NP++; \
             NP->id = Nullch; /* safety/debug */ \
             NP->seqn = 0; \
+            NP->type = 0; \
             NP->prev = (NP-1)
 #define NPathSetNode(nodeid, nodetype) \
             (NP-1)->id = nodeid; \
             (NP-1)->type = nodetype; \
-            if(st->trace_level>=9)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %s]\n", (NP-1)->prev, (NP-1), nodetype,(char*)nodeid);\
+            if(st->trace_level>=9)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %p]\n", (NP-1)->prev, (NP-1), nodetype,nodeid);\
             (NP-1)->seqn = 0;
 #define NPathPopNode \
-            --NP
+            --NP; \
+            NP->type = 0; NP->id = Nullch /* safety/debug */
 
 /* dNPathUseParent points NP directly the the parents' name_path_nodes array
  * So the function can only safely call ADD_*() but not NPathLink, unless the
@@ -344,6 +347,11 @@ np_dump_indent(pTHX_ int depth) {
         fprintf(stderr, ":   ");
 }
 
+
+/* recurse up node path ->prev chain till a node with a seqn is found
+ * (ie a node that has already been processed), then calls cb for each
+ * as it unwinds the recursion. Sets seqn and depth as it unwinds.
+ */
 int
 np_walk_new_nodes(pTHX_ struct state *st,
     npath_node_t *npath_node,
@@ -362,7 +370,7 @@ np_walk_new_nodes(pTHX_ struct state *st,
 
     if (cb) {
         if (cb(aTHX_ st, npath_node, npath_node_deeper)) {
-            /* ignore this node */
+            /* the callback wants us to 'ignore' this node */
             assert(npath_node->prev);
             assert(npath_node->depth);
             assert(npath_node_deeper);
@@ -386,6 +394,8 @@ np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_n
     if (npath_node->type == NPtype_LINK)
         fprintf(stderr, "->"); /* cosmetic */
     fprintf(stderr, "\t\t[#%ld @%u] ", npath_node->seqn, npath_node->depth);
+    if (st->trace_level >= 2)
+        fprintf(stderr, " %p", npath_node);
     fprintf(stderr, "\n");
     return 0;
 }
@@ -393,8 +403,13 @@ np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_n
 void
 np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
+    if (st->trace_level >= 2)
+        warn("np_dump_node_path_info(np=%p, type=%u, name=%p, value=%u):\n",
+            npath_node, attr_type, attr_name, attr_value);
+
     if (attr_type == NPattr_LEAFSIZE && !attr_value)
         return; /* ignore zero sized leaf items */
+
     np_walk_new_nodes(aTHX_ st, npath_node, NULL, np_dump_formatted_node);
     np_dump_indent(aTHX_ npath_node->depth+1);
     switch (attr_type) {
