@@ -251,6 +251,12 @@ struct state {
     } \
   } STMT_END
 
+#define DUMP_NPATH_NODES(np, depth) \
+  STMT_START { \
+    if (st->trace_level)
+        np_walk_all_nodes(aTHX_ st, np, np_debug_node_dump, depth) \
+  } STMT_END
+
 #else
 
 #define NPathAddSizeCb(st, name, bytes)
@@ -460,7 +466,6 @@ np_debug_node_dump(pTHX_ struct state *st, npath_node_t *npath_node) {
     return 0;
 }
 
-#define DUMP_NPATH_NODES(np, depth) if (0) np_walk_all_nodes(aTHX_ st, np, np_debug_node_dump, depth)
 
 int
 np_stream_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
