@@ -233,11 +233,25 @@ struct state {
 #define ADD_ATTR(st, attr_type, attr_name, attr_value) \
     _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP-1)
 
-#define ADD_LINK_ATTR(st, attr_type, attr_name, attr_value)		\
+#define _ADD_LINK_ATTR_NP(st, attr_type, attr_name, attr_value, np) \
   STMT_START {								\
-    if (0 && st->add_attr_cb) assert(NP->seqn);				\
-    _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, NP); 		\
+    if (st->add_attr_cb) assert(np->type == NPtype_LINK);		\
+    _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np); \
   } STMT_END;
+
+/* emit an attribute for the link that's the top node,
+ * typically a foo_size(..., NPathLink("Bar"), ...) call
+ */
+#define ADD_LINK_ATTR_TO_TOP(st, attr_type, attr_name, attr_value)		\
+    _ADD_LINK_ATTR_NP(st, attr_type, attr_name, attr_value, NP)
+
+/* emit an attribute for the link that's the previous node,
+ * typically inside a foo_size() sub before NPathPushNode() is called
+ * i.e., the NPathLink() that was an argument to the foo_size() sub.
+ */
+#define ADD_LINK_ATTR_TO_PREV(st, attr_type, attr_name, attr_value)		\
+    _ADD_LINK_ATTR_NP(st, attr_type, attr_name, attr_value, NP->prev)
+
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
 #define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
@@ -253,7 +267,7 @@ struct state {
 
 #define DUMP_NPATH_NODES(np, depth) \
   STMT_START { \
-    if (st->trace_level)
+    if (st->trace_level) \
         np_walk_all_nodes(aTHX_ st, np, np_debug_node_dump, depth) \
   } STMT_END
 
@@ -420,7 +434,7 @@ np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_n
 void
 np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
-    if (st->trace_level >= 2)
+    if (st->trace_level >= 4)
         warn("np_dump_node_path_info(np=%p, type=%u, name=%p, value=%u):\n",
             npath_node, attr_type, attr_name, attr_value);
 
@@ -437,7 +451,7 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
         fprintf(stderr, "~NAMED('%s') %lu", attr_name, attr_value);
         break;
     case NPattr_NOTE:
-        fprintf(stderr, "~note %s %lu", attr_name, attr_value);
+        fprintf(stderr, "~note %s %lu (%p)", attr_name, attr_value, (void*)attr_value);
         break;
     case NPattr_PADTMP:
     case NPattr_PADNAME:
@@ -1238,7 +1252,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
 
     while (--i) {
 	if (sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[i]))
-            ADD_LINK_ATTR(st, NPattr_NOTE, "i", i);
+            ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
     }
 
 #else
@@ -1279,15 +1293,19 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   if (NULL == thing)
       return 0;
 
-  switch (get_sv_follow_state(aTHX_ st, orig_thing)) {
+  int follow_state = get_sv_follow_state(aTHX_ st, orig_thing);
+  if (st->trace_level >= 2)
+    warn("sv_size %p: refcnt=%d, follow=%d, type=%d\n", thing, SvREFCNT(thing), follow_state, SvTYPE(thing));
+  switch (follow_state) {
   case FOLLOW_SINGLE_DONE:
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
         return 0;
   case FOLLOW_MULTI_DEFER: /*FALLTHRU*/
   case FOLLOW_MULTI_DONE:
-        if (1) { ADD_LINK_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
         return 0;
   case FOLLOW_MULTI_NOW:
-        if (1) { ADD_LINK_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing)); }
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
         do_NPathNoteAddr=1;
         break;
   case FOLLOW_SINGLE_NOW:
@@ -1300,7 +1318,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
       return 0;
   }
   NPathPushNode(thing, NPtype_SV);
-  if (do_NPathNoteAddr)
+  if (do_NPathNoteAddr || !NPathArg)
     ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing));
   ADD_SIZE(st, "sv_head", sizeof(SV));
   ADD_SIZE(st, "sv_body", body_sizes[type]);
@@ -1335,7 +1353,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 
 	  while (i--) {
 	      if (sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i]))
-                ADD_LINK_ATTR(st, NPattr_NOTE, "i", i);
+                ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
           }
       }
     }
@@ -1739,10 +1757,10 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   for (ps = parser->stack; ps <= parser->ps; ps++) {
 #if (PERL_BCDVERSION >= 0x5011002) /* roughly */
     if (sv_size(aTHX_ st, NPathLink("compcv"), (SV*)ps->compcv))
-        ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
+        ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", ps - parser->ps);
 #else /* prior to perl 8c63ea58  Dec 8 2009 */
     if (sv_size(aTHX_ st, NPathLink("comppad"), (SV*)ps->comppad))
-        ADD_LINK_ATTR(st, NPattr_NOTE, "i", ps - parser->ps);
+        ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", ps - parser->ps);
 #endif
   }
   NPathPopNode;
