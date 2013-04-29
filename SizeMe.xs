@@ -383,6 +383,17 @@ np_walk_new_nodes(pTHX_ struct state *st,
     return 0;
 }
 
+void
+np_walk_all_nodes(pTHX_ struct state *st,
+    npath_node_t *npath_node,
+    int (*cb)(pTHX_ struct state *st, npath_node_t *npath_node),
+    int depth /* -1 for all */)
+{
+    if (npath_node->prev && depth)
+        np_walk_all_nodes(aTHX_ st, npath_node->prev, cb, --depth); /* recurse */
+    cb(aTHX_ st, npath_node);
+}
+
 int
 np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
     PERL_UNUSED_ARG(st);
@@ -428,11 +439,28 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
         fprintf(stderr, "~pad%lu %s %lu", attr_type, attr_name, attr_value);
         break;
     default:
-        fprintf(stderr, "~??? %s %lu", attr_name, attr_value);
+        fprintf(stderr, "~?[type %u unknown]? %s %lu", attr_type, attr_name, attr_value);
         break;
     }
     fprintf(stderr, "\n");
 }
+
+int
+np_debug_node_dump(pTHX_ struct state *st, npath_node_t *npath_node) {
+    PERL_UNUSED_ARG(st);
+    fprintf(stderr, "%p [^%p #%-4ld @%-4u] type=%0x id=%p",
+        npath_node, npath_node->prev, npath_node->seqn, npath_node->depth,
+        npath_node->type, npath_node->id);
+    if (npath_node->type == NPtype_LINK)
+        fprintf(stderr, " -> ");
+    else
+        fprintf(stderr, " is ");
+    np_print_node_name(aTHX_ stderr, npath_node);
+    fprintf(stderr, "\n");
+    return 0;
+}
+
+#define DUMP_NPATH_NODES(np, depth) if (0) np_walk_all_nodes(aTHX_ st, np, np_debug_node_dump, depth)
 
 int
 np_stream_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
