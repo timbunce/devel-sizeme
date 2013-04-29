@@ -93,6 +93,28 @@
 #define LEAF_BITS   (16 - BYTE_BITS)
 #define LEAF_MASK   0x1FFF
 
+
+/* the values are arbitrary but chosen to be mnemonic */
+#define FOLLOW_SINGLE_NOW   11 /* refcnt=1, follow now */
+#define FOLLOW_SINGLE_DONE  12 /* refcnt=1, already followed */
+#define FOLLOW_MULTI_DEFER  20 /* refcnt>1, follow later */
+#define FOLLOW_MULTI_NOW    21 /* refcnt>1, follow now */
+#define FOLLOW_MULTI_DONE   22 /* refcnt>1, already followed */
+
+
+/*
+ * A 'Node Path' is a chain of node structures.
+ *
+ * Nodes represent either an 'item' (eg a struct) in memory or a 'link'
+ * (pointer) from the previous node in the chain (an item) to another item.
+ * Attributes aren't represented in memory, they're output directly and
+ * associated with the previous node that was output.
+ *
+ * Nodes are output lazily, triggered by the need to output an attributes.
+ * When an attribute needs to be output the chain of nodes is chased
+ * and any nodes that haven't already been output are.
+ */
+
 typedef struct npath_node_st npath_node_t;
 struct npath_node_st {
     npath_node_t *prev;
@@ -494,12 +516,6 @@ check_new(struct state *st, const void *const p) {
     leaf[i] |= this_bit;
     return TRUE;
 }
-
-#define FOLLOW_SINGLE_NOW   1 /* refcnt=1, follow now */
-#define FOLLOW_SINGLE_DONE  2 /* refcnt=1, already followed */
-#define FOLLOW_MULTI_DEFER  3 /* refcnt>1, follow later */
-#define FOLLOW_MULTI_NOW    4 /* refcnt>1, follow now */
-#define FOLLOW_MULTI_DONE   5 /* refcnt>1, already followed */
 
 static int
 get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
