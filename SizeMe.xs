@@ -873,6 +873,25 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
   }
 }
 
+#define cv_name(cv) S_cv_name(aTHX_ cv)
+char *
+S_cv_name(pTHX_ CV *cv)
+{
+    if (CvNAMED(cv))
+        return HEK_KEY(CvNAME_HEK(cv));
+    if (CvGV(cv))
+        return GvNAME(CvGV(cv));
+    if (CvANON(cv))
+        return "CvANON";
+    if (cv == PL_main_cv)
+        return "MAIN";
+    if (CvEVAL(cv))
+        return "CvEVAL";
+    if (CvSPECIAL(cv))
+        return "CvSPECIAL";
+    return NULL;
+}
+
 #define str_size(st, p, ppath) S_str_size(aTHX_ st, p, ppath)
 static void
 S_str_size(pTHX_ struct state *st, const char *const p, pPATH) {
@@ -1473,11 +1492,11 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
     goto freescalar;
 
   case SVt_PVCV: TAG;
-    /* not CvSTASH, per https://rt.cpan.org/Ticket/Display.html?id=79366 */
-    ADD_ATTR(st, NPattr_NAME, CvGV(thing) ? GvNAME(CvGV(thing)) : "UNDEFINED", 0);
+    ADD_ATTR(st, NPattr_NAME, cv_name((CV *)thing), 0);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing));
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing));
-    sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing));
+    if (!CvWEAKOUTSIDE(thing)) /* XXX */
+        sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing));
     if (CvISXSUB(thing)) {
 	sv_size(aTHX_ st, NPathLink("cv_const_sv"), cv_const_sv((CV *)thing));
     } else {
