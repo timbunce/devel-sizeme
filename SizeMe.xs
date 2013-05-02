@@ -1239,7 +1239,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
 
 #ifdef PadlistNAMES
 
-    NPathPushNode("padlist", NPtype_NAME);
+    NPathPushNode("PADLIST", NPtype_NAME);
 
     /* This relies on PADNAMELIST and PAD being typedefed to AV.  If that
        ever changes, this code will need an update. */
@@ -1352,7 +1352,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 	  SSize_t i = AvFILLp(thing) + 1;
 
 	  while (i--) {
-	      if (sv_size(aTHX_ st, NPathLink("AVelem"), AvARRAY(thing)[i]))
+	      if (sv_size(aTHX_ st, NPathLink("elem"), AvARRAY(thing)[i]))
                 ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
           }
       }
