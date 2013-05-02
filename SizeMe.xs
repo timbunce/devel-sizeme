@@ -876,7 +876,7 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
 #define str_size(st, p, ppath) S_str_size(aTHX_ st, p, ppath)
 static void
 S_str_size(pTHX_ struct state *st, const char *const p, pPATH) {
-    dNPathNodes(1, NPathArg->prev);
+    dNPathNodes(1, NPathArg);
     if(check_new(st, p)) {
         NPathPushNode(NPathArg->id, NPtype_NAME);
 	ADD_SIZE(st, NPathArg->id, 1 + strlen(p));
