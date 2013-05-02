@@ -1248,7 +1248,9 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
     dNPathUseParent(NPathArg);
 #endif
     const AV *pad_name;
+    const AV *pad;
     SV **pname;
+    SV **ppad;
     I32 i;
 
     if (!padl)
@@ -1260,16 +1262,37 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
 
     NPathPushNode("PADLIST", NPtype_NAME);
 
+    pad_name = *PadlistARRAY(padl);
+    pad = PadlistARRAY(padl)[1];
+    pname = AvARRAY(pad_name);
+    ppad = AvARRAY(pad);
+
+
     /* This relies on PADNAMELIST and PAD being typedefed to AV.  If that
        ever changes, this code will need an update. */
 
     ADD_SIZE(st, "PADLIST", sizeof(PADLIST));
     sv_size(aTHX_ st, NPathLink("PadlistNAMES"), (SV*)PadlistNAMES(padl));
+    if (0) do_sv_dump(0, Perl_debug_log, (SV*)PadlistNAMES(padl), 0, 4, 0, 0);
 
     i = PadlistMAX(padl) + 1;
     ADD_SIZE(st, "PADs", sizeof(PAD*) * i);
 
     while (--i) {
+        const SV *namesv = pname[i];
+        if (namesv && namesv == &PL_sv_undef) {
+            namesv = NULL;
+        }
+        if (namesv) {
+            /* SvFAKE: On a pad name SV, that slot in the frame AV is a REFCNT'ed reference to a lexical from "outside" */
+            if (SvFAKE(namesv))
+                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), i);
+            else
+                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), i);
+        }
+        else {
+            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", i);
+        }
 	if (sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[i]))
             ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
     }
@@ -1494,6 +1517,7 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   case SVt_PVCV: TAG;
     ADD_ATTR(st, NPattr_NAME, cv_name((CV *)thing), 0);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing));
+    if (0) do_sv_dump(0, Perl_debug_log, thing, 0, 4, 0, 0);
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing));
     if (!CvWEAKOUTSIDE(thing)) /* XXX */
         sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing));

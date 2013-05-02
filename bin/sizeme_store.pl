@@ -138,23 +138,21 @@ sub enter_node {
     my $parent = $stack[-1];
     if ($parent) {
 
-        if ($x->{name} eq 'AVelem' and $parent->{name} eq 'SV(PVAV)') {
+        if (0 and $x->{name} eq 'elem' and $parent->{name} =~ qr/^(?: PADLIST | SV\(PVAV\) )/x) {
             my $index = $x->{attr}{+NPattr_NOTE}{i};
             #Dwarn $x->{attr};
             #Dwarn $index;
-            # If node is an AVelem of a CvPADLIST propagate pad name to AVelem
-            if (@stack >= 4 and (my $cvpl = $stack[-4])->{name} eq 'CvPADLIST') {
+            # If node is an elem of a PADLIST propagate pad name to elem
+            if (@stack >= 4 and (my $cvpl = $stack[-3])->{name} eq 'PADLIST') {
                 my $padnames = $cvpl->{_cached}{padnames} ||= do {
                     my @names = @{ $cvpl->{attr}{+NPattr_PADNAME} || []};
                     $_ = "my(".($_||'').")" for @names;
                     $names[0] = '@_';
                     \@names;
                 };
-                $x->{name} = (defined $index and $padnames->[$index]) || "?";
+#Dwarn { padnames => $padnames, cvpl_attr => $cvpl->{attr}, attr => $x->{attr}, name => $x->{name} };
+                $x->{name} = (defined $index and $padnames->[$index]) || "[$index]pad?";
                 $x->{name} =~ s/my\(SVs_PADTMP\)/PADTMP/; # XXX hack for neatness
-            }
-            else {
-                $x->{name} = "[$index]" if defined $index;
             }
         }
 
@@ -173,12 +171,21 @@ sub leave_node {
     my $self_size = 0; $self_size += $_ for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
 
-    if ($x->{name} eq 'AVelem') {
+    my $parent = $stack[-1];
+
+    if ($x->{name} eq 'elem') {
         my $index = $x->{attr}{+NPattr_NOTE}{i};
         $x->{name} = "[$index]" if defined $index;
+
+        # elem link <- SV(PVAV) <- elem link <- PADLIST
+        #Dwarn [ "STACK", map { $_->{name} } reverse @stack ];
+        if (defined $index && @stack >= 3 && (my $padlist=$stack[-3])->{name} eq 'PADLIST') {
+            my $padnames = $padlist->{attr}{+NPattr_PADNAME} || [];
+            my $padname = $padnames->[$index];
+            $x->{name} = ($padname) ? "my($padname)" : "PAD[$index]";
+        }
     }
 
-    my $parent = $stack[-1];
     if ($parent) {
         # link to parent
         $x->{parent_id} = $parent->{id};
