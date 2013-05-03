@@ -173,16 +173,27 @@ sub leave_node {
 
     my $parent = $stack[-1];
 
-    if ($x->{name} eq 'elem') {
-        my $index = $x->{attr}{+NPattr_NOTE}{i};
-        $x->{name} = "[$index]" if defined $index;
-
-        # elem link <- SV(PVAV) <- elem link <- PADLIST
-        #Dwarn [ "STACK", map { $_->{name} } reverse @stack ];
-        if (defined $index && @stack >= 3 && (my $padlist=$stack[-3])->{name} eq 'PADLIST') {
+    if ($x->{name} eq 'elem'
+        and defined(my $index = $x->{attr}{+NPattr_NOTE}{i})
+    ) {
+        # give a better name to the link
+        my $padlist;
+        if (@stack >= 3 && ($padlist=$stack[-3])->{name} eq 'PADLIST') {
+            # elem link <- SV(PVAV) <- elem link <- PADLIST
             my $padnames = $padlist->{attr}{+NPattr_PADNAME} || [];
-            my $padname = $padnames->[$index];
-            $x->{name} = ($padname) ? "my($padname)" : "PAD[$index]";
+            if (my $padname = $padnames->[$index]) {
+                $x->{name} = "my($padname)";
+            }
+            else {
+                $x->{name} = ($index) ? "PAD[$index]" : '@_';
+            }
+        }
+        elsif (@stack >= 1 && ($padlist=$stack[-1])->{name} eq 'PADLIST') {
+            my $padnames = $padlist->{attr}{+NPattr_PADNAME} || [];
+            $x->{name} = "Depth$index";
+        }
+        else {
+            $x->{name} = "[$index]";
         }
     }
 
@@ -331,9 +342,7 @@ while (<>) {
                     if ($node->{type} == NPtype_LINK) {
                         push @{ $links_for_addr{$val} }, $id;
                     }
-                    else {
-                        Dwarn { node => $id, links => $links_for_addr{$val} };
-                    }
+                    #else { Dwarn { node => $id, links => $links_for_addr{$val} }; }
                 }
             }
             elsif ($type == NPattr_NAME) {

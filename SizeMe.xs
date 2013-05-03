@@ -1251,7 +1251,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
     const AV *pad;
     SV **pname;
     SV **ppad;
-    I32 i;
+    I32 ix;
 
     if (!padl)
         return;
@@ -1260,41 +1260,45 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
 
 #ifdef PadlistNAMES
 
-    NPathPushNode("PADLIST", NPtype_NAME);
-
     pad_name = *PadlistARRAY(padl);
     pad = PadlistARRAY(padl)[1];
     pname = AvARRAY(pad_name);
     ppad = AvARRAY(pad);
 
-
-    /* This relies on PADNAMELIST and PAD being typedefed to AV.  If that
-       ever changes, this code will need an update. */
+    NPathPushNode("PADLIST", NPtype_NAME);
 
     ADD_SIZE(st, "PADLIST", sizeof(PADLIST));
-    sv_size(aTHX_ st, NPathLink("PadlistNAMES"), (SV*)PadlistNAMES(padl));
-    if (0) do_sv_dump(0, Perl_debug_log, (SV*)PadlistNAMES(padl), 0, 4, 0, 0);
-
-    i = PadlistMAX(padl) + 1;
-    ADD_SIZE(st, "PADs", sizeof(PAD*) * i);
-
-    while (--i) {
-        const SV *namesv = pname[i];
+    /* add attributes describing the pads */
+    for (ix = 1; ix <= AvFILLp(pad_name); ix++) {
+        const SV *namesv = pname[ix];
         if (namesv && namesv == &PL_sv_undef) {
             namesv = NULL;
         }
         if (namesv) {
             /* SvFAKE: On a pad name SV, that slot in the frame AV is a REFCNT'ed reference to a lexical from "outside" */
             if (SvFAKE(namesv))
-                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), i);
+                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), ix);
             else
-                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), i);
+                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), ix);
         }
         else {
-            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", i);
+            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", ix);
         }
-	if (sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[i]))
-            ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
+    }
+    sv_size(aTHX_ st, NPathLink("PadlistNAMES"), (SV*)PadlistNAMES(padl));
+
+if (0) {
+    Perl_do_dump_pad(aTHX_ 0, Perl_debug_log, padl, 1);
+    do_sv_dump(0, Perl_debug_log, (SV*)PadlistNAMES(padl), 0, 4, 0, 0);
+}
+
+    ix = PadlistMAX(padl) + 1;
+    ADD_SIZE(st, "PADs", sizeof(PAD*) * ix);
+
+    for (ix = 1; ix <= PadlistMAX(padl); ix++) {
+	if (sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[ix]))
+1;
+            ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", ix);
     }
 
 #else
@@ -1302,20 +1306,20 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
     pad_name = MUTABLE_AV(*av_fetch(MUTABLE_AV(padl), 0, FALSE));
     pname = AvARRAY(pad_name);
 
-    for (i = 1; i <= AvFILLp(pad_name); i++) {
-        const SV *namesv = pname[i];
+    for (ix = 1; ix <= AvFILLp(pad_name); ix++) {
+        const SV *namesv = pname[ix];
         if (namesv && namesv == &PL_sv_undef) {
             namesv = NULL;
         }
         if (namesv) {
             /* SvFAKE: On a pad name SV, that slot in the frame AV is a REFCNT'ed reference to a lexical from "outside" */
             if (SvFAKE(namesv))
-                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), i);
+                ADD_ATTR(st, NPattr_PADFAKE, SvPVX_const(namesv), ix);
             else
-                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), i);
+                ADD_ATTR(st, NPattr_PADNAME, SvPVX_const(namesv), ix);
         }
         else {
-            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", i);
+            ADD_ATTR(st, NPattr_PADTMP, "SVs_PADTMP", ix);
         }
 
     }
