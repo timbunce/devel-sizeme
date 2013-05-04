@@ -101,6 +101,10 @@
 #define FOLLOW_MULTI_NOW    21 /* refcnt>1, follow now */
 #define FOLLOW_MULTI_DONE   22 /* refcnt>1, already followed */
 
+/* detail types to control simplification of node tree */
+#define NPf_DETAIL_COPFILE      0b0001
+#define NPf_DETAIL_HEK          0b0010
+
 
 /*
  * A 'Node Path' is a chain of node structures.
@@ -133,6 +137,7 @@ struct state {
     bool dangle_whine;
     bool go_yell;
     int trace_level;
+    UV hide_detail;
     /* My hunch (not measured) is that for most architectures pointers will
        start with 0 bits, hence the start of this array will be hot, and the
        end unused. So put the flags next to the hot end.  */
@@ -261,7 +266,7 @@ struct state {
 #define NPathAddSizeCb(st, name, bytes) \
   STMT_START { \
     if (st->add_attr_cb) { \
-      st->add_attr_cb(aTHX_ st, NP-1, NPattr_LEAFSIZE, (name), (bytes)); \
+      st->add_attr_cb(aTHX_ st, NP->prev, NPattr_LEAFSIZE, (name), (bytes)); \
     } \
   } STMT_END
 
@@ -894,13 +899,22 @@ S_cv_name(pTHX_ CV *cv)
     return NULL;
 }
 
-#define str_size(st, p, ppath) S_str_size(aTHX_ st, p, ppath)
+#define str_size(st, p, ppath) S_str_size(aTHX_ st, p, ppath, 0)
+#define str_size_detail(st, p, ppath, detail_type) S_str_size(aTHX_ st, p, ppath, detail_type)
 static void
-S_str_size(pTHX_ struct state *st, const char *const p, pPATH) {
+S_str_size(pTHX_ struct state *st, const char *const p, pPATH, UV detail_type) {
     dNPathNodes(1, NPathArg);
     if(check_new(st, p)) {
-        NPathPushNode(NPathArg->id, NPtype_NAME);
-	ADD_SIZE(st, NPathArg->id, 1 + strlen(p));
+        if (detail_type & st->hide_detail) {
+            /* add the size to the item that's prev to the calling link */
+            NP = NPathArg->prev;
+            ADD_SIZE(st, NPathArg->id, 1 + strlen(p));
+        }
+        else {
+            /* use the link name as the item name and size attr name */
+            NPathPushNode(NPathArg->id, NPtype_NAME);
+            ADD_SIZE(st, NPathArg->id, 1 + strlen(p));
+        }
     }
 }
 
@@ -1118,7 +1132,7 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
 #ifdef USE_ITHREADS
           /* XXX many duplicates here - waste memory and clutter the graph */
           /* could treat and attribute instead of a node */
-          str_size(st, basecop->cop_file, NPathLink("cop_file"));
+          str_size_detail(st, basecop->cop_file, NPathLink("cop_file"), NPf_DETAIL_COPFILE);
 #else
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv);
 #endif
@@ -1670,7 +1684,9 @@ new_state(pTHX_ SV *root_sv)
     struct state *st;
 
     Newxz(st, 1, struct state);
+    st->start_time_nv = gettimeofday_nv(aTHX);
     st->go_yell = TRUE;
+    st->hide_detail = NPf_DETAIL_COPFILE; /* XXX make an option */
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
@@ -1680,7 +1696,6 @@ new_state(pTHX_ SV *root_sv)
     if (NULL != (sv = get_sv("Devel::Size::trace", FALSE))) {
 	st->trace_level = SvIV(sv);
     }
-    st->start_time_nv = gettimeofday_nv(aTHX);
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
