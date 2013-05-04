@@ -240,13 +240,13 @@ struct state {
   } STMT_END;
 
 /* emit an attribute for the link that's the top node,
- * typically a foo_size(..., NPathLink("Bar"), ...) call
+ * typically *after* a foo_size(..., NPathLink("Bar"), ...) call
  */
 #define ADD_LINK_ATTR_TO_TOP(st, attr_type, attr_name, attr_value)		\
     _ADD_LINK_ATTR_NP(st, attr_type, attr_name, attr_value, NP)
 
 /* emit an attribute for the link that's the previous node,
- * typically inside a foo_size() sub before NPathPushNode() is called
+ * typically *inside* a foo_size() sub before NPathPushNode() is called
  * i.e., the NPathLink() that was an argument to the foo_size() sub.
  */
 #define ADD_LINK_ATTR_TO_PREV(st, attr_type, attr_name, attr_value)		\
