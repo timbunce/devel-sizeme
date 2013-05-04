@@ -930,9 +930,12 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     dNPathNodes(1, NPathArg);
 
     /* Hash keys can be shared. Have we seen this before? */
-    if (!check_new(st, hek))
+    if (!check_new(st, hek)) {
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(hek));
 	return 0;
-    NPathPushNode("hek", NPtype_NAME);
+    }
+    NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
+    ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(hek));
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
 #if PERL_VERSION < 8
 	+ 1 /* No hash key flags prior to 5.8.0  */

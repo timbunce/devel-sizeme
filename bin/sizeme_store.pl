@@ -111,13 +111,29 @@ if ($opt_db) {
 
 my @stack;
 my %seqn2node;
-my %links_for_addr;
 
 my $dotnode = sub {
     my $name = encode_entities(shift);
     $name =~ s/"/\\"/g;
     return '"'.$name.'"';
 };
+
+my %links_for_addr;
+my %node_id_of_addr;
+sub note_item_addr {
+    my ($addr, $id) = @_;
+    # for items with addr we record the id of the item
+    $node_id_of_addr{$addr} = $id;
+    Dwarn { node_id_of_addr => $id } if $opt_debug;
+}
+
+sub note_link_addr {
+    my ($addr, $id) = @_;
+    # for links with addr we build a list of all the link ids
+    # associated with an addr
+    push @{ $links_for_addr{$addr} }, $id;
+    Dwarn { links_for_addr => $links_for_addr{$addr} } if $opt_debug;
+}
 
 
 my $dot_fh;
@@ -241,7 +257,7 @@ sub leave_node {
                     # (because that'll get its own link drawn later)
                     # current that's identified by not having a parent_id (yet)
                     next if not $link_node->{parent_id};
-                    _dot_link($link_node, $x->{id}, ['color="grey"', 'style="dashed"']);
+                    _dot_link($link_node, $x->{id});
                 }
             }
         }
@@ -250,14 +266,19 @@ sub leave_node {
             die "panic: NPtype_LINK has more than one child: @kids"
                 if @kids > 1;
             for my $child_id (@kids) { # wouldn't work right, eg id= attr
-                _dot_link($x, $child_id);
+                _dot_link($x, $child_id, []);
+            }
+            if (my $addr = $x->{attr}{+NPattr_NOTE}{addr}) {
+                my $id = $node_id_of_addr{$addr};
+                warn "link $x->{id} has addr $addr which has no assoctaed node yet\n" if not $id;
+                _dot_link($x, $id) if $id;
             }
         }
 
 sub _dot_link {
     my ($link_node, $child, $link_attr) = @_;
+    $link_attr ||= ['color="grey"', 'style="dashed"'];
     my $child_id = (ref $child) ? $child->{id} : $child;
-    #die Dwarn $link_node;
     my @link_attr = ("id=$link_node->{id}");
     push @link_attr, @$link_attr if $link_attr;
     (my $link_name = $link_node->{name}) =~ s/->$//;
@@ -339,10 +360,14 @@ while (<>) {
             #Dwarn $attr;
             if ($type == NPattr_NOTE) {
                 if ($name eq 'addr') {
+                    # for SVs we see all the link addrs before the item addr
+                    # for hek's etc we see the item addr before the link addrs
                     if ($node->{type} == NPtype_LINK) {
-                        push @{ $links_for_addr{$val} }, $id;
+                        note_link_addr($val, $id);
                     }
-                    #else { Dwarn { node => $id, links => $links_for_addr{$val} }; }
+                    else {
+                        note_item_addr($val, $id);
+                    }
                 }
             }
             elsif ($type == NPattr_NAME) {
