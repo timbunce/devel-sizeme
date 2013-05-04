@@ -877,8 +877,10 @@ magic_size(pTHX_ const SV * const thing, struct state *st, pPATH) {
 char *
 S_cv_name(pTHX_ CV *cv)
 {
+#ifdef CvNAME_HEK
     if (CvNAMED(cv))
         return HEK_KEY(CvNAME_HEK(cv));
+#endif
     if (CvGV(cv))
         return GvNAME(CvGV(cv));
     if (CvANON(cv))
