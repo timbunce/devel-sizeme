@@ -1131,7 +1131,7 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
 #  ifndef CopHINTHASH_get
 #    define CopHINTHASH_get(c)  ((COPHH*)((c)->cop_hints_hash))
 #  endif
-	  refcounted_he_size(aTHX_ st, CopHINTHASH_get(basecop), NPathLink("cop_hints_hash"));
+	  refcounted_he_size(aTHX_ st, CopHINTHASH_get(basecop), NPathLink("CopHINTHASH"));
 #endif
         }
         TAG;break;
