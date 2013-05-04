@@ -113,9 +113,11 @@ my @stack;
 my %seqn2node;
 
 my $dotnode = sub {
-    my $name = encode_entities(shift);
-    $name =~ s/"/\\"/g;
-    return '"'.$name.'"';
+    my ($name, $node) = @_;
+    my $names = (ref $name) ? $name : [ $name ];
+    my $name = join "<BR/>", map { encode_entities($_) } @$names;
+    $name .= "<BR/>#$node->{id}" if $opt_showid && $node;
+    return "<$name>";
 };
 
 my %links_for_addr;
@@ -234,18 +236,19 @@ sub leave_node {
             if 0;
 
         if ($x->{type} != NPtype_LINK) {
-            my $name = $x->{title} ? "\"$x->{title}\" $x->{name}" : $x->{name};
+            my @name;
+            push @name, "\"$x->{title}\"" if $x->{title};
+            push @name, $x->{name};
 
             if ($x->{kids_size}) {
-                $name .= sprintf " %s+%s=%s", fmt_size($x->{self_size}), fmt_size($x->{kids_size}), fmt_size($x->{self_size}+$x->{kids_size});
+                push @name, sprintf " %s+%s=%s", fmt_size($x->{self_size}), fmt_size($x->{kids_size}), fmt_size($x->{self_size}+$x->{kids_size});
             }
             else {
-                $name .= sprintf " +%s", fmt_size($x->{self_size});
+                push @name, sprintf " +%s", fmt_size($x->{self_size});
             }
-            $name .= " #$x->{id}" if $opt_showid;
 
             my @node_attr = (
-                sprintf("label=%s", $dotnode->($name)),
+                sprintf("label=%s", $dotnode->(\@name, $x)),
                 "id=$x->{id}",
             );
             printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
@@ -263,7 +266,7 @@ sub leave_node {
         }
         else { # NPtype_LINK
             my @kids = @{$x->{child_id}||[]};
-            die "panic: NPtype_LINK has more than one child: @kids"
+            warn "panic: NPtype_LINK has more than one child: @kids"
                 if @kids > 1;
             for my $child_id (@kids) { # wouldn't work right, eg id= attr
                 _dot_link($x, $child_id, []);
@@ -282,8 +285,8 @@ sub _dot_link {
     my @link_attr = ("id=$link_node->{id}");
     push @link_attr, @$link_attr if $link_attr;
     (my $link_name = $link_node->{name}) =~ s/->$//;
-    $link_name .= " #$link_node->{id}" if $opt_showid;
-    push @link_attr, (sprintf "label=%s", $dotnode->($link_name));
+    #$link_name .= " #$link_node->{id}" if $opt_showid;
+    push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
     printf $dot_fh qq{n%d -> n%d [%s];\n},
         $link_node->{parent_id}, $child_id, join(",", @link_attr);
 }
