@@ -29,7 +29,7 @@ WriteMakefile1(
         #'Mojolicious::Lite' => 0,
         'Devel::Dwarn' => 0,
         'XSLoader' => 0,
-        'ORLite' => 0,
+        'DBD::SQLite' => 0,
     },
     EXE_FILES => [ 'bin/sizeme_store.pl', 'bin/sizeme_graph.pl' ],
     clean => {
