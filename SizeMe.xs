@@ -1116,13 +1116,13 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
           str_size(st, basecop->cop_label, NPathLink("cop_label"));
 #endif
 #ifdef USE_ITHREADS
+          /* XXX many duplicates here - waste memory and clutter the graph */
+          /* could treat and attribute instead of a node */
           str_size(st, basecop->cop_file, NPathLink("cop_file"));
-          /*str_size(st, basecop->cop_stashpv, NPathLink("cop_stashpv"));  XXX */
 #else
-          if (SvREFCNT(basecop->cop_stash) == 1) /* XXX hack? */
-            sv_size(aTHX_ st, NPathLink("cop_stash"), (SV *)basecop->cop_stash);
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv);
 #endif
+          sv_size(aTHX_ st, NPathLink("CopSTASH"), (SV *)CopSTASH(basecop));
 
 #if (PERL_BCDVERSION >= 0x5009004)
 #  if (PERL_BCDVERSION < 0x5013007)
