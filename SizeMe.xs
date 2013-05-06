@@ -1136,7 +1136,8 @@ if(0)do_op_dump(0, Perl_debug_log, baseop);
 #else
 	  sv_size(aTHX_ st, NPathLink("cop_filegv"), (SV *)basecop->cop_filegv);
 #endif
-          sv_size(aTHX_ st, NPathLink("CopSTASH"), (SV *)CopSTASH(basecop));
+          /* CopSTASH isn't ref counted, so isn't 'owned' by the COP */
+          /* sv_size(aTHX_ st, NPathLink("CopSTASH"), (SV *)CopSTASH(basecop)); */
 
 #if (PERL_BCDVERSION >= 0x5009004)
 #  if (PERL_BCDVERSION < 0x5013007)
