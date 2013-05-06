@@ -109,44 +109,38 @@ if ($opt_db) {
     $dbh->do("PRAGMA synchronous = OFF");
 }
 
+my @outputs;
 my @stack;
 my %seqn2node;
 
 my $dotnode = sub {
     my ($name, $node) = @_;
     my $names = (ref $name) ? $name : [ $name ];
-    my $name = join "<BR/>", map { encode_entities($_) } @$names;
+    $name = join "<BR/>", map { encode_entities($_) } @$names;
     $name .= "<BR/>#$node->{id}" if $opt_showid && $node;
     return "<$name>";
 };
 
-my %links_for_addr;
+my %links_to_addr;
 my %node_id_of_addr;
 sub note_item_addr {
     my ($addr, $id) = @_;
     # for items with addr we record the id of the item
+    warn "already seen node_id_of_addr $addr (old $node_id_of_addr{$addr}, new $id)\n"
+        if $node_id_of_addr{$addr};
     $node_id_of_addr{$addr} = $id;
     Dwarn { node_id_of_addr => $id } if $opt_debug;
 }
 
-sub note_link_addr {
+sub note_link_to_addr {
     my ($addr, $id) = @_;
     # for links with addr we build a list of all the link ids
     # associated with an addr
-    push @{ $links_for_addr{$addr} }, $id;
-    Dwarn { links_for_addr => $links_for_addr{$addr} } if $opt_debug;
+    ++$links_to_addr{$addr}{$id};
+    Dwarn { links_to_addr => $links_to_addr{$addr} } if $opt_debug;
 }
 
 
-my $dot_fh;
-
-sub fmt_size {
-    my $size = shift;
-    my $kb = $size / 1024;
-    return $size if $kb < 5;
-    return sprintf "%.1fKb", $kb if $kb < 1000;
-    return sprintf "%.1fMb", $kb/1024;
-}
 
 
 sub enter_node {
@@ -227,71 +221,10 @@ sub leave_node {
         $x->{kids_node_count} ||= 0;
     }
 
+    $_->leave_node($x) for (@outputs);
+
     # output
     # ...
-    if ($opt_dot) {
-        printf "// n%d parent=%s(type=%s)\n", $x->{id},
-                $parent ? $parent->{id} : "",
-                $parent ? $parent->{type} : ""
-            if 0;
-
-        if ($x->{type} != NPtype_LINK) {
-            my @name;
-            push @name, "\"$x->{title}\"" if $x->{title};
-            push @name, $x->{name};
-
-            if ($x->{kids_size}) {
-                push @name, sprintf " %s+%s=%s", fmt_size($x->{self_size}), fmt_size($x->{kids_size}), fmt_size($x->{self_size}+$x->{kids_size});
-            }
-            else {
-                push @name, sprintf " +%s", fmt_size($x->{self_size});
-            }
-
-            my @node_attr = (
-                sprintf("label=%s", $dotnode->(\@name, $x)),
-                "id=$x->{id}",
-            );
-            printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
-
-            if (my $addr = $x->{attr}{+NPattr_NOTE}{addr}) {
-                my @links = map { $seqn2node{$_} } @{$links_for_addr{$addr} || []};
-                for my $link_node (@links) {
-                    # skip link if it's the one that's the actual parent
-                    # (because that'll get its own link drawn later)
-                    # current that's identified by not having a parent_id (yet)
-                    next if not $link_node->{parent_id};
-                    _dot_link($link_node, $x->{id});
-                }
-            }
-        }
-        else { # NPtype_LINK
-            my @kids = @{$x->{child_id}||[]};
-            warn "panic: NPtype_LINK has more than one child: @kids"
-                if @kids > 1;
-            for my $child_id (@kids) { # wouldn't work right, eg id= attr
-                _dot_link($x, $child_id, []);
-            }
-            if (my $addr = $x->{attr}{+NPattr_NOTE}{addr}) {
-                my $id = $node_id_of_addr{$addr};
-                warn "link $x->{id} has addr $addr which has no assoctaed node yet\n" if not $id;
-                _dot_link($x, $id) if $id;
-            }
-        }
-
-sub _dot_link {
-    my ($link_node, $child, $link_attr) = @_;
-    $link_attr ||= ['color="grey"', 'style="dashed"'];
-    my $child_id = (ref $child) ? $child->{id} : $child;
-    my @link_attr = ("id=$link_node->{id}");
-    push @link_attr, @$link_attr if $link_attr;
-    (my $link_name = $link_node->{name}) =~ s/->$//;
-    #$link_name .= " #$link_node->{id}" if $opt_showid;
-    push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
-    printf $dot_fh qq{n%d -> n%d [%s];\n},
-        $link_node->{parent_id}, $child_id, join(",", @link_attr);
-}
-
-    }
     if ($dbh) {
         my $attr_json = $j->encode($x->{attr});
         my $leaves_json = $j->encode($x->{leaves});
@@ -366,7 +299,7 @@ while (<>) {
                     # for SVs we see all the link addrs before the item addr
                     # for hek's etc we see the item addr before the link addrs
                     if ($node->{type} == NPtype_LINK) {
-                        note_link_addr($val, $id);
+                        note_link_to_addr($val, $id);
                     }
                     else {
                         note_item_addr($val, $id);
@@ -393,11 +326,7 @@ while (<>) {
     }
     elsif ($type eq 'S') { # start of a run
         die "Unexpected start token" if @stack;
-        if ($opt_dot) {
-            open $dot_fh, ">$opt_dot";
-            print $dot_fh "digraph {\n"; # }
-            print $dot_fh "graph [overlap=false]\n"; # target="???", URL="???"
-        }
+        push @outputs, Devel::SizeMe::Graph::Dot->new(file => $opt_dot) if $opt_dot;
         if ($dbh) {
             # XXX add a size_run table records each run
             # XXX pick a table name to store the run nodes in
@@ -448,12 +377,7 @@ while (<>) {
         }
         #die "panic: seqn2node should be empty ". Dumper(\%seqn2node) if %seqn2node;
 
-        if ($dot_fh) {
-            print $dot_fh "}\n";
-            close $dot_fh;
-            system("open -a Graphviz $opt_dot") if $^O eq 'darwin'; # OSX
-            system("cat $opt_dot") if $opt_debug;
-        }
+        @outputs = (); # DESTROY
 
         $dbh->commit if $dbh;
     }
@@ -465,6 +389,137 @@ while (<>) {
     $dbh->commit if $dbh and $id % 10_000 == 0;
 }
 die "EOF without end token" if @stack;
+
+
+sub fmt_size {
+    my $size = shift;
+    my $kb = $size / 1024;
+    return $size if $kb < 5;
+    return sprintf "%.1fKb", $kb if $kb < 1000;
+    return sprintf "%.1fMb", $kb/1024;
+}
+
+BEGIN {
+package Devel::SizeMe::Graph::Dot;
+use Moo;
+use autodie;
+
+*fmt_size = \&main::fmt_size;
+
+my $dot_fh;
+has file => (is => 'ro');
+
+sub BUILD {
+    my $self = shift;
+
+    open $dot_fh, ">", $self->file;
+    $dot_fh->autoflush if $opt_debug;
+    print $dot_fh "digraph {\n"; # }
+    print $dot_fh "graph [overlap=false]\n"; # target="???", URL="???"
+}
+
+sub DESTROY {
+    my $self = shift;
+    return unless $dot_fh;
+    print $dot_fh "}\n";
+    close $dot_fh;
+    my $file = $self->file;
+    if ($file ne '/dev/tty') {
+        system("open -a Graphviz $file")
+            if $^O eq 'darwin'; # OSX
+        system("cat $file")
+            if $opt_debug;
+    }
+}
+
+# http://www.graphviz.org/content/attrs
+sub _dot_link {
+    my ($link_node, $child, $link_attr) = @_;
+    $link_attr ||= ['color="black"', 'style="dashed"'];
+    my $child_id = (ref $child) ? $child->{id} : $child;
+    my @link_attr = ("id=$link_node->{id}");
+    push @link_attr, @$link_attr if $link_attr;
+    (my $link_name = $link_node->{name}) =~ s/->$//;
+    #$link_name .= " #$link_node->{id}" if $opt_showid;
+    push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
+    printf $dot_fh qq{n%d -> n%d [%s];\n},
+        $link_node->{parent_id}, $child_id, join(",", @link_attr);
+}
+
+sub queue_link_to_item_addr {
+    my ($self, $addr, $link) = @_;
+
+    if (my $id = $node_id_of_addr{$addr}) {
+        # link to an addr for which we already have the node
+        warn "LINK addr $link->{id} -> $id\n";
+        _dot_link($link, $id) if $id;
+    }
+    else {
+        # link to an addr for which we don't have node yet
+        warn "link $link->{id} has addr $addr which has no associated node yet\n";
+        # queue XXX
+    }
+}
+
+sub output_pending_links_to_item_addr {
+    my ($self, $addr, $item) = @_;
+
+    my $links_hashref = $links_to_addr{$addr}
+        or return;
+    my @links = map { $seqn2node{$_} } keys %$links_hashref;
+    for my $link_node (@links) {
+        # skip link if it's the one that's the actual parent
+        # (because that'll get its own link drawn later)
+        # current that's identified by not having a parent_id (yet)
+        next if not $link_node->{parent_id};
+        warn "ITEM addr link $link_node->{id} -> $item->{id}\n";
+        _dot_link($link_node, $item->{id});
+    }
+}
+
+sub enter_node {
+}
+
+sub leave_node {
+    my ($self, $x) = @_;
+
+    if ($x->{type} != ::NPtype_LINK) {
+        my @name;
+        push @name, "\"$x->{title}\"" if $x->{title};
+        push @name, $x->{name};
+
+        if ($x->{kids_size}) {
+            push @name, sprintf " %s+%s=%s", fmt_size($x->{self_size}), fmt_size($x->{kids_size}), fmt_size($x->{self_size}+$x->{kids_size});
+        }
+        else {
+            push @name, sprintf " +%s", fmt_size($x->{self_size});
+        }
+
+        my @node_attr = (
+            sprintf("label=%s", $dotnode->(\@name, $x)),
+            "id=$x->{id}",
+        );
+        printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
+
+        if (my $addr = $x->{attr}{+::NPattr_NOTE}{addr}) {
+            $self->output_pending_links_to_item_addr($addr, $x);
+        }
+
+    }
+    else { # NPtype_LINK
+        my @kids = @{$x->{child_id}||[]};
+        warn "panic: NPtype_LINK has more than one child: @kids"
+            if @kids > 1;
+        for my $child_id (@kids) { # wouldn't work right, eg id= attr
+            _dot_link($x, $child_id, []);
+        }
+        if (my $addr = $x->{attr}{+::NPattr_NOTE}{addr}) {
+            $self->queue_link_to_item_addr($addr, $x);
+        }
+    }
+}
+
+}
 
 
 =for This is out of date but gives you an idea of the data and stream
