@@ -1709,7 +1709,7 @@ new_state(pTHX_ SV *root_sv)
 
 #ifdef PATH_TRACKING
     /* XXX quick hack */
-    st->node_stream_name = getenv("SIZEME");
+    st->node_stream_name = PerlEnv_getenv("SIZEME");
     if (st->node_stream_name) {
         if (*st->node_stream_name) {
             if (*st->node_stream_name == '|')
