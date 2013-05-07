@@ -399,19 +399,24 @@ sub fmt_size {
     return sprintf "%.1fMb", $kb/1024;
 }
 
+
+# http://www.graphviz.org/content/attrs
 BEGIN {
 package Devel::SizeMe::Graph::Dot;
 use Moo;
 use autodie;
+use Carp qw(croak);
 
 *fmt_size = \&main::fmt_size;
 
+my %pending_links;
 my $dot_fh;
 has file => (is => 'ro');
 
 sub BUILD {
     my $self = shift;
 
+    croak "Can't create new output until previous is closed" if $dot_fh;
     open $dot_fh, ">", $self->file;
     $dot_fh->autoflush if $opt_debug;
     print $dot_fh "digraph {\n"; # }
@@ -420,9 +425,14 @@ sub BUILD {
 
 sub DESTROY {
     my $self = shift;
+
     return unless $dot_fh;
+
+    $self->write_pending_links;
     print $dot_fh "}\n";
     close $dot_fh;
+    $dot_fh = undef;
+
     my $file = $self->file;
     if ($file ne '/dev/tty') {
         system("open -a Graphviz $file")
@@ -432,27 +442,46 @@ sub DESTROY {
     }
 }
 
-# http://www.graphviz.org/content/attrs
-sub _dot_link {
-    my ($link_node, $child, $link_attr) = @_;
-    $link_attr ||= ['color="black"', 'style="dashed"'];
-    my $child_id = (ref $child) ? $child->{id} : $child;
-    my @link_attr = ("id=$link_node->{id}");
-    push @link_attr, @$link_attr if $link_attr;
-    (my $link_name = $link_node->{name}) =~ s/->$//;
-    #$link_name .= " #$link_node->{id}" if $opt_showid;
-    push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
-    printf $dot_fh qq{n%d -> n%d [%s];\n},
-        $link_node->{parent_id}, $child_id, join(",", @link_attr);
+sub write_pending_links {
+    my $self = shift;
+
+    while ( my ($link_id, $dests) = each %pending_links) {
+        my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
+        while ( my ($dest_id, $attr) = each %$dests) {
+
+            my @link_attr = ("id=$link_id");
+            push @link_attr, ($attr->{hard}) ? () : ('color="black"', 'style="dashed"');
+            (my $link_name = $link_node->{name}) =~ s/->$//;
+            push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
+
+            printf $dot_fh qq{n%d -> n%d [%s];\n},
+                $link_node->{parent_id}, $dest_id, join(",", @link_attr);
+        }
+    }
 }
 
-sub queue_link_to_item_addr {
+sub assign_link_to_item {
+    my ($self, $link_node, $child, $attr) = @_;
+    $attr ||= {};
+
+    my $child_id = (ref $child) ? $child->{id} : $child;
+
+    warn "assign_link_to_item $link_node->{id} -> $child_id @{[ %$attr ]}\n";
+    warn "$link_node->{id} is not a link"
+        if $link_node->{type} != ::NPtype_LINK;
+    # XXX add check that $link_node is 'dangling'
+    # XXX add check that $child is not a link
+
+    $pending_links{ $link_node->{id} }{ $child_id } = $attr;
+}
+
+sub assign_addr_to_link {
     my ($self, $addr, $link) = @_;
 
     if (my $id = $node_id_of_addr{$addr}) {
         # link to an addr for which we already have the node
         warn "LINK addr $link->{id} -> $id\n";
-        _dot_link($link, $id) if $id;
+        $self->assign_link_to_item($link, $id, { hard => 0 });
     }
     else {
         # link to an addr for which we don't have node yet
@@ -473,7 +502,7 @@ sub output_pending_links_to_item_addr {
         # current that's identified by not having a parent_id (yet)
         next if not $link_node->{parent_id};
         warn "ITEM addr link $link_node->{id} -> $item->{id}\n";
-        _dot_link($link_node, $item->{id});
+        $self->assign_link_to_item($link_node, $item->{id}, { hard => 0 });
     }
 }
 
@@ -511,10 +540,11 @@ sub leave_node {
         warn "panic: NPtype_LINK has more than one child: @kids"
             if @kids > 1;
         for my $child_id (@kids) { # wouldn't work right, eg id= attr
-            _dot_link($x, $child_id, []);
+            $self->assign_link_to_item($x, $child_id, { hard => 1 });
         }
+        # if this link has an address
         if (my $addr = $x->{attr}{+::NPattr_NOTE}{addr}) {
-            $self->queue_link_to_item_addr($addr, $x);
+            $self->assign_addr_to_link($addr, $x);
         }
     }
 }
