@@ -104,6 +104,7 @@
 /* detail types to control simplification of node tree */
 #define NPf_DETAIL_COPFILE      0b0001
 #define NPf_DETAIL_HEK          0b0010
+#define NPf_DETAIL_REFCNT1      0b0100
 
 
 /*
@@ -260,6 +261,10 @@ struct state {
 
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
 #define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
+
+/* has the top most node been output? */
+#define NPathLinkUsed                (assert(NP->type == NPtype_LINK), NP->seqn)
+
 /* add a link and a name node to the path - a special case for op_size */
 #define NPathLinkAndNode(nid, nid2)  (_NPathLink(NP, nid, NPtype_LINK), _NPathLink(NP+1, nid2, NPtype_NAME), ((NP+1)->prev=NP), (NP+1))
 #define NPathOpLink  (NPathArg)
@@ -1377,18 +1382,33 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
         do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
   }
   switch (follow_state) {
+  case FOLLOW_SINGLE_NOW:
+        if (!(st->hide_detail & NPf_DETAIL_REFCNT1))
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+        break;
   case FOLLOW_SINGLE_DONE:
-        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+        /* we don't output addr note for refcnt=1 (FOLLOW_SINGLE_NOW)
+         * so there's no point in outputting one here
+         * except that we should never get here
+         */
+        if (st->trace_level) {
+            warn("sv with refcnt=1 seen more than once!\n");
+            if (st->trace_level >= 4)
+                do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
+        }
+        if (!(st->hide_detail & NPf_DETAIL_REFCNT1))
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
         return 0;
-  case FOLLOW_MULTI_DEFER: /*FALLTHRU*/
+  case FOLLOW_MULTI_DEFER:
+        if (!SvIMMORTAL(thing)) /* avoid clutter from links to immortals */
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+        return 1;
   case FOLLOW_MULTI_DONE:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
-        return 0;
+        return 1;
   case FOLLOW_MULTI_NOW:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
         do_NPathNoteAddr=1;
-        break;
-  case FOLLOW_SINGLE_NOW:
         break;
   }
 
@@ -1700,7 +1720,7 @@ new_state(pTHX_ SV *root_sv)
     Newxz(st, 1, struct state);
     st->start_time_nv = gettimeofday_nv(aTHX);
     st->go_yell = TRUE;
-    st->hide_detail = NPf_DETAIL_COPFILE; /* XXX make an option */
+    st->hide_detail = NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option */
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
