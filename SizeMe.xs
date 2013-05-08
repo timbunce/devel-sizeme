@@ -1358,6 +1358,7 @@ if (0) {
 }
 
 
+/* returns true if the NPathLink argument was 'used' ie output */
 static bool
 sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 {
@@ -1370,8 +1371,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
       return 0;
 
   int follow_state = get_sv_follow_state(aTHX_ st, orig_thing);
-  if (st->trace_level >= 2)
+  if (st->trace_level >= 2) {
     warn("sv_size %p: refcnt=%d, follow=%d, type=%d\n", thing, SvREFCNT(thing), follow_state, SvTYPE(thing));
+    if (st->trace_level >= 9)
+        do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
+  }
   switch (follow_state) {
   case FOLLOW_SINGLE_DONE:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
@@ -1391,7 +1395,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
       warn("Devel::Size: Unknown variable type: %u encountered\n", type); /* TODO report path */
-      return 0;
+      return 0; /* not strictly correct */
   }
   NPathPushNode(thing, NPtype_SV);
   if (do_NPathNoteAddr || !NPathArg)
@@ -1551,7 +1555,6 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
   case SVt_PVCV: TAG;
     ADD_ATTR(st, NPattr_NAME, cv_name((CV *)thing), 0);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing));
-    if (0) do_sv_dump(0, Perl_debug_log, thing, 0, 4, 0, 0);
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing));
     if (!CvWEAKOUTSIDE(thing)) /* XXX */
         sv_size(aTHX_ st, NPathLink("CvOUTSIDE"), (SV *)CvOUTSIDE(thing));
@@ -1706,6 +1709,8 @@ new_state(pTHX_ SV *root_sv)
     }
     if (NULL != (sv = get_sv("Devel::Size::trace", FALSE))) {
 	st->trace_level = SvIV(sv);
+        if (st->trace_level)
+            warn("Devel::Size::trace=%d\n", st->trace_level);
     }
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
