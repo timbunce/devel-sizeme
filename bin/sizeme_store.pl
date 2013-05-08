@@ -121,6 +121,7 @@ my $dotnode = sub {
     return "<$name>";
 };
 
+
 my %links_to_addr;
 my %node_id_of_addr;
 sub note_item_addr {
@@ -429,14 +430,16 @@ sub DESTROY {
     return unless $dot_fh;
 
     $self->write_pending_links;
+    $self->write_dangling_links;
     print $dot_fh "}\n";
     close $dot_fh;
     $dot_fh = undef;
 
     my $file = $self->file;
     if ($file ne '/dev/tty') {
-        system("open -a Graphviz $file")
-            if $^O eq 'darwin'; # OSX
+        system("dot -Tsvg $file > sizeme.svg");
+        system("open sizeme.html") if $^O eq 'darwin'; # OSX
+        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
         system("cat $file")
             if $opt_debug;
     }
@@ -456,6 +459,32 @@ sub write_pending_links {
 
             printf $dot_fh qq{n%d -> n%d [%s];\n},
                 $link_node->{parent_id}, $dest_id, join(",", @link_attr);
+        }
+    }
+}
+
+sub write_dangling_links {
+    my $self = shift;
+
+    while ( my ($addr, $link_ids) = each %links_to_addr ) {
+        next if $node_id_of_addr{$addr}; # not dangling
+
+        # output a dummy node for this addr for the links to connect to
+        my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
+        push @node_attr, (sprintf "label=%s", $dotnode->(sprintf("0x%x", $addr)));
+        printf $dot_fh qq{n%d [%s];\n},
+            $addr, join(",", @node_attr);
+
+        for my $link_id (keys %$link_ids) {
+            my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
+
+            my @link_attr = ("id=$link_id");
+            push @link_attr, 'arrowType="empty"', 'style="dotted"';
+            (my $link_name = $link_node->{name}) =~ s/->$//;
+            push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
+
+            printf $dot_fh qq{n%d -> n%d [%s];\n},
+                $link_node->{parent_id}, $addr, join(",", @link_attr);
         }
     }
 }
