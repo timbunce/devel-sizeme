@@ -952,6 +952,16 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     }
     NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
     ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(hek));
+    if (1) {
+        /* TODO add way to record the key as a NPattr_NAME
+        * controlled via a 'detail' flag bit
+        * handle non-textual keys and over-long keys sanely
+        * perhaps output "start...end" for overlong strings.
+        * We're just trying to give a hint to aid navigation.
+        */
+        ADD_ATTR(st, NPattr_NAME, HEK_KEY(hek), 0);
+    }
+
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
 #if PERL_VERSION < 8
 	+ 1 /* No hash key flags prior to 5.8.0  */
