@@ -147,30 +147,6 @@ sub note_link_to_addr {
 sub enter_node {
     my $x = shift;
     warn ">> enter_node $x->{id}\n" if $opt_debug;
-
-    my $parent = $stack[-1];
-    if ($parent) {
-
-        if (0 and $x->{name} eq 'elem' and $parent->{name} =~ qr/^(?: PADLIST | SV\(PVAV\) )/x) {
-            my $index = $x->{attr}{+NPattr_NOTE}{i};
-            #Dwarn $x->{attr};
-            #Dwarn $index;
-            # If node is an elem of a PADLIST propagate pad name to elem
-            if (@stack >= 4 and (my $cvpl = $stack[-3])->{name} eq 'PADLIST') {
-                my $padnames = $cvpl->{_cached}{padnames} ||= do {
-                    my @names = @{ $cvpl->{attr}{+NPattr_PADNAME} || []};
-                    $_ = "my(".($_||'').")" for @names;
-                    $names[0] = '@_';
-                    \@names;
-                };
-#Dwarn { padnames => $padnames, cvpl_attr => $cvpl->{attr}, attr => $x->{attr}, name => $x->{name} };
-                $x->{name} = (defined $index and $padnames->[$index]) || "[$index]pad?";
-                $x->{name} =~ s/my\(SVs_PADTMP\)/PADTMP/; # XXX hack for neatness
-            }
-        }
-
-    }
-
     return $x;
 }
 
