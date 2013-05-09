@@ -136,6 +136,7 @@ struct state {
     bool regex_whine;
     bool fm_whine;
     bool dangle_whine;
+    bool perlio_whine;
     bool go_yell;
     int trace_level;
     UV hide_detail;
@@ -940,7 +941,7 @@ regex_size(pTHX_ const REGEXP * const baseregex, struct state *st, pPATH) {
   /*ADD_SIZE(st, strlen(SvANY(baseregex)->subbeg));*/
 #endif
   if (st->go_yell && !st->regex_whine) {
-    carp("Devel::Size: Calculated sizes for compiled regexes are incomplete");
+    carp("Calculated sizes for compiled regexes are incomplete");
     st->regex_whine = 1;
   }
 }
@@ -1601,7 +1602,10 @@ else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
        not... we can't, so we don't even try */
 #ifdef USE_PERLIO
     /* Dig into xio_ifp and xio_ofp here */
-    warn("Devel::Size: Can't size up perlio layers yet\n");
+    if (st->go_yell && !st->perlio_whine) {
+        carp("Calculated sizes for perlio layers are incomplete\n");
+        st->perlio_whine = 1;
+    }
 #endif
     goto freescalar;
 
