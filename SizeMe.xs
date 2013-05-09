@@ -442,6 +442,16 @@ np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_n
     return 0;
 }
 
+int
+np_dump_node_path(pTHX_ struct state *st, npath_node_t *npath_node) {
+    if (npath_node->prev) {
+        np_dump_node_path(aTHX_ st, npath_node->prev);
+        fprintf(stderr, "/");
+    }
+    np_print_node_name(aTHX_ stderr, npath_node);
+    return 0;
+}
+
 void
 np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
@@ -1393,7 +1403,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
          * except that we should never get here
          */
         if (st->trace_level) {
-            warn("sv with refcnt=1 seen more than once!\n");
+            np_dump_node_path(aTHX_ st, NP);
+            warn(" sv with refcnt=1 seen more than once!\n");
             if (st->trace_level >= 4)
                 do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
         }
@@ -1818,8 +1829,8 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
             /* dead SV */
             if (check_new(st, sv)) { /* sanity check */
                 fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
-                np_print_node_name(aTHX_ stderr, NP);
-                fprintf(stderr, ":");
+                np_dump_node_path(aTHX_ st, NP);
+                fprintf(stderr, ": ");
                 sv_dump(sv);
             }
         }
