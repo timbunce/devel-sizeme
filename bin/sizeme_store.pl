@@ -477,7 +477,8 @@ sub assign_link_to_item {
     # XXX add check that $link_node is 'dangling'
     # XXX add check that $child is not a link
 
-    $pending_links{ $link_node->{id} }{ $child_id } = $attr;
+    my $cur = $pending_links{ $link_node->{id} }{ $child_id } ||= {};
+    $cur->{hard} ||= $attr->{hard}; # hard takes precedence
 }
 
 sub assign_addr_to_link {
@@ -506,7 +507,7 @@ sub output_pending_links_to_item_addr {
         # (because that'll get its own link drawn later)
         # current that's identified by not having a parent_id (yet)
         next if not $link_node->{parent_id};
-        warn "ITEM addr link $link_node->{id} -> $item->{id}\n";
+        warn "ITEM addr link $link_node->{id} ($seqn2node{$link_node->{parent_id}}{id}) -> $item->{id}\n";
         $self->assign_link_to_item($link_node, $item->{id}, { hard => 0 });
     }
 }
