@@ -140,6 +140,7 @@ struct state {
     bool go_yell;
     int trace_level;
     UV hide_detail;
+    SV *tmp_sv;
     /* My hunch (not measured) is that for most architectures pointers will
        start with 0 bits, hence the start of this array will be hot, and the
        end unused. So put the flags next to the hot end.  */
@@ -672,6 +673,7 @@ free_state(pTHX_ struct state *st)
     free_tracking_at((void **)st->tracking, top_level);
     if (st->sv_refcnt_ptr_table)
         ptr_table_free(st->sv_refcnt_ptr_table);
+    SvREFCNT_dec(st->tmp_sv);
     Safefree(st);
 }
 
@@ -969,13 +971,10 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
     ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(hek));
     if (1) {
-        /* TODO add way to record the key as a NPattr_NAME
-        * controlled via a 'detail' flag bit
-        * handle non-textual keys and over-long keys sanely
-        * perhaps output "start...end" for overlong strings.
-        * We're just trying to give a hint to aid navigation.
-        */
-        ADD_ATTR(st, NPattr_NAME, HEK_KEY(hek), 0);
+        /* give a safe short hint of the key string */
+        pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
+            NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
+        ADD_ATTR(st, NPattr_NAME, SvPVX(st->tmp_sv), 0);
     }
 
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
@@ -1514,14 +1513,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
                 ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
             }
             else {
-/* I've seen a PL_strtab HeVAL == 0xC and 0x40C etc
- * just running perl -Mblib -Mstrict -MDevel::Size=:all -MCarp -e 'warn perl_size()'
- * but it seemed like a corruption - it would change come and go with irrelevant code changes.
- * so we protect against that here, but I'd like to know the cause.
- */
-if (PTR2UV(HeVAL(cur_entry)) > 0xFFF)
-	      sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
-else warn("skipped suspect HeVAL %p", HeVAL(cur_entry));
+                sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
             }
 	  }
           cur_entry = cur_entry->hent_next;
@@ -1750,6 +1742,8 @@ new_state(pTHX_ SV *root_sv)
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
+    st->tmp_sv = newSV(0);
+    check_new(st, st->tmp_sv);
 #if PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 0)
     check_new(st, &PL_sv_placeholder);
 #endif
