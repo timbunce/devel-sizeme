@@ -64,7 +64,6 @@ use DBI qw(looks_like_number);
 use DBD::SQLite;
 use JSON::XS;
 use Devel::Dwarn;
-use HTML::Entities qw(encode_entities);;
 use Data::Dumper;
 use Getopt::Long;
 use Carp qw(carp croak confess);
@@ -112,14 +111,6 @@ if ($opt_db) {
 my @outputs;
 my @stack;
 my %seqn2node;
-
-my $dotnode = sub {
-    my ($name, $node) = @_;
-    my $names = (ref $name) ? $name : [ $name ];
-    $name = join "<BR/>", map { encode_entities($_) } @$names;
-    $name .= "<BR/>#$node->{id}" if $opt_showid && $node;
-    return "<$name>";
-};
 
 
 my %links_to_addr;
@@ -383,6 +374,7 @@ package Devel::SizeMe::Graph::Dot;
 use Moo;
 use autodie;
 use Carp qw(croak);
+use HTML::Entities qw(encode_entities);;
 
 *fmt_size = \&main::fmt_size;
 
@@ -431,7 +423,7 @@ sub write_pending_links {
             my @link_attr = ("id=$link_id");
             push @link_attr, ($attr->{hard}) ? () : ('color="black"', 'style="dashed"');
             (my $link_name = $link_node->{name}) =~ s/->$//;
-            push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
+            push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
 
             printf $dot_fh qq{n%d -> n%d [%s];\n},
                 $link_node->{parent_id}, $dest_id, join(",", @link_attr);
@@ -447,7 +439,7 @@ sub write_dangling_links {
 
         # output a dummy node for this addr for the links to connect to
         my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
-        push @node_attr, (sprintf "label=%s", $dotnode->(sprintf("0x%x", $addr)));
+        push @node_attr, (sprintf "label=%s", _dotlabel(sprintf("0x%x", $addr)));
         printf $dot_fh qq{n%d [%s];\n},
             $addr, join(",", @node_attr);
 
@@ -457,7 +449,7 @@ sub write_dangling_links {
             my @link_attr = ("id=$link_id");
             push @link_attr, 'arrowType="empty"', 'style="dotted"';
             (my $link_name = $link_node->{name}) =~ s/->$//;
-            push @link_attr, (sprintf "label=%s", $dotnode->($link_name, $link_node));
+            push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
 
             printf $dot_fh qq{n%d -> n%d [%s];\n},
                 $link_node->{parent_id}, $addr, join(",", @link_attr);
@@ -491,7 +483,8 @@ sub assign_addr_to_link {
     }
     else {
         # link to an addr for which we don't have node yet
-        warn "link $link->{id} has addr $addr which has no associated node yet\n";
+        warn "link $link->{id} has addr $addr which has no associated node yet\n"
+            if $opt_debug;
         # queue XXX
     }
 }
@@ -531,7 +524,7 @@ sub leave_node {
         }
 
         my @node_attr = (
-            sprintf("label=%s", $dotnode->(\@name, $x)),
+            sprintf("label=%s", _dotlabel(\@name, $x)),
             "id=$x->{id}",
         );
         printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
@@ -553,6 +546,18 @@ sub leave_node {
             $self->assign_addr_to_link($addr, $x);
         }
     }
+}
+
+sub _dotlabel {
+    my ($name, $node) = @_;
+    my @names = (ref $name) ? @$name : ($name);
+    $name = join "\\n", map {
+        # escape unprintables XXX correct sins against unicode
+        s/([\000-\037\200-\237])/sprintf("\\x%02x",ord($1))/eg;
+        encode_entities($_)
+    } @names;
+    $name .= "\\n#$node->{id}" if $opt_showid && $node;
+    return qq{"$name"};
 }
 
 }
