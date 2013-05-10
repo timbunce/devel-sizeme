@@ -697,8 +697,6 @@ free_state(pTHX_ struct state *st)
 #define RECURSE_INTO_OWNED 1
 #define RECURSE_INTO_WEAK 2
 
-#define INCLUDE_CONTENTS_OF_AGGREGATES 1 /* temp placeholder */
-
 static bool sv_size(pTHX_ struct state *, pPATH, const SV *const);
 
 typedef enum {
@@ -968,20 +966,28 @@ static int
 hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 {
     dNPathNodes(1, NPathArg);
+    int use_node_for_hek = !(st->hide_detail & NPf_DETAIL_HEK);
 
     /* Hash keys can be shared. Have we seen this before? */
+    /* XXX when shared is true we could perhaps to allocate
+     * (size of the hek / shared_he_he.he_valu.hent_refcount)
+     * rather than let the first use of the key carry the cost
+     */
     if (!check_new(st, hek)) {
-        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(hek));
+        if (use_node_for_hek)
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(hek));
 	return 0;
     }
-    NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
-    ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(hek));
-    if (1) {
+    if (use_node_for_hek) {
+        NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
+        ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(hek));
+        /* XXX make this the NPattr_NAME of the HeVAL link if not showing detail */
         /* give a safe short hint of the key string */
         pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
             NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
         ADD_ATTR(st, NPattr_NAME, SvPVX(st->tmp_sv), 0);
     }
+    else NP = NP->prev;
 
     ADD_SIZE(st, "hek_len", HEK_BASESIZE + hek->hek_len
 #if PERL_VERSION < 8
@@ -1460,19 +1466,17 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   case SVt_PVAV: TAG;
     /* Is there anything in the array? */
     if (AvMAX(thing) != -1) {
-      /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
-      ADD_SIZE(st, "av_max", sizeof(SV *) * (AvMAX(thing) + 1));
-      ADD_ATTR(st, NPattr_NOTE, "av_len", av_len((AV*)thing));
-      dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
+        SSize_t i;
+        /* an array with 10 slots has AvMax() set to 9 - te 2007-04-22 */
+        ADD_SIZE(st, "av_max", sizeof(SV *) * (AvMAX(thing) + 1));
+        ADD_ATTR(st, NPattr_NOTE, "av_len", av_len((AV*)thing));
+        dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
 
-      if (INCLUDE_CONTENTS_OF_AGGREGATES) {
-	  SSize_t i = AvFILLp(thing) + 1;
-
-	  while (i--) {
-	      if (sv_size(aTHX_ st, NPathLink("elem"), AvARRAY(thing)[i]))
+        i = AvFILLp(thing) + 1;
+        while (i--) {
+            if (sv_size(aTHX_ st, NPathLink("elem"), AvARRAY(thing)[i]))
                 ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
-          }
-      }
+        }
     }
     /* Add in the bits on the other side of the beginning */
 
@@ -1509,22 +1513,34 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
-          NPathPushNode("he", NPtype_LINK);
-          NPathPushNode("he+hek", NPtype_NAME);
-          ADD_SIZE(st, "he", sizeof(HE));
-	  hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
-	  if (INCLUDE_CONTENTS_OF_AGGREGATES) {
-            if (orig_thing == (SV*)PL_strtab) {
-                /* For PL_strtab the HeVAL is used as a refcnt */
-                ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
+
+            if (!(st->hide_detail & NPf_DETAIL_HEK)) {
+                NPathPushNode("he", NPtype_LINK);
+                NPathPushNode("he+hek", NPtype_NAME);
+                ADD_SIZE(st, "he", sizeof(HE));
+                hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
+                if (orig_thing == (SV*)PL_strtab) {
+                    /* For PL_strtab the HeVAL is used as a refcnt */
+                    ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
+                }
+                else {
+                    sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
+                }
+                NPathPopNode;
+                NPathPopNode;
             }
             else {
-                sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
+                ADD_SIZE(st, "he", sizeof(HE));
+                hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
+                if (orig_thing == (SV*)PL_strtab) {
+                    /* For PL_strtab the HeVAL is used as a refcnt */
+                    ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
+                }
+                else {
+                    sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
+                }
             }
-	  }
-          cur_entry = cur_entry->hent_next;
-          NPathPopNode;
-          NPathPopNode;
+            cur_entry = cur_entry->hent_next;
         }
       } /* bucket chain */
     }
@@ -1733,7 +1749,7 @@ new_state(pTHX_ SV *root_sv)
     Newxz(st, 1, struct state);
     st->start_time_nv = gettimeofday_nv(aTHX);
     st->go_yell = TRUE;
-    st->hide_detail = NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option */
+    st->hide_detail = NPf_DETAIL_HEK | NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option */
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
