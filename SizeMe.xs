@@ -193,6 +193,7 @@ struct state {
             NP->seqn = NP->type = 0; NP->id = Nullch; /* safety/debug */ \
             NP->prev = prev_np
 #define NPathPushNode(nodeid, nodetype) \
+    STMT_START { \
             NP->id = nodeid; \
             NP->type = nodetype; \
             NP->seqn = 0; \
@@ -201,15 +202,20 @@ struct state {
             NP->id = Nullch; /* safety/debug */ \
             NP->seqn = 0; \
             NP->type = 0; \
-            NP->prev = (NP-1)
+            NP->prev = (NP-1); \
+    } STMT_END
 #define NPathSetNode(nodeid, nodetype) \
+    STMT_START { \
             (NP-1)->id = nodeid; \
             (NP-1)->type = nodetype; \
             if(st->trace_level>=9)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %p]\n", (NP-1)->prev, (NP-1), nodetype,nodeid);\
-            (NP-1)->seqn = 0;
+            (NP-1)->seqn = 0; \
+    } STMT_END
 #define NPathPopNode \
+    STMT_START { \
             --NP; \
-            NP->type = 0; NP->id = Nullch /* safety/debug */
+            NP->type = 0; NP->id = Nullch; /* safety/debug */ \
+    } STMT_END
 
 /* dNPathUseParent points NP directly the the parents' name_path_nodes array
  * So the function can only safely call ADD_*() but not NPathLink, unless the
