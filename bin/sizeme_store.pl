@@ -92,6 +92,7 @@ GetOptions(
     'verbose|v!' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
     'showid!' => \my $opt_showid,
+    'open!' => \my $opt_open,
 ) or exit 1;
 
 $| = 1 if $opt_debug;
@@ -294,7 +295,13 @@ while (<>) {
     }
     elsif ($type eq 'S') { # start of a run
         die "Unexpected start token" if @stack;
-        push @outputs, Devel::SizeMe::Graph::Dot->new(file => $opt_dot) if $opt_dot;
+
+        if ($opt_dot) {
+            my $out = Devel::SizeMe::Output::Graphviz->new(file => $opt_dot);
+            $out->start_event_stream;
+            push @outputs, $out;
+        }
+
         if ($dbh) {
             # XXX add a size_run table records each run
             # XXX pick a table name to store the run nodes in
@@ -345,7 +352,7 @@ while (<>) {
         }
         #die "panic: seqn2node should be empty ". Dumper(\%seqn2node) if %seqn2node;
 
-        @outputs = (); # DESTROY
+        $_->end_event_stream for @outputs;
 
         $dbh->commit if $dbh;
     }
@@ -357,6 +364,8 @@ while (<>) {
     $dbh->commit if $dbh and $id % 10_000 == 0;
 }
 die "EOF without end token" if @stack;
+
+@outputs = (); # DESTROY
 
 
 sub fmt_size {
@@ -370,92 +379,47 @@ sub fmt_size {
 
 # http://www.graphviz.org/content/attrs
 BEGIN {
-package Devel::SizeMe::Graph::Dot;
+package Devel::SizeMe::Output;
 use Moo;
 use autodie;
 use Carp qw(croak);
 use HTML::Entities qw(encode_entities);;
 
+has file => (is => 'ro');
+has fh => (is => 'rw');
+
 *fmt_size = \&main::fmt_size;
 
 my %pending_links;
-my $dot_fh;
-has file => (is => 'ro');
 
-sub BUILD {
-    my $self = shift;
+sub start_event_stream {
+    my ($self) = @_;
 
-    croak "Can't create new output until previous is closed" if $dot_fh;
-    open $dot_fh, ">", $self->file;
-    $dot_fh->autoflush if $opt_debug;
-    print $dot_fh "digraph {\n"; # }
-    print $dot_fh "graph [overlap=false]\n"; # target="???", URL="???"
+    open my $fh, ">", $self->file;
+    $self->fh($fh);
+
+    $self->fh->autoflush if $opt_debug;
+    $self->write_prologue;
 }
 
-sub DESTROY {
-    my $self = shift;
-
-    return unless $dot_fh;
+sub end_event_stream {
+    my ($self) = @_;
 
     $self->write_pending_links;
     $self->write_dangling_links;
-    print $dot_fh "}\n";
-    close $dot_fh;
-    $dot_fh = undef;
+    $self->write_epilogue;
 
-    my $file = $self->file;
-    if ($file ne '/dev/tty') {
-        system("dot -Tsvg $file > sizeme.svg");
-        system("open sizeme.html") if $^O eq 'darwin'; # OSX
-        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
-        system("cat $file")
-            if $opt_debug;
-    }
+    close($self->fh);
+    $self->fh(undef);
+
+    $self->open_file if $opt_open;
 }
 
-sub write_pending_links {
-    my $self = shift;
-
-    while ( my ($link_id, $dests) = each %pending_links) {
-        my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
-        while ( my ($dest_id, $attr) = each %$dests) {
-
-            my @link_attr = ("id=$link_id");
-            push @link_attr, ($attr->{hard}) ? () : ('color="black"', 'style="dashed"');
-            (my $link_name = $link_node->{name}) =~ s/->$//;
-            push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
-
-            printf $dot_fh qq{n%d -> n%d [%s];\n},
-                $link_node->{parent_id}, $dest_id, join(",", @link_attr);
-        }
-    }
+sub write_prologue {
+}
+sub write_epilogue {
 }
 
-sub write_dangling_links {
-    my $self = shift;
-
-    while ( my ($addr, $link_ids) = each %links_to_addr ) {
-        next if $node_id_of_addr{$addr}; # not dangling
-
-        # output a dummy node for this addr for the links to connect to
-        my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
-        push @node_attr, (sprintf "label=%s", _dotlabel(sprintf("0x%x", $addr)));
-        printf $dot_fh qq{n%d [%s];\n},
-            $addr, join(",", @node_attr);
-
-        for my $link_id (keys %$link_ids) {
-            my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
-
-            my @link_attr = ("id=$link_id");
-            push @link_attr, 'arrowType="empty"', 'style="dotted"';
-            (my $link_name = $link_node->{name}) =~ s/->$//;
-            push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
-
-            printf $dot_fh qq{n%d -> n%d [%s];\n},
-                $link_node->{parent_id}, $addr, join(",", @link_attr);
-        }
-    }
-}
 
 sub assign_link_to_item {
     my ($self, $link_node, $child, $attr) = @_;
@@ -489,11 +453,12 @@ sub assign_addr_to_link {
     }
 }
 
-sub output_pending_links_to_item_addr {
+sub resolve_addr_to_item {
     my ($self, $addr, $item) = @_;
 
     my $links_hashref = $links_to_addr{$addr}
-        or return;
+        or return; # we've no links waiting for this addr
+
     my @links = map { $seqn2node{$_} } keys %$links_hashref;
     for my $link_node (@links) {
         # skip link if it's the one that's the actual parent
@@ -505,48 +470,173 @@ sub output_pending_links_to_item_addr {
     }
 }
 
+
+sub write_pending_links {
+    my $self = shift;
+    while ( my ($link_id, $dests) = each %pending_links) {
+        my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
+        while ( my ($dest_id, $attr) = each %$dests) {
+            $self->emit_link($link_id, $dest_id, $attr);
+        }
+    }
+}
+
+sub write_dangling_links {
+    my $self = shift;
+
+    while ( my ($addr, $link_ids) = each %links_to_addr ) {
+        next if $node_id_of_addr{$addr}; # not dangling
+
+        $self->emit_addr_node($addr);
+
+        for my $link_id (keys %$link_ids) {
+            $self->emit_link($link_id, $addr, { kind => 'addr' });
+        }
+    }
+}
+
+sub open_file {
+    my $self = shift;
+
+    my $file = $self->file;
+    if ($file ne '/dev/tty') {
+        system("cat $file") if $opt_debug;
+    }
+}
+
+
 sub enter_node {
 }
 
-sub leave_node {
-    my ($self, $x) = @_;
-
-    if ($x->{type} != ::NPtype_LINK) {
-        my @name;
-        push @name, "\"$x->{title}\"" if $x->{title};
-        push @name, $x->{name};
-
-        if ($x->{kids_size}) {
-            push @name, sprintf " %s+%s=%s", fmt_size($x->{self_size}), fmt_size($x->{kids_size}), fmt_size($x->{self_size}+$x->{kids_size});
-        }
-        else {
-            push @name, sprintf " +%s", fmt_size($x->{self_size});
-        }
-
-        my @node_attr = (
-            sprintf("label=%s", _dotlabel(\@name, $x)),
-            "id=$x->{id}",
-        );
-        printf $dot_fh qq{n%d [ %s ];\n}, $x->{id}, join(",", @node_attr);
-
-        if (my $addr = $x->{attr}{+::NPattr_NOTE}{addr}) {
-            $self->output_pending_links_to_item_addr($addr, $x);
-        }
-
-    }
-    else { # NPtype_LINK
-        my @kids = @{$x->{child_id}||[]};
-        warn "panic: NPtype_LINK has more than one child: @kids"
-            if @kids > 1;
-        for my $child_id (@kids) { # wouldn't work right, eg id= attr
-            $self->assign_link_to_item($x, $child_id, { hard => 1 });
-        }
-        # if this link has an address
-        if (my $addr = $x->{attr}{+::NPattr_NOTE}{addr}) {
-            $self->assign_addr_to_link($addr, $x);
-        }
+sub leave_item_node {
+    my ($self, $item_node) = @_;
+    $self->emit_item_node($item_node, { label => $self->fmt_item_label($item_node) });
+    if (my $addr = $item_node->{attr}{+::NPattr_NOTE}{addr}) {
+        $self->resolve_addr_to_item($addr, $item_node);
     }
 }
+
+sub leave_link_node {
+    my ($self, $link_node) = @_;
+    my @kids = @{$link_node->{child_id}||[]};
+    warn "panic: NPtype_LINK has more than one child: @kids"
+        if @kids > 1;
+    for my $child_id (@kids) {
+        $self->assign_link_to_item($link_node, $child_id, { hard => 1 });
+    }
+    # if this link has an address
+    if (my $addr = $link_node->{attr}{+::NPattr_NOTE}{addr}) {
+        $self->assign_addr_to_link($addr, $link_node);
+    }
+}
+
+sub leave_node {
+    my ($self, $node) = @_;
+    return $self->leave_item_node($node) if $node->{type} != ::NPtype_LINK;
+    return $self->leave_link_node($node);
+}
+
+
+} # Devel::SizeMe::Output
+
+
+# http://www.graphviz.org/content/attrs
+BEGIN {
+package Devel::SizeMe::Output::Graphviz;
+use Moo;
+use autodie;
+use Carp qw(croak);
+use HTML::Entities qw(encode_entities);;
+extends 'Devel::SizeMe::Output';
+
+*fmt_size = \&main::fmt_size;
+
+
+sub write_prologue {
+    my $self = shift;
+    my $fh = $self->fh or return;
+    $self->SUPER::write_prologue(@_);
+    print $fh "digraph {\n"; # }
+    print $fh "graph [overlap=false]\n"; # target="???", URL="???"
+}
+
+sub write_epilogue {
+    my $self = shift;
+    my $fh = $self->fh or return;
+    $self->SUPER::write_epilogue(@_);
+    print $fh "}\n";
+}
+
+sub open_file {
+    my $self = shift;
+    $self->SUPER::open_file(@_);
+
+    my $file = $self->file;
+    if ($file ne '/dev/tty') {
+        system("dot -Tsvg $file > sizeme.svg");
+        system("open sizeme.html") if $^O eq 'darwin'; # OSX
+        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
+    }
+}
+
+sub emit_link {
+    my ($self, $link_id, $dest_id, $attr) = @_;
+    my $fh = $self->fh or return;
+    my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
+
+    my @link_attr = ("id=$link_id");
+    if ($attr->{kind} and $attr->{kind} eq 'addr') {
+        push @link_attr, 'arrowType="empty"', 'style="dotted"';
+    }
+    else {
+        push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
+    }
+
+    (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
+    push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
+    printf $fh qq{n%d -> n%d [%s];\n},
+        $link_node->{parent_id}, $dest_id, join(",", @link_attr);
+}
+
+sub emit_addr_node {
+    my ($self, $addr) = @_;
+    my $fh = $self->fh or return;
+    # output a dummy node for this addr for the links to connect to
+    my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
+    push @node_attr, (sprintf "label=%s", _dotlabel(sprintf("0x%x", $addr)));
+    printf $fh qq{n%d [%s];\n},
+        $addr, join(",", @node_attr);
+}
+
+sub emit_item_node {
+    my ($self, $item_node, $attr) = @_;
+    my $fh = $self->fh or return;
+    my $name = $attr->{label};
+    my @node_attr = ( "id=$item_node->{id}" );
+    push @node_attr, sprintf("label=%s", _dotlabel($name, $item_node))
+        if $name;
+    printf $fh qq{n%d [ %s ];\n}, $item_node->{id}, join(",", @node_attr);
+}
+
+sub fmt_item_label {
+    my ($self, $item_node) = @_;
+    my @name;
+    push @name, "\"$item_node->{title}\""
+        if $item_node->{title};
+    push @name, $item_node->{name};
+    if ($item_node->{kids_size}) {
+        push @name, sprintf " %s+%s=%s",
+            fmt_size($item_node->{self_size}),
+            fmt_size($item_node->{kids_size}),
+            fmt_size($item_node->{self_size}+$item_node->{kids_size});
+    }
+    else {
+        push @name, sprintf " +%s",
+            fmt_size($item_node->{self_size});
+    }
+    return \@name;
+}
+
 
 sub _dotlabel {
     my ($name, $node) = @_;
