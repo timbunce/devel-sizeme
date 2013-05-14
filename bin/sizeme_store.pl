@@ -81,8 +81,8 @@ use constant NPattr_PADFAKE  => 0x02;
 use constant NPattr_PADNAME  => 0x03;
 use constant NPattr_PADTMP   => 0x04;
 use constant NPattr_NOTE     => 0x05;
-use constant NPattr_PRE_ATTR => 0x06;
-my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE PREATTR)); # XXX get from XS in some way
+use constant NPattr_ADDR     => 0x06;
+my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR)); # XXX get from XS in some way
 
 
 GetOptions(
@@ -225,20 +225,34 @@ while (<>) {
             if $opt_text;
 
         # this is the core driving logic
+
         while ($val < @stack) {
             my $x = leave_node(pop @stack);
             warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
                 if $opt_verbose;
         }
-        die "panic: stack already has item at depth $val"
-            if $stack[$val];
+
+        die "panic: stack already has item at depth $val" if $stack[$val];
         die "Depth out of sync\n" if $val != @stack;
+
         my $node = enter_node({
             id => $id, type => $type, name => $name, extra => $extra,
             attr => { }, leaves => {}, depth => $val, self_size=>0, kids_size=>0
         });
+
         $stack[$val] = $node;
         $seqn2node{$id} = $node;
+
+        # if parent is a link that has an addr
+        # then copy that addr to this item
+        if ($type != NPtype_LINK
+            and $val
+            and (my $addr = $stack[-2]{attr}{addr})
+        ) {
+            warn "noted addr from parent\n";
+            note_item_addr($addr, $id);
+        }
+
     }
 
     # --- Leaf name and memory size
@@ -264,22 +278,25 @@ while (<>) {
             $attr->{$type}{$name} = $val;
             #Dwarn $attr;
             if ($type == NPattr_NOTE) {
-                if ($name eq 'addr') {
-                    # for SVs we see all the link addrs before the item addr
-                    # for hek's etc we see the item addr before the link addrs
-                    if ($node->{type} == NPtype_LINK) {
-                        note_link_to_addr($val, $id);
-                    }
-                    else {
-                        note_item_addr($val, $id);
-                    }
-                }
             }
             elsif ($type == NPattr_NAME) {
                 $node->{title} = $name if !$val; # XXX hack
             }
         }
-        # attributes where the number is a key (or always zero)
+        elsif ($type == NPattr_ADDR) {
+            printf "%s~%s %d 0x%x [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $val, $val, $type
+                if $opt_text;
+            #$attr->{NPattr_NOTE()}{'addr'} = $val;
+            $attr->{addr} = $val;
+            # for SVs we see all the link addrs before the item addr
+            # for hek's etc we see the item addr before the link addrs
+            if ($node->{type} == NPtype_LINK) {
+                note_link_to_addr($val, $id);
+            }
+            else {
+                note_item_addr($val, $id);
+            }
+        }
         elsif (NPattr_PADFAKE==$type or NPattr_PADTMP==$type or NPattr_PADNAME==$type) {
             printf "%s~%s('%s') %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
                 if $opt_text;
@@ -473,6 +490,8 @@ sub resolve_addr_to_item {
 
 sub write_pending_links {
     my $self = shift;
+    warn "write_pending_links\n"
+        if $opt_debug;
     while ( my ($link_id, $dests) = each %pending_links) {
         my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
         while ( my ($dest_id, $attr) = each %$dests) {
@@ -484,6 +503,8 @@ sub write_pending_links {
 sub write_dangling_links {
     my $self = shift;
 
+    warn "write_dangling_links\n"
+        if $opt_debug;
     while ( my ($addr, $link_ids) = each %links_to_addr ) {
         next if $node_id_of_addr{$addr}; # not dangling
 
@@ -506,12 +527,13 @@ sub open_file {
 
 
 sub enter_node {
+    return shift;
 }
 
 sub leave_item_node {
     my ($self, $item_node) = @_;
     $self->emit_item_node($item_node, { label => $self->fmt_item_label($item_node) });
-    if (my $addr = $item_node->{attr}{+::NPattr_NOTE}{addr}) {
+    if (my $addr = $item_node->{attr}{addr}) {
         $self->resolve_addr_to_item($addr, $item_node);
     }
 }
@@ -525,7 +547,7 @@ sub leave_link_node {
         $self->assign_link_to_item($link_node, $child_id, { hard => 1 });
     }
     # if this link has an address
-    if (my $addr = $link_node->{attr}{+::NPattr_NOTE}{addr}) {
+    if (my $addr = $link_node->{attr}{addr}) {
         $self->assign_addr_to_link($addr, $link_node);
     }
 }
@@ -573,9 +595,9 @@ sub open_file {
 
     my $file = $self->file;
     if ($file ne '/dev/tty') {
-        system("dot -Tsvg $file > sizeme.svg");
+        system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
         system("open sizeme.html") if $^O eq 'darwin'; # OSX
-        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
+        system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
     }
 }
 

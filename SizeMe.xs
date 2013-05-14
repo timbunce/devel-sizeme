@@ -236,6 +236,7 @@ struct state {
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
 #define NPattr_NOTE     0x05
+#define NPattr_ADDR     0x06
 
 #define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) \
   STMT_START { \
@@ -480,6 +481,9 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
         break;
     case NPattr_NOTE:
         fprintf(stderr, "~note %s %lu (%p)", attr_name, attr_value, (void*)attr_value);
+        break;
+    case NPattr_ADDR:
+        fprintf(stderr, "~addr %lu (%p)", attr_value, (void*)attr_value);
         break;
     case NPattr_PADTMP:
     case NPattr_PADNAME:
@@ -975,12 +979,12 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
      */
     if (!check_new(st, hek)) {
         if (use_node_for_hek)
-            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(hek));
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(hek));
 	return 0;
     }
     if (use_node_for_hek) {
         NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
-        ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(hek));
+        ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(hek));
         /* XXX make this the NPattr_NAME of the HeVAL link if not showing detail */
         /* give a safe short hint of the key string */
         pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
@@ -1405,8 +1409,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   }
   switch (follow_state) {
   case FOLLOW_SINGLE_NOW:
-        if (!(st->hide_detail & NPf_DETAIL_REFCNT1))
-            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+        if (!(st->hide_detail & NPf_DETAIL_REFCNT1) && NP->prev)
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         break;
   case FOLLOW_SINGLE_DONE:
         /* we don't output addr note for refcnt=1 (FOLLOW_SINGLE_NOW)
@@ -1420,17 +1424,17 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
                 do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
         }
         if (!(st->hide_detail & NPf_DETAIL_REFCNT1))
-            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         return 0;
   case FOLLOW_MULTI_DEFER:
         if (!SvIMMORTAL(thing)) /* avoid clutter from links to immortals */
-            ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         return 1;
   case FOLLOW_MULTI_DONE:
-        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         return 1;
   case FOLLOW_MULTI_NOW:
-        ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "addr", PTR2UV(thing));
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         do_NPathNoteAddr=1;
         break;
   }
@@ -1442,7 +1446,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   }
   NPathPushNode(thing, NPtype_SV);
   if (do_NPathNoteAddr || !NPathArg)
-    ADD_ATTR(st, NPattr_NOTE, "addr", PTR2UV(thing));
+    ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(thing));
   ADD_SIZE(st, "sv_head", sizeof(SV));
   ADD_SIZE(st, "sv_body", body_sizes[type]);
 
@@ -1749,7 +1753,7 @@ new_state(pTHX_ SV *root_sv)
     Newxz(st, 1, struct state);
     st->start_time_nv = gettimeofday_nv(aTHX);
     st->go_yell = TRUE;
-    st->hide_detail = NPf_DETAIL_HEK | NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option */
+    if(1)st->hide_detail = NPf_DETAIL_HEK | NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option */
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
