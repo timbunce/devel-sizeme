@@ -231,12 +231,13 @@ struct state {
 
 /* XXX these should probably be generalized into flag bits */
 #define NPattr_LEAFSIZE 0x00
-#define NPattr_NAME     0x01
+#define NPattr_LABEL    0x01
 #define NPattr_PADFAKE  0x02
 #define NPattr_PADNAME  0x03
 #define NPattr_PADTMP   0x04
 #define NPattr_NOTE     0x05
 #define NPattr_ADDR     0x06
+#define NPattr_REFCNT   0x07
 
 #define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) \
   STMT_START { \
@@ -341,15 +342,22 @@ gettimeofday_nv(pTHX)
 }
 
 
+static char *
+svtypename(SV *sv)
+{
+    int type = SvTYPE(sv);
+    return (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
+}
+
+
 int
 np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
 {
     switch (npath_node->type) {
-    case NPtype_SV: { /* id is pointer to the SV sv_size was called on */
+    case NPtype_SV: { /* id is pointer to the SV that sv_size() was called on */
         const SV *sv = (SV*)npath_node->id;
         int type = SvTYPE(sv);
-        const char *typename = (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
-        fprintf(fp, "SV(%s)", typename);
+        fprintf(fp, "SV(%s)", svtypename(sv));
         switch(type) {  /* add some useful details */
         case SVt_PVAV: fprintf(fp, " fill=%ld/%ld", (long)av_len((AV*)sv), AvMAX((AV*)sv)); break;
         case SVt_PVHV: fprintf(fp, " fill=%ld/%ld", HvFILL((HV*)sv), HvMAX((HV*)sv)); break;
@@ -463,7 +471,7 @@ np_dump_node_path(pTHX_ struct state *st, npath_node_t *npath_node) {
 void
 np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
-    if (st->trace_level >= 4)
+    if (st->trace_level >= 8)
         warn("np_dump_node_path_info(np=%p, type=%u, name=%p, value=%u):\n",
             npath_node, attr_type, attr_name, attr_value);
 
@@ -476,7 +484,7 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
     case NPattr_LEAFSIZE:
         fprintf(stderr, "+%ld %s =%ld", attr_value, attr_name, attr_value+st->total_size);
         break;
-    case NPattr_NAME:
+    case NPattr_LABEL:
         fprintf(stderr, "~NAMED('%s') %lu", attr_name, attr_value);
         break;
     case NPattr_NOTE:
@@ -611,6 +619,12 @@ check_new(struct state *st, const void *const p) {
     return TRUE;
 }
 
+static UV
+get_sv_follow_seencnt(pTHX_ struct state *st, const SV *const sv)
+{
+    return PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
+}
+
 static int
 get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
 {
@@ -632,7 +646,7 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
         warn("get_sv_follow_state %p refcnt %u seen %lu\n", sv, SvREFCNT(sv), seen_cnt);
 
     if (seen_cnt < SvREFCNT(sv)) {
-        return FOLLOW_MULTI_DEFER;   /* pretend we've seen this sv before */
+        return FOLLOW_MULTI_DEFER;
     }
     if (seen_cnt > SvREFCNT(sv)) {
         if (st->trace_level >= 2)
@@ -985,11 +999,11 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     if (use_node_for_hek) {
         NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
         ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(hek));
-        /* XXX make this the NPattr_NAME of the HeVAL link if not showing detail */
+        /* XXX make this the NPattr_LABEL of the HeVAL link if not showing detail */
         /* give a safe short hint of the key string */
         pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
             NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
-        ADD_ATTR(st, NPattr_NAME, SvPVX(st->tmp_sv), 0);
+        ADD_ATTR(st, NPattr_LABEL, SvPVX(st->tmp_sv), 0);
     }
     else NP = NP->prev;
 
@@ -1403,12 +1417,13 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 
   int follow_state = get_sv_follow_state(aTHX_ st, orig_thing);
   if (st->trace_level >= 2) {
-    warn("sv_size %p: refcnt=%d, follow=%d, type=%d\n", thing, SvREFCNT(thing), follow_state, SvTYPE(thing));
+    warn("sv_size %p: %s refcnt=%d, follow=%d, type=%d\n", thing, svtypename(thing), SvREFCNT(thing), follow_state, SvTYPE(thing));
     if (st->trace_level >= 9)
         do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
   }
   switch (follow_state) {
   case FOLLOW_SINGLE_NOW:
+        /* only give addr attribute to SVs with refcnt=1 if asked */
         if (!(st->hide_detail & NPf_DETAIL_REFCNT1) && NP->prev)
             ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         break;
@@ -1427,8 +1442,13 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
             ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         return 0;
   case FOLLOW_MULTI_DEFER:
-        if (!SvIMMORTAL(thing)) /* avoid clutter from links to immortals */
-            ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
+        if (SvIMMORTAL(thing)) /* avoid clutter from links to immortals */
+            return 1;
+        ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
+        if (get_sv_follow_seencnt(aTHX_ st, thing) == 1) {
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_LABEL, svtypename(thing), 0);
+            ADD_LINK_ATTR_TO_PREV(st, NPattr_REFCNT, "", SvREFCNT(thing));
+        }
         return 1;
   case FOLLOW_MULTI_DONE:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
@@ -1504,9 +1524,9 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   case SVt_PVHV: TAG;
     /* Now the array of buckets */
 #ifdef HvENAME
-    if (HvENAME(thing)) { ADD_ATTR(st, NPattr_NAME, HvENAME(thing), 0); }
+    if (HvENAME(thing)) { ADD_ATTR(st, NPattr_LABEL, HvENAME(thing), 0); }
 #else
-    if (HvNAME(thing))  { ADD_ATTR(st, NPattr_NAME, HvNAME(thing), 0); }
+    if (HvNAME(thing))  { ADD_ATTR(st, NPattr_LABEL, HvNAME(thing), 0); }
 #endif
     ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
     /* Now walk the bucket chain */
@@ -1603,7 +1623,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
     goto freescalar;
 
   case SVt_PVCV: TAG;
-    ADD_ATTR(st, NPattr_NAME, cv_name((CV *)thing), 0);
+    ADD_ATTR(st, NPattr_LABEL, cv_name((CV *)thing), 0);
     sv_size(aTHX_ st, NPathLink("CvGV"), (SV *)CvGV(thing));
     padlist_size(aTHX_ st, NPathLink("CvPADLIST"), CvPADLIST(thing));
     if (!CvWEAKOUTSIDE(thing)) /* XXX */
@@ -1650,7 +1670,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 #else	
 	ADD_SIZE(st, "GvNAMELEN", GvNAMELEN(thing));
 #endif
-        ADD_ATTR(st, NPattr_NAME, GvNAME(thing), 0);
+        ADD_ATTR(st, NPattr_LABEL, GvNAME(thing), 0);
 #ifdef GvFILE_HEK
 	hek_size(aTHX_ st, GvFILE_HEK(thing), 1, NPathLink("GvFILE_HEK"));
 #elif defined(GvFILE)

@@ -76,13 +76,14 @@ use constant NPtype_MAGIC    => 0x04;
 use constant NPtype_OP       => 0x05;
 
 use constant NPattr_LEAFSIZE => 0x00;
-use constant NPattr_NAME     => 0x01;
+use constant NPattr_LABEL    => 0x01;
 use constant NPattr_PADFAKE  => 0x02;
 use constant NPattr_PADNAME  => 0x03;
 use constant NPattr_PADTMP   => 0x04;
 use constant NPattr_NOTE     => 0x05;
 use constant NPattr_ADDR     => 0x06;
-my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR)); # XXX get from XS in some way
+use constant NPattr_REFCNT   => 0x07;
+my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR REFCNT)); # XXX get from XS in some way
 
 
 GetOptions(
@@ -171,7 +172,7 @@ sub leave_node {
         }
         elsif (@stack >= 1 && ($padlist=$stack[-1])->{name} eq 'PADLIST') {
             my $padnames = $padlist->{attr}{+NPattr_PADNAME} || [];
-            $x->{name} = "Depth$index";
+            $x->{name} = "Pad$index";
         }
         else {
             $x->{name} = "[$index]";
@@ -198,7 +199,7 @@ sub leave_node {
         my $attr_json = $j->encode($x->{attr});
         my $leaves_json = $j->encode($x->{leaves});
         $node_ins_sth->execute(
-            $x->{id}, $x->{name}, $x->{title}, $x->{type}, $x->{depth}, $x->{parent_id},
+            $x->{id}, $x->{name}, $x->{attr}{label}, $x->{type}, $x->{depth}, $x->{parent_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
             $x->{child_id} ? join(",", @{$x->{child_id}}) : undef,
             $attr_json, $leaves_json,
@@ -270,7 +271,7 @@ while (<>) {
         my $attr = $node->{attr} || die;
 
         # attributes where the string is a key (or always empty and the type is the key)
-        if ($type == NPattr_NAME or $type == NPattr_NOTE) {
+        if ($type == NPattr_LABEL or $type == NPattr_NOTE) {
             printf "%s~%s(%s) %d [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $name, $val, $type
                 if $opt_text;
             warn "Node $id already has attribute $type:$name (value $attr->{$type}{$name})\n"
@@ -279,8 +280,8 @@ while (<>) {
             #Dwarn $attr;
             if ($type == NPattr_NOTE) {
             }
-            elsif ($type == NPattr_NAME) {
-                $node->{title} = $name if !$val; # XXX hack
+            elsif ($type == NPattr_LABEL) {
+                $attr->{label} = $name if !$val; # XXX hack
             }
         }
         elsif ($type == NPattr_ADDR) {
@@ -304,10 +305,15 @@ while (<>) {
                 if defined $attr->{$type}[$val];
             $attr->{+NPattr_PADNAME}[$val] = $name; # store all as NPattr_PADNAME
         }
+        elsif (NPattr_REFCNT==$type) {
+            printf "%s~%s %d\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $val
+                if $opt_text;
+            $attr->{refcnt} = $val;
+        }
         else {
             printf "%s~%s %d [t%d]\n", $indent x ($node->{depth}+1), $name, $val, $type
                 if $opt_text;
-            warn "Invalid attribute type '$type' on line $. ($_)";
+            warn "Unknown attribute type '$type' on line $. ($_)";
         }
     }
     elsif ($type eq 'S') { # start of a run
@@ -507,10 +513,18 @@ sub write_dangling_links {
         if $opt_debug;
     while ( my ($addr, $link_ids) = each %links_to_addr ) {
         next if $node_id_of_addr{$addr}; # not dangling
+        my @link_ids = keys %$link_ids;
 
-        $self->emit_addr_node($addr);
+        # one of the links that points to this addr has
+        # attributes that describe the addr being pointed to
+        my @link_attr = grep { $_->{refcnt} } map { $seqn2node{$_}->{attr} } @link_ids;
+        warn "multiple links to addr $addr have refcnt attr"
+            if @link_attr > 1;
+        my $attr = $link_attr[0];
 
-        for my $link_id (keys %$link_ids) {
+        $self->emit_addr_node($addr, $attr);
+
+        for my $link_id (@link_ids) {
             $self->emit_link($link_id, $addr, { kind => 'addr' });
         }
     }
@@ -595,8 +609,8 @@ sub open_file {
 
     my $file = $self->file;
     if ($file ne '/dev/tty') {
-        system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
-        system("open sizeme.html") if $^O eq 'darwin'; # OSX
+        #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
+        #system("open sizeme.html") if $^O eq 'darwin'; # OSX
         system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
     }
 }
@@ -621,11 +635,14 @@ sub emit_link {
 }
 
 sub emit_addr_node {
-    my ($self, $addr) = @_;
+    my ($self, $addr, $attr) = @_;
     my $fh = $self->fh or return;
+    my @label = sprintf("0x%x", $addr);
+    unshift @label, $attr->{label} if $attr->{label};
+    push    @label, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
     # output a dummy node for this addr for the links to connect to
     my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
-    push @node_attr, (sprintf "label=%s", _dotlabel(sprintf("0x%x", $addr)));
+    push @node_attr, (sprintf "label=%s", _dotlabel(\@label));
     printf $fh qq{n%d [%s];\n},
         $addr, join(",", @node_attr);
 }
@@ -643,8 +660,8 @@ sub emit_item_node {
 sub fmt_item_label {
     my ($self, $item_node) = @_;
     my @name;
-    push @name, "\"$item_node->{title}\""
-        if $item_node->{title};
+    push @name, "\"$item_node->{attr}{label}\""
+        if $item_node->{attr}{label};
     push @name, $item_node->{name};
     if ($item_node->{kids_size}) {
         push @name, sprintf " %s+%s=%s",
