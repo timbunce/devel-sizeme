@@ -622,7 +622,7 @@ sub emit_link {
 
     my @link_attr = ("id=$link_id");
     if ($attr->{kind} and $attr->{kind} eq 'addr') {
-        push @link_attr, 'arrowType="empty"', 'style="dotted"';
+        push @link_attr, 'arrowhead="empty"', 'style="dotted"';
     }
     else {
         push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
