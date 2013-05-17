@@ -4,13 +4,6 @@ See https://github.com/timbunce/devel-sizeme/issues
 
 Integrate changes back into Devel::Size so we can share a common core.
 
-Add ref count handling, per https://rt.cpan.org/Ticket/Display.html?id=79789
-Output addr as a leaf of a link node for items not scanned due to ref cnt
-    render those as dotted lines on the graph visualization
-    (and thus change from a tree to a DAG) so we can see alternate paths.
-
-Optionally add addr to all nodes to enable visualization of actual memory layout
-
 Restructure:
     Devel::SizeMe::Core - loads XS and sets options
     Devel::SizeMe - loads Devel::SizeMe::Core
@@ -48,3 +41,41 @@ Reduce data volume to optimize usage and visualizations
 
 Docs
     note TARG effect on total_size([[]]) not counting the inner ref due to refcnt
+    note issues around sizing of hash keys (re shared string table)
+
+Random References:
+http://cpansearch.perl.org/src/RURBAN/illguts-0.42/index.html
+
+Graph file formats:
+    dot (graphviz)
+    gdf - https://gephi.org/users/supported-graph-formats/gdf-format/
+    gexf - http://gexf.net/format/
+    gml - https://gephi.org/users/supported-graph-formats/gml-format/
+    graphml
+    net (Pajek)
+    vna (netdraw)
+    https://gephi.org/users/supported-graph-formats/
+    Suitable: gexf, gml, graphml (also gdf)
+
+Useful techniques:
+    Treemap
+    Hypergraph - hides distant detail
+
+Network Visualization tools:
+
+https://gephi.org
+    Import: dot, gml, gdf, graphml, net, vna, tlp
+    Export: dl, gdf, gexf, gml, graphml, net, vna
+    http://stackoverflow.com/questions/tagged/gephi
+http://zvtm.sourceforge.net/zgrviewer.html
+    Java app. Import: dot
+http://sourceforge.net/projects/hypergraph/
+    Java Applet.
+https://github.com/uskudnik/GraphGL
+    JS. Designed for rendering massive graphs. Immature.
+http://tulip.labri.fr/TulipDrupal/
+    Import: dot, gml, gexf, net, tlp
+    Export: gml, tlp
+http://www.cytoscape.org
+Graphviz - sfdp
+http://ophid.utoronto.ca/navigator/
