@@ -346,6 +346,8 @@ static char *
 svtypename(SV *sv)
 {
     int type = SvTYPE(sv);
+    if (type > SVt_LAST)
+        return "SVt_UNKNOWN";
     return (type == SVt_IV && SvROK(sv)) ? "RV" : svtypenames[type];
 }
 
