@@ -89,6 +89,7 @@ my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR REFCNT)); # XXX g
 GetOptions(
     'text!' => \my $opt_text,
     'dot=s' => \my $opt_dot,
+    'graphml=s' => \my $opt_graphml,
     'db=s'  => \my $opt_db,
     'verbose|v!' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
@@ -325,6 +326,12 @@ while (<>) {
             push @outputs, $out;
         }
 
+        if ($opt_graphml) {
+            my $out = Devel::SizeMe::Output::Easy->new(file => $opt_graphml, as => 'as_graphml');
+            $out->start_event_stream;
+            push @outputs, $out;
+        }
+
         if ($dbh) {
             # XXX add a size_run table records each run
             # XXX pick a table name to store the run nodes in
@@ -400,7 +407,6 @@ sub fmt_size {
 }
 
 
-# http://www.graphviz.org/content/attrs
 BEGIN {
 package Devel::SizeMe::Output;
 use Moo;
@@ -409,19 +415,12 @@ use Carp qw(croak);
 use HTML::Entities qw(encode_entities);;
 
 has file => (is => 'ro');
-has fh => (is => 'rw');
-
-*fmt_size = \&main::fmt_size;
 
 my %pending_links;
 
 sub start_event_stream {
     my ($self) = @_;
-
-    open my $fh, ">", $self->file;
-    $self->fh($fh);
-
-    $self->fh->autoflush if $opt_debug;
+    $self->create_output;
     $self->write_prologue;
 }
 
@@ -432,17 +431,14 @@ sub end_event_stream {
     $self->write_dangling_links;
     $self->write_epilogue;
 
-    close($self->fh);
-    $self->fh(undef);
-
-    $self->open_file if $opt_open;
+    $self->close_output;
+    $self->view_output if $opt_open;
 }
 
 sub write_prologue {
 }
 sub write_epilogue {
 }
-
 
 sub assign_link_to_item {
     my ($self, $link_node, $child, $attr) = @_;
@@ -530,7 +526,7 @@ sub write_dangling_links {
     }
 }
 
-sub open_file {
+sub view_output {
     my $self = shift;
 
     my $file = $self->file;
@@ -583,10 +579,37 @@ use Moo;
 use autodie;
 use Carp qw(croak);
 use HTML::Entities qw(encode_entities);;
+
 extends 'Devel::SizeMe::Output';
+
+has fh => (is => 'rw');
 
 *fmt_size = \&main::fmt_size;
 
+sub create_output {
+    my $self = shift;
+    open my $fh, ">", $self->file;
+    $self->fh($fh);
+    $self->fh->autoflush if $opt_debug;
+}
+
+sub close_output {
+    my $self = shift;
+    close($self->fh);
+    $self->fh(undef);
+}
+
+sub view_output {
+    my $self = shift;
+    $self->SUPER::view_output(@_);
+
+    my $file = $self->file;
+    if ($file ne '/dev/tty') {
+        #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
+        #system("open sizeme.html") if $^O eq 'darwin'; # OSX
+        system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
+    }
+}
 
 sub write_prologue {
     my $self = shift;
@@ -600,19 +623,8 @@ sub write_epilogue {
     my $self = shift;
     my $fh = $self->fh or return;
     $self->SUPER::write_epilogue(@_);
+    # { - balancing brace for the next line:
     print $fh "}\n";
-}
-
-sub open_file {
-    my $self = shift;
-    $self->SUPER::open_file(@_);
-
-    my $file = $self->file;
-    if ($file ne '/dev/tty') {
-        #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
-        #system("open sizeme.html") if $^O eq 'darwin'; # OSX
-        system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
-    }
 }
 
 sub emit_link {
@@ -689,7 +701,114 @@ sub _dotlabel {
     return qq{"$name"};
 }
 
+} # END
+
+BEGIN {
+package Devel::SizeMe::Output::Easy;
+use Moo;
+use autodie;
+use Graph::Easy;
+use Carp qw(croak);
+use HTML::Entities qw(encode_entities);;
+
+extends 'Devel::SizeMe::Output';
+
+has as => (is => 'rw', required => 1);
+has graph => (is => 'rw');
+
+*fmt_size = \&main::fmt_size;
+
+sub create_output {
+    my $self = shift;
+    my $graph = Graph::Easy->new();
+    $self->graph($graph);
 }
+
+sub close_output {
+    my $self = shift;
+    open my $fh, ">", $self->file;
+    my $as = $self->as; # method name
+    print $fh $self->graph->$as();
+    close $fh;
+    $self->file;
+}
+
+sub view_output {
+    my $self = shift;
+    $self->SUPER::view_output(@_);
+
+    my $file = $self->file;
+    if ($file ne '/dev/tty') {
+        #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
+        #system("open sizeme.html") if $^O eq 'darwin'; # OSX
+        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
+    }
+}
+
+sub emit_link {
+    my ($self, $link_id, $dest_id, $attr) = @_;
+
+    my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
+    my $edge = $self->graph->add_edge($link_node->{parent_id}, $dest_id);
+
+    (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
+    my %attr = ( label => $link_name );
+
+    if ($attr->{kind} and $attr->{kind} eq 'addr') {
+        $attr{style} = 'dotted';
+    }
+    else {
+        $attr{style} = 'dotted' if not $attr->{hard};
+    }
+    $edge->set_attributes(\%attr);
+}
+
+sub emit_addr_node {
+    my ($self, $addr, $attr) = @_;
+    my $node = $self->graph->add_node($addr);
+
+    my @label = sprintf("0x%x", $addr);
+    unshift @label, $attr->{label} if $attr->{label};
+    push    @label, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
+
+    my %attr = (
+        label => join("\n", @label),
+        color => "grey60",
+    );
+
+    $node->set_attributes(\%attr);
+}
+
+sub emit_item_node {
+    my ($self, $item_node, $attr) = @_;
+    my $node = $self->graph->add_node($item_node->{id});
+    my %attr = (
+        label => $attr->{label},
+    );
+    $node->set_attributes(\%attr);
+}
+
+sub fmt_item_label {
+    my ($self, $item_node) = @_;
+    my @name;
+    push @name, "\"$item_node->{attr}{label}\""
+        if $item_node->{attr}{label};
+    push @name, $item_node->{name};
+    if ($item_node->{kids_size}) {
+        push @name, sprintf " %s+%s=%s",
+            fmt_size($item_node->{self_size}),
+            fmt_size($item_node->{kids_size}),
+            fmt_size($item_node->{self_size}+$item_node->{kids_size});
+    }
+    else {
+        push @name, sprintf " +%s",
+            fmt_size($item_node->{self_size});
+    }
+    encode_entities($_, '\x00-\x1f') for @name;
+    return join("\n", @name);
+}
+
+} # END
 
 
 =for This is out of date but gives you an idea of the data and stream
