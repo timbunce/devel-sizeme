@@ -721,16 +721,26 @@ has graph => (is => 'rw');
 sub create_output {
     my $self = shift;
     my $graph = Graph::Easy->new();
+    $graph->id('sizeme');
     $self->graph($graph);
 }
 
 sub close_output {
     my $self = shift;
-    open my $fh, ">", $self->file;
-    my $as = $self->as; # method name
-    print $fh $self->graph->$as();
-    close $fh;
-    $self->file;
+    my $graph = $self->graph;
+    $graph->set_attribute('root', 1);
+    my %as_to_file = ($self->as, $self->file);
+    $as_to_file{as_graphviz} = 'sizeme_eg.dot';
+    # These trigger layout which is slooooow for more than a few node
+    #$as_to_file{as_ascii} = 'sizeme_eg.txt';
+    #$as_to_file{as_html} = 'sizeme_eg.html';
+    #$as_to_file{as_svg} = 'sizeme_eg.svg';
+    while ( my ($as, $file) = each %as_to_file) {
+        warn "Writing graph $as to $file...\n" if $opt_debug or 1;
+        open my $fh, ">", $file;
+        print $fh $graph->$as();
+        close $fh;
+    }
 }
 
 sub view_output {
@@ -756,6 +766,9 @@ sub emit_link {
 
     if ($attr->{kind} and $attr->{kind} eq 'addr') {
         $attr{style} = 'dotted';
+        $attr{arrowstyle} = 'closed';
+        $attr{labelcolor} = 'grey50';
+        $attr{color} = 'grey50';
     }
     else {
         $attr{style} = 'dotted' if not $attr->{hard};
@@ -773,7 +786,8 @@ sub emit_addr_node {
 
     my %attr = (
         label => join("\n", @label),
-        color => "grey60",
+        color => "grey50",
+        borderstyle => 'dotted',
     );
 
     $node->set_attributes(\%attr);
@@ -804,6 +818,7 @@ sub fmt_item_label {
         push @name, sprintf " +%s",
             fmt_size($item_node->{self_size});
     }
+    push @name, "#$item_node->{id}" if $opt_showid && $item_node;
     encode_entities($_, '\x00-\x1f') for @name;
     return join("\n", @name);
 }
