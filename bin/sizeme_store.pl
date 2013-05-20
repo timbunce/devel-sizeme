@@ -327,7 +327,7 @@ while (<>) {
         }
 
         if ($opt_graphml) {
-            my $out = Devel::SizeMe::Output::Easy->new(file => $opt_graphml, as => 'as_graphml');
+            my $out = Devel::SizeMe::Output::Graphml->new(file => $opt_graphml);
             $out->start_event_stream;
             push @outputs, $out;
         }
@@ -572,6 +572,231 @@ sub leave_node {
 } # Devel::SizeMe::Output
 
 
+
+BEGIN {
+
+# based on https://metacpan.org/source/SHLOMIF/Graph-Easy-0.72/lib/Graph/Easy/As_graphml.pm#L221
+# and https://metacpan.org/source/SZABGAB/SVG-2.59/lib/SVG/XML.pm#L47
+sub ::xml_escape {
+    local $_;
+    
+    s/&/&amp;/g;    # quote &
+    s/>/&gt;/g;     # quote >
+    s/</&lt;/g;     # quote <
+    s/"/&quot;/g;   # quote "
+    s/'/&apos;/g;   # quote '
+    s/\\\\/\\/g;    # "\\" to "\"
+
+    # Invalid XML characters are removed and warned about
+    # Tabs (\x09) and newlines (\x0a) are valid.
+    while ( s/([\x00-\x08\x0b\x1f])// ) {
+        my $char = "'\\x".sprintf('%02X',ord($1))."'";
+        Carp::carp("Removed $char from xml");
+    }
+    s/([\200-\377])/'&#'.ord($1).';'/ge;
+
+    return $_;
+}
+
+
+{
+package # hide from PAUSE
+    graphml::attr;
+use Moo;
+use Carp;
+my $next_id = 0;
+my %by_name;
+
+# graph, node, edge, or all
+has for => ( is=>'ro', required=>1 );
+# boolean, int, long, float, double, or string
+has type => ( is=>'ro', required=>1 );
+has name => ( is=>'ro', required=>1 );
+has default => ( is=>'ro' );
+has key => ( is=>'ro' );
+
+sub BUILD {
+    my $self = shift;
+    croak "Duplicate attribute name ".$self->name
+        if $by_name{ $self->name };
+    $by_name{ $self->name } = $self;
+    $next_id++;
+    $self->key( "d$next_id");
+}
+
+sub fmt_declaration {
+    my $self = shift;
+
+    my $default = '';
+    $default = sprintf "<default>%s</default>", ::xml_escape($self->default)
+        if defined $self->default;
+
+    return sprintf '<key id="%s" for="%s" attr.name="%s" attr.type="%s">%s</key>',
+        $self->key, $self->for, $self->name, $self->type, $default;
+}
+
+sub fmt_data {
+    my ($self, $value) = @_;
+    return sprintf '<data key="%s">%s</data>', $self->key, ::xml_escape($value);
+}
+
+}
+
+package Devel::SizeMe::Output::Graphml;
+# http://graphml.graphdrawing.org/primer/graphml-primer.html
+
+use Moo;
+use autodie;
+use Carp qw(croak);
+use HTML::Entities qw(encode_entities);;
+
+extends 'Devel::SizeMe::Output';
+
+has fh => (is => 'rw');
+
+*fmt_size = \&main::fmt_size;
+
+sub create_output {
+    my $self = shift;
+    open my $fh, ">", $self->file;
+    $self->fh($fh);
+    $self->fh->autoflush if $opt_debug;
+}
+
+sub close_output {
+    my $self = shift;
+    close($self->fh);
+    $self->fh(undef);
+}
+
+sub view_output {
+    my $self = shift;
+    $self->SUPER::view_output(@_);
+
+    my $file = $self->file;
+    if ($file ne '/dev/tty') {
+        #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
+        #system("open sizeme.html") if $^O eq 'darwin'; # OSX
+        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
+    }
+}
+
+sub write_prologue {
+    my $self = shift;
+    my $fh = $self->fh or return;
+
+    my $txt = <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+    http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+EOF
+;
+    print $fh $txt;
+
+    # define attr
+
+    print $fh qq{<graph id="sizeme" edgedefault="directed">\n};
+
+}
+
+sub write_epilogue {
+    my $self = shift;
+    my $fh = $self->fh or return;
+    print $fh qq{</graph>\n};
+    print $fh qq{</graphml>\n};
+}
+
+sub emit_link {
+    my ($self, $link_id, $dest_id, $attr) = @_;
+    my $fh = $self->fh or return;
+    my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
+
+    my @link_attr = ("id=$link_id");
+    if ($attr->{kind} and $attr->{kind} eq 'addr') {
+        push @link_attr, 'arrowhead="empty"', 'style="dotted"';
+    }
+    else {
+        push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
+    }
+
+    (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
+    push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
+
+
+    my @xml_attr;
+    printf $fh qq{\t<edge id="%s" source="%s" target="%s">\n},
+        $link_id, $link_node->{parent_id}, $dest_id;
+    print $fh "\t\t$_\n" for @xml_attr;
+    print $fh qq{\t</edge>\n},
+}
+
+sub _emit_node {
+    my ($self, $id, $xml_attr) = @_;
+    my $fh = $self->fh or return;
+    print $fh qq{\t<node id="$id">\n};
+    print $fh "\t\t$_\n" for @$xml_attr;
+    print $fh qq{\t</node>\n};
+}
+
+sub emit_addr_node {
+    my ($self, $addr, $attr) = @_;
+    my @label = sprintf("0x%x", $addr);
+    unshift @label, $attr->{label} if $attr->{label};
+    push    @label, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
+    # output a dummy node for this addr for the links to connect to
+    my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
+    push @node_attr, (sprintf "label=%s", _dotlabel(\@label));
+
+    $self->_emit_node($addr, []);
+}
+
+sub emit_item_node {
+    my ($self, $item_node, $attr) = @_;
+    my $name = $attr->{label};
+    my @node_attr = ( "id=$item_node->{id}" );
+    push @node_attr, sprintf("label=%s", _dotlabel($name, $item_node))
+        if $name;
+    $self->_emit_node($item_node->{id}, []);
+}
+
+sub fmt_item_label {
+    my ($self, $item_node) = @_;
+    my @name;
+    push @name, "\"$item_node->{attr}{label}\""
+        if $item_node->{attr}{label};
+    push @name, $item_node->{name};
+    if ($item_node->{kids_size}) {
+        push @name, sprintf " %s+%s=%s",
+            fmt_size($item_node->{self_size}),
+            fmt_size($item_node->{kids_size}),
+            fmt_size($item_node->{self_size}+$item_node->{kids_size});
+    }
+    else {
+        push @name, sprintf " +%s",
+            fmt_size($item_node->{self_size});
+    }
+    return \@name;
+}
+
+
+sub _dotlabel {
+    my ($name, $node) = @_;
+    my @names = (ref $name) ? @$name : ($name);
+    $name = join "\\n", map {
+        # escape unprintables XXX correct sins against unicode
+        s/([\000-\037\200-\237])/sprintf("\\x%02x",ord($1))/eg;
+        encode_entities($_)
+    } @names;
+    $name .= "\\n#$node->{id}" if $opt_showid && $node;
+    return qq{"$name"};
+}
+
+} # END
+
+
+
 # http://www.graphviz.org/content/attrs
 BEGIN {
 package Devel::SizeMe::Output::Graphviz;
@@ -798,6 +1023,9 @@ sub emit_item_node {
     my $node = $self->graph->add_node($item_node->{id});
     my %attr = (
         label => $attr->{label},
+        'x-self_size' => $item_node->{self_size},
+        'x-kids_size' => $item_node->{kids_size},
+        'x-size'      => $item_node->{self_size}+$item_node->{kids_size},
     );
     $node->set_attributes(\%attr);
 }
