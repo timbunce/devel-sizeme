@@ -89,7 +89,7 @@ my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR REFCNT)); # XXX g
 GetOptions(
     'text!' => \my $opt_text,
     'dot=s' => \my $opt_dot,
-    'graphml=s' => \my $opt_graphml,
+    'gexf=s' => \my $opt_gexf,
     'db=s'  => \my $opt_db,
     'verbose|v!' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
@@ -326,8 +326,8 @@ while (<>) {
             push @outputs, $out;
         }
 
-        if ($opt_graphml) {
-            my $out = Devel::SizeMe::Output::Graphml->new(file => $opt_graphml);
+        if ($opt_gexf) {
+            my $out = Devel::SizeMe::Output::GEXF->new(file => $opt_gexf);
             $out->start_event_stream;
             push @outputs, $out;
         }
@@ -578,7 +578,8 @@ BEGIN {
 # based on https://metacpan.org/source/SHLOMIF/Graph-Easy-0.72/lib/Graph/Easy/As_graphml.pm#L221
 # and https://metacpan.org/source/SZABGAB/SVG-2.59/lib/SVG/XML.pm#L47
 sub ::xml_escape {
-    local $_ = shift;
+    local $_ = shift
+        or return $_;
     #carp "xml_escape called with undef" if not defined $_;
     
     s/&/&amp;/g;    # quote &
@@ -644,8 +645,8 @@ sub fmt_data {
 
 }
 
-package Devel::SizeMe::Output::Graphml;
-# http://graphml.graphdrawing.org/primer/graphml-primer.html
+package Devel::SizeMe::Output::GEXF;
+# http://gexf.net/format/index.html
 
 use Moo;
 use autodie;
@@ -660,33 +661,19 @@ has fh => (is => 'rw');
 my @attr_names = qw(label_attr size_attr kids_size_attr total_size_attr weight_attr);
 has \@attr_names => (is => 'rw');
 
+my @buffered_edges;
+
 *fmt_size = \&main::fmt_size;
 
 sub BUILD {
     my $self = shift;
 
-=pod
-    # per https://bugs.launchpad.net/gephi/+bug/581629
-        properties.addNodePropertyAssociation(NodeProperties.LABEL, "label");
-        properties.addNodePropertyAssociation(NodeProperties.LABEL, "d3"); // Default node label used by yEd from yworks.com.
-        properties.addNodePropertyAssociation(NodeProperties.X, "x");
-        properties.addNodePropertyAssociation(NodeProperties.Y, "y");
-        properties.addNodePropertyAssociation(NodeProperties.Z, "z");
-        properties.addNodePropertyAssociation(NodeProperties.SIZE, "size");
-        //Default edge associations
-        properties.addEdgePropertyAssociation(EdgeProperties.LABEL, "label");
-        properties.addEdgePropertyAssociation(EdgeProperties.LABEL, "edgelabel");
-        properties.addEdgePropertyAssociation(EdgeProperties.LABEL, "d7"); // Default edge label used by yEd from yworks.com.
-        properties.addEdgePropertyAssociation(EdgeProperties.WEIGHT, "weight");
-        properties.addEdgePropertyAssociation(EdgeProperties.ID, "id");
-        properties.addEdgePropertyAssociation(EdgeProperties.ID, "edgeid");
-=cut
-
-    $self->label_attr( graphml::attr->new(for=>'all', type=>'string', name=>'label', key=>"d3"));
-    $self->size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'size'));
-    $self->kids_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'kids_size'));
-    $self->total_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'total_size'));
-    $self->weight_attr( graphml::attr->new(for=>'edge', type=>'double', name=>'weight', key=>'weight'));
+ #   $self->label_attr( graphml::attr->new(for=>'all', type=>'string', name=>'label', key=>"d3"));
+ #   $self->size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'size'));
+ #   $self->kids_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'kids_size'));
+ #   $self->total_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'total_size'));
+ #   $self->weight_attr( graphml::attr->new(for=>'edge', type=>'double', name=>'weight', key=>'weight'));
+    @buffered_edges = ();
 }
 
 sub create_output {
@@ -718,28 +705,50 @@ sub write_prologue {
     my $self = shift;
     my $fh = $self->fh or return;
 
-    my $txt = <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
-    http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
-EOF
-;
-    print $fh $txt;
-    # define attr
+    print $fh qq{<?xml version="1.0" encoding="UTF-8"?>
+<gexf xmlns="http://www.gexf.net/1.2draft"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:viz="http://www.gexf.net/1.2draft/viz"
+        xsi:schemaLocation="http://www.gexf.net/1.2draft
+        http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">
+    <meta lastmodifieddate="2013-01-01">
+        <creator>Devel::SizeMe</creator>
+        <description>Perl Internals Memory</description>
+    </meta>
+};
+    print $fh qq{<graph defaultedgetype="directed">
+        <attributes class="node" type="static">
+        <attribute id="label" title="label" type="string"/>
+        <attribute id="nsb" title="self_bytes" type="int"/>
+        <attribute id="nkb" title="kids_bytes" type="int"/>
+        <attribute id="ntb" title="total_bytes" type="int"/>
+        <attribute id="nrc" title="refcnt" type="int"/>
+        </attributes>
+};
 
-    print $fh qq{<graph id="sizeme" edgedefault="directed">\n};
-    print $fh $self->$_->fmt_data_key_declaration
-        for (@attr_names);
+}
 
+
+sub _fmt_viz {
+    my ($viz) = @_;
+    return '';
 }
 
 sub write_epilogue {
     my $self = shift;
     my $fh = $self->fh or return;
-    print $fh qq{</graph>\n};
-    print $fh qq{</graphml>\n};
+
+    print $fh qq{<edges>\n};
+    for my $edge (@buffered_edges) {
+        my ($id, $src, $dest, $label, $weight, $viz) = @$edge;
+        my $viz_str = _fmt_viz($viz);
+        my $suffix = ($viz_str) ? ">$viz_str</edge>" : " />";
+        print $fh sprintf qq{\t<edge id="%s" source="%s" target="%s" label="%s" weight="%s"%s\n},
+                $id, $src, $dest, ::xml_escape($label), $weight, $suffix;
+    }
+    print $fh qq{</edges>\n};
+
+    print $fh qq{</graph>\n</gexf>\n};
 }
 
 sub emit_link {
@@ -754,39 +763,53 @@ sub emit_link {
     else {
         push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
     }
-
     (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
     push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
 
-    my @attr;
-    push @attr, $self->label_attr->fmt_data($link_name);
+    my $label = _dotlabel($link_name, $link_node),
+    my $weight = 1;
+    my %viz;
 
-    printf $fh qq{\t<edge id="%s" source="%s" target="%s">\n},
-        $link_id, $link_node->{parent_id}, $dest_id;
-    print $fh "\t\t$_\n" for @attr;
-    print $fh qq{\t</edge>\n},
+    push @buffered_edges, [ $link_id, $link_node->{parent_id}, $dest_id, $label, $weight, \%viz ];
 }
 
+=pod
+<node id="646" label="java.beans.PropertyEditorManager">
+<viz:size value="4.18782"/>
+<viz:color b="2" g="110" r="254"/>
+<viz:position x="102.81538" y="-427.74304" z="0.0"/>
+</node>
+=cut
+
 sub _emit_node {
-    my ($self, $id, $xml_attr) = @_;
+    my ($self, $id, $label, $attr, $viz) = @_;
     my $fh = $self->fh or return;
-    print $fh qq{\t<node id="$id">\n};
-    print $fh "\t\t$_\n" for @$xml_attr;
+
+    warn "no label for node $id\n" unless $label;
+    printf $fh qq{\t<node id="%s" label="%s">\n}, $id, ::xml_escape($label||'');
+    if (keys %$attr) {
+        print $fh qq{\t<attvalues>\n};
+        while ( my ($k, $v) = each %$attr ) {
+            next if not defined $v;
+            printf $fh qq{\t\t<attvalue for="%s" value="%s"/>\n},
+                $k, ::xml_escape($v);
+        }
+        print $fh qq{\t</attvalues>\n};
+    }
     print $fh qq{\t</node>\n};
 }
 
 sub emit_item_node {
     my ($self, $item_node, $attr) = @_;
-    my $name = $attr->{label};
-    my @node_attr = ( "id=$item_node->{id}" );
-    push @node_attr, sprintf("label=%s", _dotlabel($name, $item_node))
-        if $name;
-    my @attr;
-    push @attr, $self->label_attr->fmt_data(_dotlabel($name, $item_node));
-    push @attr, $self->size_attr->fmt_data($item_node->{self_size});
-    push @attr, $self->kids_size_attr->fmt_data($item_node->{kids_size});
-    push @attr, $self->total_size_attr->fmt_data($item_node->{self_size}+$item_node->{kids_size});
-    $self->_emit_node($item_node->{id}, \@attr);
+    my %attr = (
+        nsb => $item_node->{self_size},
+        nkb => $item_node->{kids_size},
+        ntb => $item_node->{self_size}+$item_node->{kids_size},
+        nrc => $item_node->{refcnt},
+    );
+    my %viz;
+    my $label = _dotlabel($attr->{label}, $item_node);
+    $self->_emit_node($item_node->{id}, $label, \%attr, \%viz);
 }
 
 sub emit_addr_node {
@@ -798,9 +821,9 @@ sub emit_addr_node {
     my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
     push @node_attr, (sprintf "label=%s", _dotlabel(\@label));
 
-    my @attr;
-    push @attr, $self->label_attr->fmt_data(_dotlabel(\@label));
-    $self->_emit_node($addr, \@attr);
+    my %attr;
+    #push @attr, $self->label_attr->fmt_data(_dotlabel(\@label));
+    $self->_emit_node($addr, $attr->{label}, \%attr);
 }
 
 sub fmt_item_label {
@@ -829,9 +852,8 @@ sub _dotlabel {
     $name = join " ", map {
         # escape unprintables XXX correct sins against unicode
         s/([\000-\037\200-\237])/sprintf("\\x%02x",ord($1))/eg;
-        encode_entities($_)
+        $_;
     } @names;
-    $name .= " #$node->{id}" if $opt_showid && $node;
     return qq{$name};
 }
 
