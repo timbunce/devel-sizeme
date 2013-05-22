@@ -578,7 +578,8 @@ BEGIN {
 # based on https://metacpan.org/source/SHLOMIF/Graph-Easy-0.72/lib/Graph/Easy/As_graphml.pm#L221
 # and https://metacpan.org/source/SZABGAB/SVG-2.59/lib/SVG/XML.pm#L47
 sub ::xml_escape {
-    local $_;
+    local $_ = shift;
+    #carp "xml_escape called with undef" if not defined $_;
     
     s/&/&amp;/g;    # quote &
     s/>/&gt;/g;     # quote >
@@ -609,11 +610,11 @@ my %by_name;
 
 # graph, node, edge, or all
 has for => ( is=>'ro', required=>1 );
-# boolean, int, long, float, double, or string
+# boolean, int, long, float, double, or string are supported by gephi
 has type => ( is=>'ro', required=>1 );
 has name => ( is=>'ro', required=>1 );
 has default => ( is=>'ro' );
-has key => ( is=>'ro' );
+has key => ( is=>'rw' );
 
 sub BUILD {
     my $self = shift;
@@ -621,23 +622,24 @@ sub BUILD {
         if $by_name{ $self->name };
     $by_name{ $self->name } = $self;
     $next_id++;
-    $self->key( "d$next_id");
+    $self->key( ($self->name =~ m/^\w+$/) ? $self->name : "a$next_id")
+        unless defined $self->key;
 }
 
-sub fmt_declaration {
+sub fmt_data_key_declaration {
     my $self = shift;
 
     my $default = '';
     $default = sprintf "<default>%s</default>", ::xml_escape($self->default)
         if defined $self->default;
 
-    return sprintf '<key id="%s" for="%s" attr.name="%s" attr.type="%s">%s</key>',
+    return sprintf qq{\t<key id="%s" for="%s" attr.name="%s" attr.type="%s">%s</key>\n},
         $self->key, $self->for, $self->name, $self->type, $default;
 }
 
 sub fmt_data {
     my ($self, $value) = @_;
-    return sprintf '<data key="%s">%s</data>', $self->key, ::xml_escape($value);
+    return sprintf qq{<data key="%s">%s</data>}, $self->key, ::xml_escape($value);
 }
 
 }
@@ -652,9 +654,40 @@ use HTML::Entities qw(encode_entities);;
 
 extends 'Devel::SizeMe::Output';
 
+
 has fh => (is => 'rw');
 
+my @attr_names = qw(label_attr size_attr kids_size_attr total_size_attr weight_attr);
+has \@attr_names => (is => 'rw');
+
 *fmt_size = \&main::fmt_size;
+
+sub BUILD {
+    my $self = shift;
+
+=pod
+    # per https://bugs.launchpad.net/gephi/+bug/581629
+        properties.addNodePropertyAssociation(NodeProperties.LABEL, "label");
+        properties.addNodePropertyAssociation(NodeProperties.LABEL, "d3"); // Default node label used by yEd from yworks.com.
+        properties.addNodePropertyAssociation(NodeProperties.X, "x");
+        properties.addNodePropertyAssociation(NodeProperties.Y, "y");
+        properties.addNodePropertyAssociation(NodeProperties.Z, "z");
+        properties.addNodePropertyAssociation(NodeProperties.SIZE, "size");
+        //Default edge associations
+        properties.addEdgePropertyAssociation(EdgeProperties.LABEL, "label");
+        properties.addEdgePropertyAssociation(EdgeProperties.LABEL, "edgelabel");
+        properties.addEdgePropertyAssociation(EdgeProperties.LABEL, "d7"); // Default edge label used by yEd from yworks.com.
+        properties.addEdgePropertyAssociation(EdgeProperties.WEIGHT, "weight");
+        properties.addEdgePropertyAssociation(EdgeProperties.ID, "id");
+        properties.addEdgePropertyAssociation(EdgeProperties.ID, "edgeid");
+=cut
+
+    $self->label_attr( graphml::attr->new(for=>'all', type=>'string', name=>'label', key=>"d3"));
+    $self->size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'size'));
+    $self->kids_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'kids_size'));
+    $self->total_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'total_size'));
+    $self->weight_attr( graphml::attr->new(for=>'edge', type=>'double', name=>'weight', key=>'weight'));
+}
 
 sub create_output {
     my $self = shift;
@@ -694,10 +727,11 @@ sub write_prologue {
 EOF
 ;
     print $fh $txt;
-
     # define attr
 
     print $fh qq{<graph id="sizeme" edgedefault="directed">\n};
+    print $fh $self->$_->fmt_data_key_declaration
+        for (@attr_names);
 
 }
 
@@ -724,11 +758,12 @@ sub emit_link {
     (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
     push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
 
+    my @attr;
+    push @attr, $self->label_attr->fmt_data($link_name);
 
-    my @xml_attr;
     printf $fh qq{\t<edge id="%s" source="%s" target="%s">\n},
         $link_id, $link_node->{parent_id}, $dest_id;
-    print $fh "\t\t$_\n" for @xml_attr;
+    print $fh "\t\t$_\n" for @attr;
     print $fh qq{\t</edge>\n},
 }
 
@@ -740,6 +775,20 @@ sub _emit_node {
     print $fh qq{\t</node>\n};
 }
 
+sub emit_item_node {
+    my ($self, $item_node, $attr) = @_;
+    my $name = $attr->{label};
+    my @node_attr = ( "id=$item_node->{id}" );
+    push @node_attr, sprintf("label=%s", _dotlabel($name, $item_node))
+        if $name;
+    my @attr;
+    push @attr, $self->label_attr->fmt_data(_dotlabel($name, $item_node));
+    push @attr, $self->size_attr->fmt_data($item_node->{self_size});
+    push @attr, $self->kids_size_attr->fmt_data($item_node->{kids_size});
+    push @attr, $self->total_size_attr->fmt_data($item_node->{self_size}+$item_node->{kids_size});
+    $self->_emit_node($item_node->{id}, \@attr);
+}
+
 sub emit_addr_node {
     my ($self, $addr, $attr) = @_;
     my @label = sprintf("0x%x", $addr);
@@ -749,16 +798,9 @@ sub emit_addr_node {
     my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
     push @node_attr, (sprintf "label=%s", _dotlabel(\@label));
 
-    $self->_emit_node($addr, []);
-}
-
-sub emit_item_node {
-    my ($self, $item_node, $attr) = @_;
-    my $name = $attr->{label};
-    my @node_attr = ( "id=$item_node->{id}" );
-    push @node_attr, sprintf("label=%s", _dotlabel($name, $item_node))
-        if $name;
-    $self->_emit_node($item_node->{id}, []);
+    my @attr;
+    push @attr, $self->label_attr->fmt_data(_dotlabel(\@label));
+    $self->_emit_node($addr, \@attr);
 }
 
 sub fmt_item_label {
@@ -784,13 +826,13 @@ sub fmt_item_label {
 sub _dotlabel {
     my ($name, $node) = @_;
     my @names = (ref $name) ? @$name : ($name);
-    $name = join "\\n", map {
+    $name = join " ", map {
         # escape unprintables XXX correct sins against unicode
         s/([\000-\037\200-\237])/sprintf("\\x%02x",ord($1))/eg;
         encode_entities($_)
     } @names;
-    $name .= "\\n#$node->{id}" if $opt_showid && $node;
-    return qq{"$name"};
+    $name .= " #$node->{id}" if $opt_showid && $node;
+    return qq{$name};
 }
 
 } # END
