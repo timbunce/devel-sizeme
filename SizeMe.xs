@@ -342,8 +342,8 @@ gettimeofday_nv(pTHX)
 }
 
 
-static char *
-svtypename(SV *sv)
+static const char *
+svtypename(const SV *sv)
 {
     int type = SvTYPE(sv);
     if (type > SVt_LAST)
@@ -474,7 +474,7 @@ void
 np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr_type, const char *attr_name, UV attr_value)
 {
     if (st->trace_level >= 8)
-        warn("np_dump_node_path_info(np=%p, type=%u, name=%p, value=%u):\n",
+        warn("np_dump_node_path_info(np=%p, type=%lu, name=%p, value=%lu):\n",
             npath_node, attr_type, attr_name, attr_value);
 
     if (attr_type == NPattr_LEAFSIZE && !attr_value)
@@ -501,7 +501,7 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
         fprintf(stderr, "~pad%lu %s %lu", attr_type, attr_name, attr_value);
         break;
     default:
-        fprintf(stderr, "~?[type %u unknown]? %s %lu", attr_type, attr_name, attr_value);
+        fprintf(stderr, "~?[type %lu unknown]? %s %lu", attr_type, attr_name, attr_value);
         break;
     }
     fprintf(stderr, "\n");
