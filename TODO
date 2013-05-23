@@ -48,10 +48,13 @@ http://cpansearch.perl.org/src/RURBAN/illguts-0.42/index.html
 
 Graph file formats:
     dot (graphviz)
-    gdf - https://gephi.org/users/supported-graph-formats/gdf-format/
-    gexf - http://gexf.net/format/
-    gml - https://gephi.org/users/supported-graph-formats/gml-format/
     graphml
+        http://en.wikipedia.org/wiki/GraphML
+        http://graphml.graphdrawing.org/primer/graphml-primer.html
+    gexf - http://gexf.net/format/
+        http://gexf.net/1.2draft/gexf-12draft-primer.pdf
+    gml - https://gephi.org/users/supported-graph-formats/gml-format/
+    gdf - https://gephi.org/users/supported-graph-formats/gdf-format/
     net (Pajek)
     vna (netdraw)
     https://gephi.org/users/supported-graph-formats/
@@ -64,9 +67,18 @@ Useful techniques:
 Network Visualization tools:
 
 https://gephi.org
+    http://gephi.org/tutorials/gephi-tutorial-visualization.pdf
     Import: dot, gml, gdf, graphml, net, vna, tlp
     Export: dl, gdf, gexf, gml, graphml, net, vna
+        https://marketplace.gephi.org/plugin/sigmajs-exporter/
     http://stackoverflow.com/questions/tagged/gephi
+    Opt-click-drag on mac trackpad to alter 3d view
+
+http://www.cytoscape.org
+    http://cytoscape.org/manual/Cytoscape2_8Manual.html#Supported%20Network%20File%20Formats
+    Import: gml, xgmml, sbml, biopax, psi-mi, sif, nnf
+    Export: xgmml, psi-mi, sif, nnf
+
 http://zvtm.sourceforge.net/zgrviewer.html
     Java app. Import: dot
 http://sourceforge.net/projects/hypergraph/
@@ -76,6 +88,5 @@ https://github.com/uskudnik/GraphGL
 http://tulip.labri.fr/TulipDrupal/
     Import: dot, gml, gexf, net, tlp
     Export: gml, tlp
-http://www.cytoscape.org
 Graphviz - sfdp
 http://ophid.utoronto.ca/navigator/

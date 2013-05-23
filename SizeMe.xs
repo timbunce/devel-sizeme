@@ -17,6 +17,9 @@
 #include "XSUB.h"
 
 #define DPPP_PL_parser_NO_DUMMY
+#define NEED_my_snprintf
+#define NEED_pv_escape
+#define NEED_pv_pretty
 #define NEED_PL_parser
 #include "ppport.h"
 
@@ -1368,7 +1371,7 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
     sv_size(aTHX_ st, NPathLink("PadlistNAMES"), (SV*)PadlistNAMES(padl));
 
 if (0) {
-    Perl_do_dump_pad(aTHX_ 0, Perl_debug_log, padl, 1);
+    do_dump_pad(0, Perl_debug_log, padl, 1);
     do_sv_dump(0, Perl_debug_log, (SV*)PadlistNAMES(padl), 0, 4, 0, 0);
 }
 
