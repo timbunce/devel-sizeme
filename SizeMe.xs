@@ -367,7 +367,7 @@ np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
         break;
     }
     case NPtype_OP: { /* id is pointer to the OP op_size was called on */
-        const OP *op = (OP*)npath_node->id;
+        OP *op = (OP*)npath_node->id;
         fprintf(fp, "OP(%s)", OP_NAME(op));
         break;
     }
@@ -624,7 +624,7 @@ check_new(struct state *st, const void *const p) {
 static UV
 get_sv_follow_seencnt(pTHX_ struct state *st, const SV *const sv)
 {
-    return PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
+    return PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, (void*)sv));
 }
 
 static int
@@ -640,8 +640,8 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
     }
 
     /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
-    seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, sv));
-    ptr_table_store(st->sv_refcnt_ptr_table, sv, (void*)seen_cnt);
+    seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, (void*)sv));
+    ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, (void*)seen_cnt);
 
     ++st->multi_refcnt;
     if (st->trace_level >= 9)
@@ -1003,6 +1003,9 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
         ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(hek));
         /* XXX make this the NPattr_LABEL of the HeVAL link if not showing detail */
         /* give a safe short hint of the key string */
+#ifndef PERL_PV_ESCAPE_NONASCII
+#define PERL_PV_ESCAPE_NONASCII 0
+#endif
         pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
             NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
         ADD_ATTR(st, NPattr_LABEL, SvPVX(st->tmp_sv), 0);
