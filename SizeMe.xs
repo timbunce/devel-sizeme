@@ -214,6 +214,11 @@ struct state {
             if(st->trace_level>=9)fprintf(stderr,"NPathSetNode (%p <-) %p <- [%d %p]\n", (NP-1)->prev, (NP-1), nodetype,nodeid);\
             (NP-1)->seqn = 0; \
     } STMT_END
+#define NPathSetNodeIfChanged(nodeid, nodetype) \
+    STMT_START { \
+        if (strNE(nodeid, (NP-1)->id) || nodetype != (NP-1)->type) \
+            NPathSetNode(nodeid, nodetype); \
+    } STMT_END
 #define NPathPopNode \
     STMT_START { \
             --NP; \
@@ -1859,8 +1864,8 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
  * are vast numbers of SVs here and that stresses the UI
  */
         ++arena_count;
-        sprintf(path_link_group, "arena-group-%d", (arena_count >> 8));
-        NPathSetNode(path_link_group, NPtype_NAME);
+        sprintf(path_link_group, "arena-g%d", (arena_count >> 8));
+        NPathSetNodeIfChanged(path_link_group, NPtype_NAME);
 
         sprintf(path_link_name, "arena-%p", sva);
         NPathPushNode(path_link_name, NPtype_NAME);
@@ -2139,7 +2144,8 @@ perl_size()
 CODE:
 {
   /* just the current perl interpreter */
-  struct state *st = new_state(aTHX_ NULL);
+  /* PL_defstash works around the main:: => :: ref loop */
+  struct state *st = new_state(aTHX_ PL_defstash);
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
   free_state(aTHX_ st);
