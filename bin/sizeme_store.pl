@@ -121,8 +121,10 @@ my %node_id_of_addr;
 sub note_item_addr {
     my ($addr, $id) = @_;
     # for items with addr we record the id of the item
-    warn "already seen node_id_of_addr $addr (old $node_id_of_addr{$addr}, new $id)\n"
-        if $node_id_of_addr{$addr};
+    if (my $old = $node_id_of_addr{$addr}) {
+        return if $id == $old;
+        warn "id for address $addr changed from $old to $id!\n";
+    }
     $node_id_of_addr{$addr} = $id;
     Dwarn { node_id_of_addr => $id } if $opt_debug;
 }
@@ -251,7 +253,6 @@ while (<>) {
             and $val
             and (my $addr = $stack[-2]{attr}{addr})
         ) {
-            warn "noted addr from parent\n";
             note_item_addr($addr, $id);
         }
 
