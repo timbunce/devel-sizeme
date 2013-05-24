@@ -322,15 +322,9 @@ Welcome to the Mojolicious real-time web framework!
 
 <!--[if IE]><script language="javascript" type="text/javascript" src="excanvas.js"></script><![endif]-->
 
-<script language="javascript" type="text/javascript" src="jit-yc.js"></script>
-<script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
-<script language="javascript" type="text/javascript" src="sprintf.js"></script>
-<script language="javascript" type="text/javascript" src="treemap.js"></script>
-<script language="javascript" type="text/javascript" src="bootstrap/js/bootstrap.min.js"></script>
-<script language="javascript" type="text/javascript" src="yesmeck-jquery-jsonview/jquery.jsonview.js"></script>
 </head>
 
-<body onload="init();">
+<body>
 
 <div class="container-fluid">
 
@@ -384,5 +378,14 @@ Welcome to the Mojolicious real-time web framework!
 </div>
 
 </div>
+
+<script language="javascript" type="text/javascript" src="jit-yc.js"></script>
+<script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
+<script language="javascript" type="text/javascript" src="sprintf.js"></script>
+<script language="javascript" type="text/javascript" src="treemap.js"></script>
+<script language="javascript" type="text/javascript" src="bootstrap/js/bootstrap.min.js"></script>
+<script language="javascript" type="text/javascript" src="yesmeck-jquery-jsonview/jquery.jsonview.js"></script>
+<script type="text/javascript"> $('document').ready(init) </script>
+
 </body>
 </html>
