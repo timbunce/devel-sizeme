@@ -134,7 +134,7 @@ get '/jit_tree/:id/:depth' => sub {
         Dwarn(Storable::dclone($jit_tree)); # dclone to avoid stringification
     }
 
-    $self->render_json($jit_tree);
+    $self->render(json=>$jit_tree);
 };
 
 my %node_queue;
