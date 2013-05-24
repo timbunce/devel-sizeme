@@ -316,6 +316,7 @@ Welcome to the Mojolicious real-time web framework!
 <!-- CSS Files -->
 <link type="text/css" href="css/base.css" rel="stylesheet" />
 <link type="text/css" href="css/Treemap.css" rel="stylesheet" />
+<link type="text/css" href="yesmeck-jquery-jsonview/jquery.jsonview.css" rel="stylesheet" />
 <link type="text/css" href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen" />
 <link type="text/css" href="bootstrap/css/bootstrap-responsive.min.css" rel="stylesheet" />
 
@@ -326,6 +327,7 @@ Welcome to the Mojolicious real-time web framework!
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
 <script language="javascript" type="text/javascript" src="treemap.js"></script>
 <script language="javascript" type="text/javascript" src="bootstrap/js/bootstrap.min.js"></script>
+<script language="javascript" type="text/javascript" src="yesmeck-jquery-jsonview/jquery.jsonview.js"></script>
 </head>
 
 <body onload="init();">
@@ -342,17 +344,21 @@ Welcome to the Mojolicious real-time web framework!
             </div>
         </div>
         <div class="row-fluid">
-            <div class="span12" id="sizeme_info_div">
+            <div class="span12 text-left" id="sizeme_info_div">
                 <p class="text-left">
-                Click on a node to zoom in.<br /><br />            
                 <a id="back" href="#" class="theme button white">Go to Parent</a>
-                <br />
                 <form name=params>
-                <label for="logarea">&nbsp;Logarithmic scale
+                <label for="logarea">Log scale
                 <input type=checkbox id="logarea" name="logarea">
                 </form>
                 </p>
             </div>
+        </div>
+        <div class="row-fluid">
+            <small>
+            <div class="span12 text-left" id="sizeme_data_div">
+            </div>
+            </small>
         </div>
 
     </div>
