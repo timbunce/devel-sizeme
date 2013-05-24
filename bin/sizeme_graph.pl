@@ -201,6 +201,8 @@ sub _fetch_node_tree {
     $node->{attr}   = $j->decode(delete $node->{attr_json});
     $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
+    $depth = 1 if $depth > 1 and $node->{name} =~ /^arena/;
+
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
 
@@ -208,6 +210,7 @@ sub _fetch_node_tree {
         # this makes the treemap more usable
         if (@child_ids == 1
             #        && $node->{type} == 2 # only collapse links XXX
+                and $node->{name} !~ /^arena/
         ) {
             warn "#$id fetch only child $child_ids[0]\n"
                 if $opt_debug;
@@ -230,7 +233,7 @@ sub _fetch_node_tree {
                     my $dst = $child->{attr}{$attr_type} ||= {};
                     for my $k (keys %$src) {
                         warn "Node $child->{id} attr $attr_type:$k=$dst->{$k} overwritten by $src->{$k}\n"
-                            if defined $dst->{$k};
+                            if defined $dst->{$k} and $dst->{$k} ne $src->{$k};
                         $dst->{$k} = $src->{$k};
                     }
                 }
@@ -260,9 +263,13 @@ sub _fetch_node_tree {
             $node = $child; # use the merged child as this node
         }
 
-        if (@child_ids > 10_000) {
+        if (@child_ids > 1_000) {
             warn "Node $id ($node->{name}) has ".scalar(@child_ids)." children\n";
             # XXX merge/prune/something?
+        }
+
+        if ($node->{name} =~ /^arena-g\d+/) {
+            warn "$node->{name} $depth";
         }
 
         if ($depth) { # recurse to required depth
@@ -299,52 +306,77 @@ Welcome to the Mojolicious real-time web framework!
 
 @@ layouts/default.html.ep
 <!DOCTYPE html>
+<html lang="en">
+
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Perl Memory Treemap</title>
 
 <!-- CSS Files -->
 <link type="text/css" href="css/base.css" rel="stylesheet" />
 <link type="text/css" href="css/Treemap.css" rel="stylesheet" />
+<link type="text/css" href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen" />
+<link type="text/css" href="bootstrap/css/bootstrap-responsive.min.css" rel="stylesheet" />
 
 <!--[if IE]><script language="javascript" type="text/javascript" src="excanvas.js"></script><![endif]-->
 
-<!-- JIT Library File -->
 <script language="javascript" type="text/javascript" src="jit-yc.js"></script>
 <script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
 <script language="javascript" type="text/javascript" src="treemap.js"></script>
+<script language="javascript" type="text/javascript" src="bootstrap/js/bootstrap.min.js"></script>
 </head>
 
 <body onload="init();">
 
-<div id="container">
+<div class="container-fluid">
 
-<div id="left-container">
+<div class="row-fluid">
 
-<div class="text">
-<h4> Perl Memory TreeMap </h4> 
-    Click on a node to zoom in.<br /><br />            
+    <div class="span3" id="sizeme_left_column_div">
+
+        <div class="row-fluid">
+            <div class="span12" id="sizeme_title_div">
+                <h4>Perl Memory TreeMap</h4> 
+            </div>
+        </div>
+        <div class="row-fluid">
+            <div class="span12" id="sizeme_info_div">
+                <p class="text-left">
+                Click on a node to zoom in.<br /><br />            
+                <a id="back" href="#" class="theme button white">Go to Parent</a>
+                <br />
+                <form name=params>
+                <label for="logarea">&nbsp;Logarithmic scale
+                <input type=checkbox id="logarea" name="logarea">
+                </form>
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="span9" id="sizeme_right_column_div">
+        <div class="row-fluid">
+            <div class="span9" id="sizeme_path_div">
+            <p class="text-left" id="sizeme_path_p">Path</p>
+            </div>
+            <div class="span9">
+                <div id="XXcenter-container">
+                    <div id="infovis"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<a id="back" href="#" class="theme button white">Go to Parent</a>
-<br />
-<form name=params>
-<label for="logarea">&nbsp;Logarithmic scale
-<input type=checkbox id="logarea" name="logarea">
-</form>
-
+<div class="row-fluid">
+    <div class="span12" id="sizeme_log_div">
+        <p class="text-left" id="sizeme_log_p">Log</p>
+    </div>
 </div>
 
-<div id="center-container">
-    <div id="infovis"></div>
-</div>
-
-<div id="right-container">
-    <div id="inner-details"></div>
-</div>
-
-<div id="log"></div>
 </div>
 </body>
 </html>

@@ -1,13 +1,5 @@
-#right-container {
-  display: none;
-}
-
-#center-container {
-  width:800px;
-}
-
 #infovis {
-  width:800px;
+  width:900px;
 }
 
 .node {
@@ -33,11 +25,6 @@
     font-size:10px;
     font-family: Menlo, Monaco, "Courier New", monospace;
     padding:7px;
-}
-
-.album {
-    width:100px;
-    margin:3px;
 }
 
 #id-list {
