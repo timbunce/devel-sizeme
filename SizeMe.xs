@@ -1509,8 +1509,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
         ADD_ATTR(st, NPattr_NOTE, "av_len", av_len((AV*)thing));
         dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
 
-        i = AvFILLp(thing) + 1;
-        while (i--) {
+        for (i=0; i <= AvFILLp(thing); ++i) { /* in natural order */
             if (sv_size(aTHX_ st, NPathLink("elem"), AvARRAY(thing)[i]))
                 ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
         }
