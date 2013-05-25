@@ -76,10 +76,8 @@ GetOptions(
 die "Can't open $opt_db: $!\n" unless -r $opt_db;
 warn "Reading $opt_db\n";
 
-my $dbh = DBI->connect("dbi:SQLite:$opt_db");
-my $select_node_by_id_sth = $dbh->prepare("select * from node where id = ?") or die $dbh->errstr;
-$select_node_by_id_sth->execute(1);
-my $select_node_by_id_fields = $select_node_by_id_sth->{NAME} or die;
+my $dbh = DBI->connect("dbi:SQLite:$opt_db", undef, undef, { RaiseError => 1 });
+my $select_node_by_id_sth = $dbh->prepare("select * from node where id = ?");
 
 
 my $static_dir = $INC{'Devel/SizeMe/Graph.pm'} or die 'panic';
@@ -164,6 +162,7 @@ sub _get_node {
     # optimize for single node
     if (@ids == 1) {
         $select_node_by_id_sth->execute($id);
+        our $select_node_by_id_fields ||= $select_node_by_id_sth->{NAME};
         my %node;
         @node{@$select_node_by_id_fields} = $select_node_by_id_sth->fetchrow_array
             or die "Node '$id' not found"; # should not happen
