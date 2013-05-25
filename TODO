@@ -23,21 +23,14 @@ hv placeholders
 [ 1 => [] ]
 $x=[]; push @$x, $x; total_size($x); # loop
 
-Visualization should show refs to SVs that weren't counted.
-
-Remove log scale checkbox from the treemp as it doesn't work yet
 
 Reduce data volume to optimize usage and visualizations
     ideally as an optional post-processing on the db tables
-    drop he+hek detail?
-        perhaps by adding a size to links to represent the hidden sizes
-    drop SV(RV) detail
+    drop SV(RV) detail?
         for cases where there's only a single ref to the SV(RV)
     prune
-        bottom up delete nodes below a certain size
-    enable control of level of detail
-        cop_file as node or as attribute?
-        he/hek etc as node or as attribute (if note shared)?
+        bottom up delete nodes below a certain size, add size to parent
+        only if the parent is the only node refering to it
 
 Docs
     note TARG effect on total_size([[]]) not counting the inner ref due to refcnt
