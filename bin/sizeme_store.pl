@@ -91,7 +91,7 @@ GetOptions(
     'dot=s' => \my $opt_dot,
     'gexf=s' => \my $opt_gexf,
     'db=s'  => \my $opt_db,
-    'verbose|v!' => \my $opt_verbose,
+    'verbose|v+' => \my $opt_verbose,
     'debug|d!' => \my $opt_debug,
     'showid!' => \my $opt_showid,
     'open!' => \my $opt_open,
@@ -142,7 +142,7 @@ sub note_link_to_addr {
 
 sub enter_node {
     my $x = shift;
-    warn ">> enter_node $x->{id}\n" if $opt_debug;
+    warn ">> enter_node $x->{id}\n" if $opt_verbose;
     return $x;
 }
 
@@ -150,10 +150,11 @@ sub enter_node {
 sub leave_node {
     my $x = shift;
     confess unless defined $x->{id};
-    warn "<< leave_node $x->{id}\n" if $opt_debug;
+    warn "<< leave_node $x->{id}\n" if $opt_verbose;
     #delete $seqn2node{$x->{id}};
 
-    my $self_size = 0; $self_size += $_ for values %{$x->{leaves}};
+    my $self_size = 0;
+    $self_size += $_ for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
 
     my $parent = $stack[-1];
@@ -223,37 +224,37 @@ while (<>) {
 
     if ($type =~ s/^-//) {     # Node type ($val is depth)
 
-        printf "%s%s%s %s [#%d @%d]\n", $indent x $val, $name,
-                ($type == NPtype_LINK) ? "->" : "",
-                $extra||'', $id, $val
-            if $opt_text;
-
         # this is the core driving logic
 
         while ($val < @stack) {
             my $x = leave_node(pop @stack);
             warn "N $id d$val ends $x->{id} d$x->{depth}: size $x->{self_size}+$x->{kids_size}\n"
-                if $opt_verbose;
+                if $opt_debug;
         }
+
+        printf "%s%s%s %s [#%d @%d]\n", $indent x $val, $name,
+                ($type == NPtype_LINK) ? "->" : "",
+                $extra||'', $id, $val
+            if $opt_text;
 
         die "panic: stack already has item at depth $val" if $stack[$val];
         die "Depth out of sync\n" if $val != @stack;
 
         my $node = enter_node({
             id => $id, type => $type, name => $name, extra => $extra,
-            attr => { }, leaves => {}, depth => $val, self_size=>0, kids_size=>0
+            attr => { }, leaves => {}, depth => $val, self_size=>0,
+            kids_size=>0, kids_node_count=>0
         });
 
         $stack[$val] = $node;
         $seqn2node{$id} = $node;
 
-        # if parent is a link that has an addr
-        # then copy that addr to this item
+        # if parent is a link that has an addr then note the addr is associated with this node
         if ($type != NPtype_LINK
             and $val
-            and (my $addr = $stack[-2]{attr}{addr})
+            and (my $addr_on_parent_link = $stack[-2]{attr}{addr})
         ) {
-            note_item_addr($addr, $id);
+            note_item_addr($addr_on_parent_link, $id);
         }
 
     }
@@ -289,7 +290,6 @@ while (<>) {
         elsif ($type == NPattr_ADDR) {
             printf "%s~%s %d 0x%x [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $val, $val, $type
                 if $opt_text;
-            #$attr->{NPattr_NOTE()}{'addr'} = $val;
             $attr->{addr} = $val;
             # for SVs we see all the link addrs before the item addr
             # for hek's etc we see the item addr before the link addrs
@@ -379,7 +379,7 @@ while (<>) {
 
         if ($opt_verbose or $run_size != $top_size) {
             warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
-            warn Dumper($top);
+            warn Dumper($top) if $opt_debug;
         }
         #die "panic: seqn2node should be empty ". Dumper(\%seqn2node) if %seqn2node;
 
