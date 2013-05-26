@@ -1827,10 +1827,14 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
     dVAR;
     SV* sva;
     U32 arena_count;
+    int want_type;
     dNPathNodes(3, NPathArg);
 
+    if (st->trace_level)
+        fprintf(stderr, "sweeping arenas for unseen SVs\n");
+
     NPathPushNode("unseen", NPtype_NAME);
-    NPathPushNode("dummy", NPtype_NAME);
+    NPathPushNode("dummy", NPtype_LINK);
 
     /* by this point we should have visited all the SVs
      * so now we'll run through all the SVs via the arenas
@@ -1839,44 +1843,56 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
      * found here will be leaks.
      * Meanwhile, this can find many thousands...
      */
-    for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
+
+    /* we break this down by type to be more useful (and avoid lots of
+     * SVs with the same path
+     */
+    for (want_type = SVt_LAST-1; want_type >= 0; --want_type) {
         char path_link_group[40];
-        char path_link_name[40];
-        const SV * const svend = &sva[SvREFCNT(sva)];
-        SV* sv;
 
-/* XXX break this down in some way because sometimes there
- * are vast numbers of SVs here and that stresses the UI
- */
-        ++arena_count;
-        sprintf(path_link_group, "arena-g%d", (arena_count >> 8));
-        NPathSetNodeIfChanged(path_link_group, NPtype_NAME);
+        sprintf(path_link_group, "arena-%s", svtypenames[want_type]);
+        NPathSetNode(path_link_group, NPtype_LINK);
 
-        sprintf(path_link_name, "arena-%p", sva);
-        NPathPushNode(path_link_name, NPtype_NAME);
+        for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
+            char path_link_name[40];
+            const SV * const svend = &sva[SvREFCNT(sva)];
+            SV* sv;
 
-        if (st->trace_level)
-            fprintf(stderr, "%s start: %ld\n", path_link_name, st->total_size);
+            sprintf(path_link_name, "arena-%p", sva);
+            NPathPushNode(path_link_name, NPtype_NAME);
 
-        for (sv = sva + 1; sv < svend; ++sv) {
-            if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
-                /* is a live SV */
-                sv_size(aTHX_ st, NPathLink("arena"), sv);
-                continue;
+            if (st->trace_level >= 7)
+                fprintf(stderr, "%s/%s start: %ld\n", path_link_group, path_link_name, st->total_size);
+
+            for (sv = sva + 1; sv < svend; ++sv) {
+                if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
+                    /* is a live SV */
+                    if (SvTYPE(sv) == want_type) {
+                        if (sv_size(aTHX_ st, NPathLink("arena"), sv)) {
+                            if (st->trace_level > 2) {
+                                fprintf(stderr, "unseen sv type %d (want %d) ", SvTYPE(sv), want_type);
+                                sv_dump(sv);
+                            }
+                        }
+                    }
+                    continue;
+                }
+                /* dead SV */
+                if (check_new(st, sv)) { /* sanity check */
+                    fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
+                    np_dump_node_path(aTHX_ st, NP);
+                    fprintf(stderr, ": ");
+                    sv_dump(sv);
+                }
             }
-            /* dead SV */
-            if (check_new(st, sv)) { /* sanity check */
-                fprintf(stderr, "unseen_sv_size encountered freed SV unexpectedly at ");
-                np_dump_node_path(aTHX_ st, NP);
-                fprintf(stderr, ": ");
-                sv_dump(sv);
-            }
+
+            if (st->trace_level >= 7)
+                fprintf(stderr, "%s/%s   end: %ld\n", path_link_group, path_link_name, st->total_size);
+
+            NPathPopNode;
         }
-
-        if (st->trace_level)
-            fprintf(stderr, "%s   end: %ld\n", path_link_name, st->total_size);
-        NPathPopNode;
     }
+
 }
 
 #ifdef PERL_MAD
