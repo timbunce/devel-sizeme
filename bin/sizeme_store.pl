@@ -448,7 +448,8 @@ sub assign_link_to_item {
 
     my $child_id = (ref $child) ? $child->{id} : $child;
 
-    warn "assign_link_to_item $link_node->{id} -> $child_id @{[ %$attr ]}\n";
+    warn "assign_link_to_item $link_node->{id} -> $child_id @{[ %$attr ]}\n"
+        if $opt_verbose;
     warn "$link_node->{id} is not a link"
         if $link_node->{type} != ::NPtype_LINK;
     # XXX add check that $link_node is 'dangling'
@@ -463,7 +464,7 @@ sub assign_addr_to_link {
 
     if (my $id = $node_id_of_addr{$addr}) {
         # link to an addr for which we already have the node
-        warn "LINK addr $link->{id} -> $id\n";
+        warn "LINK addr $link->{id} -> $id\n" if $opt_debug;
         $self->assign_link_to_item($link, $id, { hard => 0 });
     }
     else {
@@ -520,7 +521,11 @@ sub write_dangling_links {
             if @link_attr > 1;
         my $attr = $link_attr[0];
 
-        $self->emit_addr_node($addr, $attr);
+        my @labels = sprintf("0x%x", $addr);
+        unshift @labels, $attr->{label} if $attr->{label};
+        push    @labels, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
+
+        $self->emit_addr_node($addr, \@labels, $attr);
 
         for my $link_id (@link_ids) {
             $self->emit_link($link_id, $addr, { kind => 'addr' });
@@ -815,17 +820,15 @@ sub emit_item_node {
 }
 
 sub emit_addr_node {
-    my ($self, $addr, $attr) = @_;
-    my @label = sprintf("0x%x", $addr);
-    unshift @label, $attr->{label} if $attr->{label};
-    push    @label, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
+    my ($self, $addr, $labels, $attr) = @_;
+
     # output a dummy node for this addr for the links to connect to
     my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
-    push @node_attr, (sprintf "label=%s", _dotlabel(\@label));
+    push @node_attr, (sprintf "label=%s", _dotlabel($labels));
 
     my %attr;
     #push @attr, $self->label_attr->fmt_data(_dotlabel(\@label));
-    $self->_emit_node($addr, $attr->{label}, \%attr);
+    $self->_emit_node($addr, join("\n",@$labels), \%attr);
 }
 
 sub fmt_item_label {
@@ -907,7 +910,7 @@ sub write_prologue {
     my $fh = $self->fh or return;
     $self->SUPER::write_prologue(@_);
     print $fh "digraph {\n"; # }
-    print $fh "graph [overlap=false]\n"; # target="???", URL="???"
+    print $fh "graph [overlap=false, rankdir=LR]\n"; # target="???", URL="???"
 }
 
 sub write_epilogue {
@@ -938,14 +941,12 @@ sub emit_link {
 }
 
 sub emit_addr_node {
-    my ($self, $addr, $attr) = @_;
+    my ($self, $addr, $labels, $attr) = @_;
     my $fh = $self->fh or return;
-    my @label = sprintf("0x%x", $addr);
-    unshift @label, $attr->{label} if $attr->{label};
-    push    @label, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
+
     # output a dummy node for this addr for the links to connect to
     my @node_attr = ('color="grey60"', 'style="rounded,dotted"');
-    push @node_attr, (sprintf "label=%s", _dotlabel(\@label));
+    push @node_attr, (sprintf "label=%s", _dotlabel($labels));
     printf $fh qq{n%d [%s];\n},
         $addr, join(",", @node_attr);
 }
@@ -1068,15 +1069,11 @@ sub emit_link {
 }
 
 sub emit_addr_node {
-    my ($self, $addr, $attr) = @_;
+    my ($self, $addr, $labels, $attr) = @_;
     my $node = $self->graph->add_node($addr);
 
-    my @label = sprintf("0x%x", $addr);
-    unshift @label, $attr->{label} if $attr->{label};
-    push    @label, "refcnt=$attr->{refcnt}" if $attr->{refcnt};
-
     my %attr = (
-        label => join("\n", @label),
+        label => join("\n", @$labels),
         color => "grey50",
         borderstyle => 'dotted',
     );
