@@ -155,10 +155,20 @@ get '/jit_tree/:id/:depth' => sub {
         Dwarn(Storable::dclone($jit_tree)); # dclone to avoid stringification
     }
 
-    $self->render(json => {
+    my %response = (
         name_path  => name_path_for_node($id),
         nodes => $jit_tree
-    });
+    );
+    # XXX temp hack
+    #     //   <li><a href="#">Home</a> <span class="divider">/</span></li>
+    #     //   <li><a href="#">Library</a> <span class="divider">/</span></li>
+    #     //   <li class="active">Data</li>
+    $response{name_path_html} = join "", map {
+        sprintf q{<li><a href="/%d">%s</a><span class="divider">/</span></li>},
+            $_->{id}, $_->{name};
+    } @{$response{name_path}};
+
+    $self->render(json => \%response);
 };
 
 my %node_queue;
@@ -367,13 +377,11 @@ Welcome to the Mojolicious real-time web framework!
 
     <div class="span9" id="sizeme_right_column_div">
         <div class="row-fluid">
-            <div class="span9" id="sizeme_path_div">
-                <ul class="breadcrumb" id="sizeme_path_ul"> </ul>
+            <div class="span12" id="sizeme_path_div">
+                <ul class="breadcrumb pull-left" id="sizeme_path_ul">Path</ul>
             </div>
-            <div class="span9">
-                <div id="XXcenter-container">
-                    <div id="infovis"></div>
-                </div>
+            <div class="span12" style="margin-left:0; text-align:center">
+                <div id="infovis"></div>
             </div>
         </div>
     </div>
@@ -387,7 +395,7 @@ Welcome to the Mojolicious real-time web framework!
 
 </div>
 
-<script language="javascript" type="text/javascript" src="jit.js"></script>
+<script language="javascript" type="text/javascript" src="jit-yc.js"></script>
 <script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
 <script language="javascript" type="text/javascript" src="treemap.js"></script>
