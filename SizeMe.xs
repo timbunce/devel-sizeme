@@ -283,9 +283,6 @@ struct state {
 #define _NPathLink(np, nid, ntype)   (((np)->id=nid), ((np)->type=ntype), ((np)->seqn=0))
 #define NPathLink(nid)               (_NPathLink(NP, nid, NPtype_LINK), NP)
 
-/* has the top most node been output? */
-#define NPathLinkUsed                (assert(NP->type == NPtype_LINK), NP->seqn)
-
 /* add a link and a name node to the path - a special case for op_size */
 #define NPathLinkAndNode(nid, nid2)  (_NPathLink(NP, nid, NPtype_LINK), _NPathLink(NP+1, nid2, NPtype_NAME), ((NP+1)->prev=NP), (NP+1))
 #define NPathOpLink  (NPathArg)
@@ -458,8 +455,6 @@ int
 np_dump_formatted_node(pTHX_ struct state *st, npath_node_t *npath_node, npath_node_t *npath_node_deeper) {
     PERL_UNUSED_ARG(st);
     PERL_UNUSED_ARG(npath_node_deeper);
-    if (0 && npath_node->type == NPtype_LINK)
-        return 1;
     np_dump_indent(aTHX_ npath_node->depth);
     np_print_node_name(aTHX_ stderr, npath_node);
     if (npath_node->type == NPtype_LINK)
