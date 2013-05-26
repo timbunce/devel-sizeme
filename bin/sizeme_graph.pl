@@ -348,7 +348,7 @@ Welcome to the Mojolicious real-time web framework!
         <div class="row-fluid">
             <div class="span12 text-left" id="sizeme_info_div">
                 <p class="text-left">
-                <a id="back" href="#" class="theme button white">Go to Parent</a>
+                <a id="goto_parent" href="#" class="theme button white">Go to Parent</a>
                 <form name=params>
                 <label for="logarea">Log scale
                 <input type=checkbox id="logarea" name="logarea">
@@ -387,7 +387,7 @@ Welcome to the Mojolicious real-time web framework!
 
 </div>
 
-<script language="javascript" type="text/javascript" src="jit-yc.js"></script>
+<script language="javascript" type="text/javascript" src="jit.js"></script>
 <script language="javascript" type="text/javascript" src="jquery-1.8.1-min.js"></script>
 <script language="javascript" type="text/javascript" src="sprintf.js"></script>
 <script language="javascript" type="text/javascript" src="treemap.js"></script>
