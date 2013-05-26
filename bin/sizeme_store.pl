@@ -336,6 +336,7 @@ while (<>) {
         if ($dbh) {
             # XXX add a size_run table records each run
             # XXX pick a table name to store the run nodes in
+            # XXX use separate tables for nodes and links
             #$run_ins_sth->execute(
             my $table = "node";
             $dbh->do("DROP TABLE IF EXISTS $table");
@@ -764,7 +765,7 @@ sub emit_link {
     else {
         push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
     }
-    (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
+    (my $link_name = $link_node->{attr}{label} || $link_node->{name}) =~ s/->$//; # XXX hack
     push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
 
     my $label = _dotlabel($link_name, $link_node),
@@ -930,7 +931,7 @@ sub emit_link {
         push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
     }
 
-    (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
+    (my $link_name = $link_node->{attr}{label} || $link_node->{name}) =~ s/->$//; # XXX hack
     push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
     printf $fh qq{n%d -> n%d [%s];\n},
         $link_node->{parent_id}, $dest_id, join(",", @link_attr);
@@ -1051,7 +1052,7 @@ sub emit_link {
     my $link_node = $seqn2node{$link_id} or die "No node for id $link_id";
     my $edge = $self->graph->add_edge($link_node->{parent_id}, $dest_id);
 
-    (my $link_name = $link_node->{name}) =~ s/->$//; # XXX hack
+    (my $link_name = $link_node->{attr}{label} || $link_node->{name}) =~ s/->$//; # XXX hack
     my %attr = ( label => $link_name );
 
     if ($attr->{kind} and $attr->{kind} eq 'addr') {

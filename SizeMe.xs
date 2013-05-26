@@ -22,6 +22,9 @@
 #define NEED_pv_pretty
 #define NEED_PL_parser
 #include "ppport.h"
+#ifndef PERL_PV_ESCAPE_NONASCII
+#define PERL_PV_ESCAPE_NONASCII 0
+#endif
 
 #include "refcounted_he.h"
 
@@ -507,6 +510,9 @@ np_dump_node_path_info(pTHX_ struct state *st, npath_node_t *npath_node, UV attr
     case NPattr_PADNAME:
     case NPattr_PADFAKE:
         fprintf(stderr, "~pad%lu %s %lu", attr_type, attr_name, attr_value);
+        break;
+    case NPattr_REFCNT:
+        fprintf(stderr, "~refcnt %lu", attr_value);
         break;
     default:
         fprintf(stderr, "~?[type %lu unknown]? %s %lu", attr_type, attr_name, attr_value);
@@ -1009,14 +1015,7 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     if (use_node_for_hek) {
         NPathPushNode((shared)?"hek-shared":"hek", NPtype_NAME);
         ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(hek));
-        /* XXX make this the NPattr_LABEL of the HeVAL link if not showing detail */
-        /* give a safe short hint of the key string */
-#ifndef PERL_PV_ESCAPE_NONASCII
-#define PERL_PV_ESCAPE_NONASCII 0
-#endif
-        pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
-            NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
-        ADD_ATTR(st, NPattr_LABEL, SvPVX(st->tmp_sv), 0);
+
     }
     else NP = NP->prev;
 
@@ -1549,32 +1548,35 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
       for (cur_bucket = 0; cur_bucket <= HvMAX(thing); cur_bucket++) {
         cur_entry = *(HvARRAY(thing) + cur_bucket);
         while (cur_entry) {
+            HEK *hek = cur_entry->hent_hek;
 
             if (!(st->hide_detail & NPf_DETAIL_HEK)) {
                 NPathPushNode("he", NPtype_LINK);
                 NPathPushNode("he+hek", NPtype_NAME);
-                ADD_SIZE(st, "he", sizeof(HE));
-                hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
-                if (orig_thing == (SV*)PL_strtab) {
-                    /* For PL_strtab the HeVAL is used as a refcnt */
-                    ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
-                }
-                else {
-                    sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
-                }
-                NPathPopNode;
-                NPathPopNode;
+            }
+
+            ADD_SIZE(st, "he", sizeof(HE));
+            hek_size(aTHX_ st, hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
+            if (orig_thing == (SV*)PL_strtab) {
+                /* For PL_strtab the HeVAL is used as a refcnt */
+                ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
             }
             else {
-                ADD_SIZE(st, "he", sizeof(HE));
-                hek_size(aTHX_ st, cur_entry->hent_hek, HvSHAREKEYS(thing), NPathLink("hent_hek"));
-                if (orig_thing == (SV*)PL_strtab) {
-                    /* For PL_strtab the HeVAL is used as a refcnt */
-                    ADD_SIZE(st, "shared_hek", HeKLEN(cur_entry));
+                if (sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry))) {
+                    char buf[20];
+                    /* XXX make this the NPattr_LABEL of the HeVAL link if not showing detail */
+                    /* give a safe short hint of the key string */
+                    pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), sizeof(buf)-(3+2+1),
+                        NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
+                    buf[0] = '{';
+                    strcpy(stpcpy(&buf[1], SvPVX(st->tmp_sv)), "}");
+                    ADD_LINK_ATTR_TO_TOP(st, NPattr_LABEL, buf, 0);
                 }
-                else {
-                    sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry));
-                }
+            }
+
+            if (!(st->hide_detail & NPf_DETAIL_HEK)) {
+                NPathPopNode;
+                NPathPopNode;
             }
             cur_entry = cur_entry->hent_next;
         }
