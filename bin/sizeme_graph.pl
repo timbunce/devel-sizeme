@@ -170,49 +170,29 @@ sub _set_node_queue {
 sub _get_node {
     my $id = shift;
 
-    my $node = delete $node_cache{$id};
+    my $node = $node_cache{$id};
     return $node if ref $node;
 
     my @ids;
     # ensure the one the caller wanted is actually in the batch
     push @ids, $id;
     delete $node_queue{$id};
-
+    # also fetch a chunk of nodes from the read-ahead list
     while ( $_ = scalar each %node_queue ) {
         delete $node_queue{$_};
         push @ids, $_;
-        last if @ids > 10_000; # batch size
-    }
-    
-    # optimize for single node
-    if (@ids == 1) {
-        $select_node_by_id_sth->execute($id);
-        our $select_node_by_id_fields ||= $select_node_by_id_sth->{NAME};
-        my %node;
-        @node{@$select_node_by_id_fields} = $select_node_by_id_sth->fetchrow_array
-            or die "Node '$id' not found"; # should not happen
-        $node = \%node;
-    }
-    else {
-
-        my $sql = "select * from node where id in (".join(",",@ids).")";
-        my $sth = $dbh->prepare($sql);
-        $sth->execute;
-
-        our $NAME ||= $sth->FETCH('NAME');
-        my @row = (undef) x @$NAME;
-        $sth->bind_columns(\(@row));
-        while ($sth->fetch) {
-            my $row_hash = {};
-            @{$row_hash}{@$NAME} = @row;
-            $node_cache{ $row_hash->{id} } = $row_hash;
-        }
-
-        $node = delete($node_cache{$id}) || die "panic $id";
+        last if @ids > 1_000; # batch size
     }
 
-    return $node;
+    my $sql = "select * from node where id in (".join(",",@ids).")";
+    my $rows = $dbh->selectall_arrayref($sql);
+    for (@{ $dbh->selectall_arrayref($sql, { Slice => {} })}) {
+        $node_cache{ $_->{id} } = $_;
+    }
+
+    return $node_cache{$id};
 }
+
 
 sub _fetch_node_tree {
     my ($id, $depth) = @_;
@@ -220,10 +200,13 @@ sub _fetch_node_tree {
     warn "#$id fetching\n"
         if $opt_debug;
 
-    my $node = _get_node($id);
+    my $node = _get_node($id)
+        or die "No node $id";
+    $node = { %$node }; # XXX copy for inflation
     $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size)); # numify
     $node->{leaves} = $j->decode(delete $node->{leaves_json});
     $node->{attr}   = $j->decode(delete $node->{attr_json});
+
     $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
     $depth = 1 if $depth > 1 and $node->{name} =~ /^arena/;
