@@ -156,13 +156,12 @@ sub leave_node {
     my $self_size = 0;
     $self_size += $_ for values %{$x->{leaves}};
     $x->{self_size} = $self_size;
+    my $attr = $x->{attr};
 
-    my $parent = $stack[-1];
-
+    # improve the name of elem nodes
     if ($x->{name} eq 'elem'
         and defined(my $index = $x->{attr}{+NPattr_NOTE}{i})
     ) {
-        # give a better name to the link
         my $padlist;
         if (@stack >= 3 && ($padlist=$stack[-3])->{name} eq 'PADLIST') {
             # elem link <- SV(PVAV) <- elem link <- PADLIST
@@ -183,16 +182,42 @@ sub leave_node {
         }
     }
 
+    my $parent = $stack[-1];
+
+    # if node has addr and there are multiple links_to_addr{$addr}
+    # then we can choose which one will be our parent
+    my $addr = $attr->{addr};
+    if ($addr) { # TODO add option to control adoption
+        if ($x->{type} == NPtype_LINK) {
+
+        }
+        else {
+            if ( keys %{$links_to_addr{$addr}||{}} > 1) {
+                my @candidates = keys %{$links_to_addr{$addr}};
+                # XXX for now we simply pick one that isn't our current parent
+                # because our current parent will be the arena for SVs where
+                # we've not been able to find all the refs
+                my @other = grep { $_ != $parent->{id} } @candidates;
+                my $new_parent_id = shift @other;
+                warn "$x->{id} addr $addr parent_id changed from $parent->{id} to $new_parent_id (candidates: @candidates)\n";
+                # we can't simply change $parent here because we've already
+                # 'left' that new parent so that node and the ones above it have
+                # their totals set. We'd have to change them all. We could do that
+                # as an edit to the db once we're using the db as the primary store.
+                # Meanwhile we'll use a separate field to record the parent that
+                # should be used for naming his node
+                $x->{namedby_id} = $new_parent_id;
+            }
+        }
+    }
+
     if ($parent) {
         # link to parent
         $x->{parent_id} = $parent->{id};
         # accumulate into parent
         $parent->{kids_node_count} += 1 + ($x->{kids_node_count}||0);
         $parent->{kids_size} += $self_size + $x->{kids_size};
-        push @{$parent->{child_id}}, $x->{id};
-    }
-    else {
-        $x->{kids_node_count} ||= 0;
+        push @{$parent->{child_id}}, $x->{id}; # XXX 
     }
 
     $_->leave_node($x) for (@outputs);
@@ -203,7 +228,8 @@ sub leave_node {
         my $attr_json = $j->encode($x->{attr});
         my $leaves_json = $j->encode($x->{leaves});
         $node_ins_sth->execute(
-            $x->{id}, $x->{name}, $x->{attr}{label}, $x->{type}, $x->{depth}, $x->{parent_id},
+            $x->{id}, $x->{name}, $x->{attr}{label}, $x->{type}, $x->{depth},
+            $x->{parent_id}, $x->{namedby_id},
             $x->{self_size}, $x->{kids_size}, $x->{kids_node_count},
             $x->{child_id} ? join(",", @{$x->{child_id}}) : undef,
             $attr_json, $leaves_json,
@@ -348,6 +374,7 @@ while (<>) {
                     type integer,
                     depth integer,
                     parent_id integer,
+                    namedby_id integer,
 
                     self_size integer,
                     kids_size integer,
@@ -358,7 +385,7 @@ while (<>) {
                 )
             });
             $node_ins_sth = $dbh->prepare(qq{
-                INSERT INTO $table VALUES (?,?,?,?,?,?,  ?,?,?,?,?,?)
+                INSERT INTO $table VALUES (?,?,?,?,?,?,?,  ?,?,?,?,?,?)
             });
         }
     }
