@@ -1,3 +1,17 @@
+Treemap history support, including linking to specific nodes
+Displaying node path with treemap, as links, with tooltips (name, total_size etc)
+Sort out naming:
+    id vs name vs label
+    item type CV/NV/RV etc (short)
+    descriptive: Foo::, {keystr}, [42], *GLOB, etc (longer)
+Better handling of pads
+    especially padtmp
+    eg add scope, or ideally line range when emiting pad names
+    Perhaps add general flags UV attr that contains flags appropriate to the node (eg SV or pad)
+Review general SV and attribute handling
+    Emit more raw info
+Add global attributes, especially perl version
+
 *** Random TODOs:
 
 See https://github.com/timbunce/devel-sizeme/issues
