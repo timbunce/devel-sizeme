@@ -90,11 +90,33 @@ if ( $Mojolicious::VERSION >= 2.49 ) {
 }
 
 
+sub name_path_for_node {
+    my ($id) = @_;
+    my @name_path;
+
+    while ($id) { # work backwards towards root
+        my $node = _get_node($id);
+        push @name_path, $node;
+        $id = $node->{namedby_id} || $node->{parent_id};
+        if (@name_path > 1_000) {
+            my %id_count;
+            ++$id_count{$_->{id}} for @name_path;
+            my $desc = join ", ", map { "n$_ ($id_count{$_})" } keys %id_count;
+            warn "name_path too deep (possible parent_id/namedby_id loop involving $desc)\n";
+            last;
+        }
+    }
+
+    return [ reverse @name_path ];
+}
+
+
 # Documentation browser under "/perldoc"
 plugin 'PODRenderer';
 
-get '/' => sub {
+get '/:id' => sub {
     my $self = shift;
+    # JS handles the :id
     $self->render('index');
 };
 
@@ -133,7 +155,10 @@ get '/jit_tree/:id/:depth' => sub {
         Dwarn(Storable::dclone($jit_tree)); # dclone to avoid stringification
     }
 
-    $self->render(json => $jit_tree);
+    $self->render(json => {
+        name_path  => name_path_for_node($id),
+        nodes => $jit_tree
+    });
 };
 
 my %node_queue;
@@ -360,7 +385,7 @@ Welcome to the Mojolicious real-time web framework!
     <div class="span9" id="sizeme_right_column_div">
         <div class="row-fluid">
             <div class="span9" id="sizeme_path_div">
-            <p class="text-left" id="sizeme_path_p">Path</p>
+                <ul class="breadcrumb" id="sizeme_path_ul"> </ul>
             </div>
             <div class="span9">
                 <div id="XXcenter-container">
