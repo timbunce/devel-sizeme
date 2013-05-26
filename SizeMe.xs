@@ -368,10 +368,6 @@ np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
         const SV *sv = (SV*)npath_node->id;
         int type = SvTYPE(sv);
         fprintf(fp, "SV(%s)", svtypename(sv));
-        switch(type) {  /* add some useful details */
-        case SVt_PVAV: fprintf(fp, " fill=%ld/%ld", (long)av_len((AV*)sv), AvMAX((AV*)sv)); break;
-        case SVt_PVHV: fprintf(fp, " fill=%ld/%ld", HvFILL((HV*)sv), HvMAX((HV*)sv)); break;
-        }
         break;
     }
     case NPtype_OP: { /* id is pointer to the OP op_size was called on */
@@ -1437,14 +1433,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   case FOLLOW_SINGLE_DONE:
         /* we don't output addr note for refcnt=1 (FOLLOW_SINGLE_NOW)
          * so there's no point in outputting one here
-         * except that we should never get here
          */
-        if (st->trace_level) {
-            np_dump_node_path(aTHX_ st, NP);
-            warn(" sv with refcnt=1 seen more than once!\n");
-            if (st->trace_level >= 4)
-                do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
-        }
         if (!(st->hide_detail & NPf_DETAIL_REFCNT1))
             ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         return 0;
