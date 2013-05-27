@@ -1860,24 +1860,22 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
         NPathSetNode(path_link_group, NPtype_LINK);
 
         for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
-            char path_link_name[40];
             const SV * const svend = &sva[SvREFCNT(sva)];
             SV* sv;
 
-            sprintf(path_link_name, "arena-%p", sva);
-            NPathPushNode(path_link_name, NPtype_NAME);
-
             if (st->trace_level >= 7)
-                fprintf(stderr, "%s/%s start: %ld\n", path_link_group, path_link_name, st->total_size);
+                fprintf(stderr, "%s start: %ld\n", path_link_group, st->total_size);
 
             for (sv = sva + 1; sv < svend; ++sv) {
                 if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
                     /* is a live SV */
                     if (SvTYPE(sv) == want_type) {
                         if (sv_size(aTHX_ st, NPathLink("arena"), sv)) {
+                            /* TODO - resolve these 'unseen' SVs by expanding the coverage of perl_size() */
+                            /* you can enable the sv_dump below and try to work out what the SVs are */
                             ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(sv)); /* TODO control via detail */
                             if (st->trace_level > 2) {
-                                fprintf(stderr, "unseen sv type %d (want %d) ", SvTYPE(sv), want_type);
+                                fprintf(stderr, "UNSEEN ");
                                 sv_dump(sv);
                             }
                         }
@@ -1894,9 +1892,8 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
             }
 
             if (st->trace_level >= 7)
-                fprintf(stderr, "%s/%s   end: %ld\n", path_link_group, path_link_name, st->total_size);
+                fprintf(stderr, "%s   end: %ld\n", path_link_group, st->total_size);
 
-            NPathPopNode;
         }
     }
 
@@ -2214,6 +2211,7 @@ CODE:
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
 
+  st->recurse = RECURSE_INTO_ALL;
   perl_size(aTHX_ st, NPathLink("perl_interp"));
 # ifdef HAS_MSTATS
   NPathSetNode("free_malloc_space", NPtype_NAME);
