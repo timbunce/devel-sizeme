@@ -718,9 +718,10 @@ free_state(pTHX_ struct state *st)
    implementation of total_size() didn't report "everything", and changing the
    only available size to "everything" doesn't feel at all useful.  */
 
-#define RECURSE_INTO_NONE 0
-#define RECURSE_INTO_OWNED 1
-#define RECURSE_INTO_WEAK 2
+#define RECURSE_INTO_NONE   0
+#define RECURSE_INTO_OWNED  1
+#define RECURSE_INTO_WEAK   2
+#define RECURSE_INTO_ALL    3
 
 static bool sv_size(pTHX_ struct state *, pPATH, const SV *const);
 
@@ -1424,6 +1425,10 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
     if (st->trace_level >= 9)
         do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
   }
+
+  if (follow_state == FOLLOW_MULTI_DEFER && st->recurse == RECURSE_INTO_ALL)
+    follow_state = FOLLOW_MULTI_NOW;
+
   switch (follow_state) {
   case FOLLOW_SINGLE_NOW:
         /* only give addr attribute to SVs with refcnt=1 if asked */
@@ -2186,6 +2191,7 @@ CODE:
   /* just the current perl interpreter */
   /* PL_defstash works around the main:: => :: ref loop */
   struct state *st = new_state(aTHX_ PL_defstash);
+  st->recurse = RECURSE_INTO_ALL;
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
   free_state(aTHX_ st);
