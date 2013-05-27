@@ -1991,6 +1991,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_modglobal"), (SV*)PL_modglobal);
   sv_size(aTHX_ st, NPathLink("PL_errors"), (SV*)PL_errors);
   sv_size(aTHX_ st, NPathLink("PL_stashcache"), (SV*)PL_stashcache);
+  sv_size(aTHX_ st, NPathLink("PL_curstname"), (SV*)PL_curstname);
   sv_size(aTHX_ st, NPathLink("PL_patchlevel"), (SV*)PL_patchlevel);
 #ifdef PL_apiversion
   sv_size(aTHX_ st, NPathLink("PL_apiversion"), (SV*)PL_apiversion);
@@ -2014,7 +2015,10 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #ifdef PL_ofsgv
   sv_size(aTHX_ st, NPathLink("PL_ofsgv"), (SV*)PL_ofsgv);
 #endif
+  sv_size(aTHX_ st, NPathLink("PL_statname"), (SV*)PL_statname);
+  sv_size(aTHX_ st, NPathLink("PL_statgv"), (SV*)PL_statgv);
   sv_size(aTHX_ st, NPathLink("PL_argvout_stack"), (SV*)PL_argvout_stack);
+
   sv_size(aTHX_ st, NPathLink("PL_beginav"), (SV*)PL_beginav);
   sv_size(aTHX_ st, NPathLink("PL_beginav_save"), (SV*)PL_beginav_save);
   sv_size(aTHX_ st, NPathLink("PL_checkav_save"), (SV*)PL_checkav_save);
@@ -2027,6 +2031,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_endav"), (SV*)PL_endav);
   sv_size(aTHX_ st, NPathLink("PL_checkav"), (SV*)PL_checkav);
   sv_size(aTHX_ st, NPathLink("PL_initav"), (SV*)PL_initav);
+
 #ifdef PL_isarev
   sv_size(aTHX_ st, NPathLink("PL_isarev"), (SV*)PL_isarev);
 #endif
@@ -2045,6 +2050,8 @@ perl_size(pTHX_ struct state *const st, pPATH)
   sv_size(aTHX_ st, NPathLink("PL_pidstatus"), (SV*)PL_pidstatus);
 #endif
   sv_size(aTHX_ st, NPathLink("PL_subname"), (SV*)PL_subname);
+  sv_size(aTHX_ st, NPathLink("PL_toptarget"), (SV*)PL_toptarget);
+  sv_size(aTHX_ st, NPathLink("PL_bodytarget"), (SV*)PL_bodytarget);
 #ifdef USE_LOCALE_NUMERIC
   sv_size(aTHX_ st, NPathLink("PL_numeric_radix_sv"), (SV*)PL_numeric_radix_sv);
   str_size(st, PL_numeric_name, NPathLink("PL_numeric_name"));
@@ -2086,6 +2093,27 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #if (PERL_BCDVERSION >= 0x5009005)
   parser_size(aTHX_ st, NPathLink("PL_parser"), PL_parser);
 #endif
+
+  if (1) {
+    int i;
+    /* count character classes  */
+    for (i = 0; i < POSIX_SWASH_COUNT; i++) {
+        sv_size(aTHX_ st, NPathLink("PL_utf8_swash_ptrs"), PL_utf8_swash_ptrs[i]);
+    }
+    sv_size(aTHX_ st, NPathLink("PL_utf8_mark"), PL_utf8_mark);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_toupper"), PL_utf8_toupper);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_totitle"), PL_utf8_totitle);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_tolower"), PL_utf8_tolower);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_tofold"), PL_utf8_tofold);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_idstart"), PL_utf8_idstart);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_idcont"), PL_utf8_idcont);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_foldclosures"), PL_utf8_foldclosures);
+    for (i = 0; i < POSIX_CC_COUNT; i++) {
+        sv_size(aTHX_ st, NPathLink("PL_Posix_ptrs"), PL_Posix_ptrs[i]);
+        sv_size(aTHX_ st, NPathLink("PL_L1Posix_ptrs"), PL_L1Posix_ptrs[i]);
+        sv_size(aTHX_ st, NPathLink("PL_XPosix_ptrs"), PL_XPosix_ptrs[i]);
+    }
+  }
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
   /* TODO PL_exitlist */
