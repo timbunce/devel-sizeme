@@ -2068,7 +2068,16 @@ perl_size(pTHX_ struct state *const st, pPATH)
   }
 #endif
 #endif
-  /* TODO PL_stashpad */
+
+    if (1) { /* PL_stashpad */
+        PADOFFSET o = 0;
+        for (; o < PL_stashpadmax; ++o) {
+            if (PL_stashpad[o])
+                if (sv_size(aTHX_ st, NPathLink("PL_stashpad"), PL_stashpad[o]))
+                    sv_dump(PL_stashpad[o]);
+        }
+    }
+
   op_size_class(aTHX_ (OP*)&PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
   op_size_class(aTHX_ (OP*)PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
 
