@@ -139,6 +139,7 @@ struct npath_node_st {
 struct state {
     UV total_size;
     int recurse;
+    bool recurse_into_weak;
     bool regex_whine;
     bool fm_whine;
     bool dangle_whine;
@@ -720,8 +721,8 @@ free_state(pTHX_ struct state *st)
 
 #define RECURSE_INTO_NONE   0
 #define RECURSE_INTO_OWNED  1
-#define RECURSE_INTO_WEAK   2
 #define RECURSE_INTO_ALL    3
+/* weak refs are handled differently */
 
 static bool sv_size(pTHX_ struct state *, pPATH, const SV *const);
 
@@ -1479,11 +1480,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   case SVt_IV: TAG;
 #endif
     if(st->recurse && SvROK(thing)) {
-        if (!SvWEAKREF(thing)) {
-            sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing));
-        }
-        else if (st->recurse >= RECURSE_INTO_WEAK) {
+        if (SvWEAKREF(thing) && st->recurse_into_weak) {
             sv_size(aTHX_ st, NPathLink("weakRV"), SvRV_const(thing));
+        }
+        else {
+            sv_size(aTHX_ st, NPathLink("RV"), SvRV_const(thing));
         }
     }
     TAG;break;
