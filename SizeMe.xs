@@ -1439,16 +1439,16 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
         return 0;
   case FOLLOW_MULTI_DEFER:
         if (SvIMMORTAL(thing)) /* avoid clutter from links to immortals */
-            return 1;
+            return 0;
         ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         if (get_sv_follow_seencnt(aTHX_ st, thing) == 1) {
             ADD_LINK_ATTR_TO_PREV(st, NPattr_LABEL, svtypename(thing), 0);
             ADD_LINK_ATTR_TO_PREV(st, NPattr_REFCNT, "", SvREFCNT(thing));
         }
-        return 1;
+        return 0;
   case FOLLOW_MULTI_DONE:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
-        return 1;
+        return 0;
   case FOLLOW_MULTI_NOW:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         do_NPathNoteAddr=1;
@@ -1770,8 +1770,9 @@ new_state(pTHX_ SV *root_sv)
 
     Newxz(st, 1, struct state);
     st->start_time_nv = gettimeofday_nv(aTHX);
+    st->recurse = RECURSE_INTO_OWNED;
     st->go_yell = TRUE;
-    if(1)st->hide_detail = NPf_DETAIL_HEK | NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option */
+    if(1)st->hide_detail = NPf_DETAIL_HEK | NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option XXX invert */
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
@@ -1869,6 +1870,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
                     /* is a live SV */
                     if (SvTYPE(sv) == want_type) {
                         if (sv_size(aTHX_ st, NPathLink("arena"), sv)) {
+                            ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(sv)); /* TODO control via detail */
                             if (st->trace_level > 2) {
                                 fprintf(stderr, "unseen sv type %d (want %d) ", SvTYPE(sv), want_type);
                                 sv_dump(sv);
