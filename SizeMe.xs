@@ -2087,8 +2087,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
         PADOFFSET o = 0;
         for (; o < PL_stashpadmax; ++o) {
             if (PL_stashpad[o])
-                if (sv_size(aTHX_ st, NPathLink("PL_stashpad"), PL_stashpad[o]))
-                    sv_dump(PL_stashpad[o]);
+                sv_size(aTHX_ st, NPathLink("PL_stashpad"), (SV*)PL_stashpad[o]);
         }
     }
 
@@ -2112,7 +2111,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
     sv_size(aTHX_ st, NPathLink("PL_utf8_tofold"), PL_utf8_tofold);
     sv_size(aTHX_ st, NPathLink("PL_utf8_idstart"), PL_utf8_idstart);
     sv_size(aTHX_ st, NPathLink("PL_utf8_idcont"), PL_utf8_idcont);
-    sv_size(aTHX_ st, NPathLink("PL_utf8_foldclosures"), PL_utf8_foldclosures);
+    sv_size(aTHX_ st, NPathLink("PL_utf8_foldclosures"), (SV*)PL_utf8_foldclosures);
     for (i = 0; i < POSIX_CC_COUNT; i++) {
         sv_size(aTHX_ st, NPathLink("PL_Posix_ptrs"), PL_Posix_ptrs[i]);
         sv_size(aTHX_ st, NPathLink("PL_L1Posix_ptrs"), PL_L1Posix_ptrs[i]);
@@ -2190,7 +2189,7 @@ CODE:
 {
   /* just the current perl interpreter */
   /* PL_defstash works around the main:: => :: ref loop */
-  struct state *st = new_state(aTHX_ PL_defstash);
+  struct state *st = new_state(aTHX_ (SV*)PL_defstash);
   st->recurse = RECURSE_INTO_ALL;
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
