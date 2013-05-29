@@ -187,7 +187,8 @@ sub leave_node {
     # if node has addr and there are multiple links_to_addr{$addr}
     # then we can choose which one will be our parent
     my $addr = $attr->{addr};
-    if ($addr) { # TODO add option to control adoption
+    # XXX disabled for now - really needs to be done as a separate phase
+    if ( 0 && $addr) { # TODO add option to control adoption
         if ($x->{type} == NPtype_LINK) {
 
         }
@@ -314,7 +315,7 @@ while (<>) {
             }
         }
         elsif ($type == NPattr_ADDR) {
-            printf "%s~%s %d 0x%x [t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $val, $val, $type
+            printf "%s~%s %d 0x%x [#%d t%d]\n", $indent x ($node->{depth}+1), $attr_type_name[$type], $val, $val, $node->{id}, $type
                 if $opt_text;
             $attr->{addr} = $val;
             # for SVs we see all the link addrs before the item addr
