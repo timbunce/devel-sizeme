@@ -1464,6 +1464,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
       warn("Devel::Size: Unknown variable type: %u encountered\n", type); /* TODO report path */
+      sv_dump(thing);
       return 0; /* not strictly correct */
   }
   NPathPushNode(thing, NPtype_SV);
@@ -1827,6 +1828,7 @@ new_state(pTHX_ SV *root_sv)
     return st;
 }
 
+
 /* XXX based on S_visit() in sv.c */
 static void
 unseen_sv_size(pTHX_ struct state *st, pPATH)
@@ -1897,7 +1899,51 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 
         }
     }
+}
 
+
+static void
+deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
+{
+    dNPathNodes(1, NPathArg);
+    char node_name[20];
+    PTR_TBL_ENT_t **ary;
+    int visited = 0;
+    int i;
+
+    if (st->trace_level)
+        fprintf(stderr, "sweeping probable ref loops, cycle %d\n", cycle);
+
+    sprintf(node_name, "cycles-%d", cycle);
+    NPathPushNode(node_name, NPtype_NAME);
+
+    /* visit each item in sv_refcnt_ptr_table */
+    ary = st->sv_refcnt_ptr_table->tbl_ary;
+    for (i=0; i < st->sv_refcnt_ptr_table->tbl_max + 1; i++, ary++) {
+        PTR_TBL_ENT_t *tblent = *ary;
+        for (; tblent; tblent = tblent->next) {
+            const SV *sv = tblent->oldval;
+            UV visitcnt = PTR2UV(tblent->newval);
+            if (visitcnt < SvREFCNT(sv)) {
+                if (st->trace_level >= 6)
+                    fprintf(stderr, "SVs 0x%p with refcnt %d has been seen %d times\n", sv, SvREFCNT(sv), visitcnt);
+                ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, INT2PTR(void*,SvREFCNT(sv)-1));
+                sv_size(aTHX_ st, NPathLink("cycle"), sv);
+                ++visited;
+            }
+        }
+    }
+
+    NPathPopNode;
+
+    if (st->trace_level)
+        fprintf(stderr, "visited %d deferred SVs on cycle %d\n", visited, cycle);
+
+    /* if we visited any SVs then try again since we may have encountered some
+     * more SVs that haven't been visited yet
+     */
+    if (visited)
+        deferred_by_refcnt_size(aTHX_ st, NPathArg, cycle+1);
 }
 
 #ifdef PERL_MAD
@@ -2145,6 +2191,10 @@ perl_size(pTHX_ struct state *const st, pPATH)
     NPathPopNode;
   }
   /* XXX iterate over bodies_by_type and crawl the free chains for each */
+
+  /* iterate over our sv_refcnt_ptr_table looking for any SVs that haven't been */
+  /* seen as often as their refcnt and follow them now */
+  deferred_by_refcnt_size(aTHX_ st, NPathLink("refcnt"), 1);
 
   /* iterate over all SVs to find any we've not accounted for yet */
   /* once the code above is visiting all SVs, any found here have been leaked */
