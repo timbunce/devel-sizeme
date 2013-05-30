@@ -1464,7 +1464,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
       warn("Devel::Size: Unknown variable type: %u encountered\n", type); /* TODO report path */
-      sv_dump(thing);
+      sv_dump((SV*)thing);
       return 0; /* not strictly correct */
   }
   NPathPushNode(thing, NPtype_SV);
@@ -2202,6 +2202,37 @@ perl_size(pTHX_ struct state *const st, pPATH)
 }
 
 
+static void
+malloc_free_size(pTHX_ struct state *const st, pPATH)
+{
+    dNPathNodes(1, NPathArg);
+
+# ifdef _MALLOC_MALLOC_H_ /* OSX. Not sure where else mstats is available */
+# define HAS_MSTATS
+# endif
+# ifdef HAS_MSTATS
+    /* some systems have the SVID2/XPG mallinfo structure and function */
+    struct mstats ms = mstats(); /* mstats() first */
+# endif
+
+# ifdef HAS_MSTATS
+    NPathPushNode("free_malloc_space", NPtype_NAME);
+    ADD_SIZE(st, "bytes_free", ms.bytes_free);
+    ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
+    ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
+    ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
+    ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
+    /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
+    /* for now we use bytes_total as an approximation */
+    NPathSetNode("unknown", NPtype_NAME);
+    ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
+# else
+    ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "no_malloc_data", 0);
+    /* XXX ? */
+# endif
+}
+
+
 MODULE = Devel::SizeMe        PACKAGE = Devel::SizeMe       
 
 PROTOTYPES: DISABLE
@@ -2251,33 +2282,14 @@ heap_size()
 CODE:
 {
   /* the current perl interpreter plus malloc, in the context of total heap size */
-# ifdef _MALLOC_MALLOC_H_ /* OSX. Now sure where else mstats is available */
-# define HAS_MSTATS
-# endif
-# ifdef HAS_MSTATS
-  /* some systems have the SVID2/XPG mallinfo structure and function */
-  struct mstats ms = mstats(); /* mstats() first */
-# endif
-  struct state *st = new_state(aTHX_ NULL);
+
+  struct state *st = new_state(aTHX_ (SV*)PL_defstash);
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
 
   st->recurse = RECURSE_INTO_ALL;
   perl_size(aTHX_ st, NPathLink("perl_interp"));
-# ifdef HAS_MSTATS
-  NPathSetNode("free_malloc_space", NPtype_NAME);
-  ADD_SIZE(st, "bytes_free", ms.bytes_free);
-  ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
-  ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
-  ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
-  ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
-  /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
-  /* for now we use bytes_total as an approximation */
-  NPathSetNode("unknown", NPtype_NAME);
-  ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
-# else
-    /* XXX ? */
-# endif
+  malloc_free_size(aTHX_ st, NPathLink("malloc"));
 
   RETVAL = st->total_size;
   free_state(aTHX_ st);
