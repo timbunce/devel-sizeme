@@ -140,7 +140,7 @@ get '/jit_tree/:id/:depth' => sub {
         my ($node) = @_;
         my $children = delete $node->{children}; # XXX edits the src tree
         my $area = $node->{self_size}+$node->{kids_size};
-        $node->{'$area'} = ($logarea) ? log($area) : $area; # XXX move to jit js
+        $node->{'$area'} = ($logarea && $area) ? log($area) : $area; # XXX move to jit js
         my $jit_node = {
             id   => $node->{id},
             name => ($node->{title} || $node->{name}).($opt_showid ? " #$node->{id}" : ""),
@@ -362,7 +362,7 @@ Welcome to the Mojolicious real-time web framework!
             <div class="span12 text-left" id="sizeme_info_div">
                 <p class="text-left">
                 <a id="goto_parent" href="#" class="theme button white">Go to Parent</a>
-                <form name=params>
+                <form name=params id="sizeme_form">
                 <label for="logarea">Log scale
                 <input type=checkbox id="logarea" name="logarea">
                 </form>
@@ -381,7 +381,7 @@ Welcome to the Mojolicious real-time web framework!
     <div class="span9" id="sizeme_right_column_div">
         <div class="row-fluid">
             <div class="span12" id="sizeme_path_div">
-                <ul class="breadcrumb pull-left" id="sizeme_path_ul">Path</ul>
+                <ul class="breadcrumb pull-left text-left" id="sizeme_path_ul">Path</ul>
             </div>
             <div class="span12" style="margin-left:0; text-align:center">
                 <div id="infovis"></div>
