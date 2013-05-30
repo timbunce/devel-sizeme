@@ -655,6 +655,9 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
     if (seen_cnt < SvREFCNT(sv)) {
         return FOLLOW_MULTI_DEFER;
     }
+    if (check_new(st, sv)) {
+        return FOLLOW_MULTI_NOW;
+    }
     if (seen_cnt > SvREFCNT(sv)) {
         if (st->trace_level >= 2)
             warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
@@ -662,7 +665,7 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
             sv_dump((SV*)sv);
     }
 
-    return (check_new(st, sv)) ? FOLLOW_MULTI_NOW : FOLLOW_MULTI_DONE;
+    return FOLLOW_MULTI_DONE;
 }
 
 
@@ -720,7 +723,7 @@ free_state(pTHX_ struct state *st)
 
 #define RECURSE_INTO_NONE   0
 #define RECURSE_INTO_OWNED  1
-#define RECURSE_INTO_ALL    3
+#define RECURSE_INTO_ALL    3 /* not used */
 /* weak refs are handled differently */
 
 static bool sv_size(pTHX_ struct state *, pPATH, const SV *const);
@@ -1428,9 +1431,6 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
     if (st->trace_level >= 9)
         do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
   }
-
-  if (follow_state == FOLLOW_MULTI_DEFER && st->recurse == RECURSE_INTO_ALL)
-    follow_state = FOLLOW_MULTI_NOW;
 
   switch (follow_state) {
   case FOLLOW_SINGLE_NOW:
@@ -2271,7 +2271,7 @@ CODE:
   /* just the current perl interpreter */
   /* PL_defstash works around the main:: => :: ref loop */
   struct state *st = new_state(aTHX_ (SV*)PL_defstash);
-  st->recurse = RECURSE_INTO_ALL;
+  st->recurse = RECURSE_INTO_OWNED;
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
   free_state(aTHX_ st);
@@ -2289,7 +2289,7 @@ CODE:
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
 
-  st->recurse = RECURSE_INTO_ALL;
+  st->recurse = RECURSE_INTO_OWNED;
   perl_size(aTHX_ st, NPathLink("perl_interp"));
   malloc_free_size(aTHX_ st, NPathLink("malloc"));
 
