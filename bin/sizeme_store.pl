@@ -407,7 +407,7 @@ while (<>) {
         # ie doesn't include time to read file/pipe and commit to database.
 
         if ($opt_verbose or $run_size != $top_size) {
-            warn "EOF ends $top->{id} d$top->{depth}: size $top->{self_size}+$top->{kids_size}\n";
+            warn "EOF ends $top->{id} d$top->{depth}: size in $run_size, out $top_size ($top->{self_size}+$top->{kids_size})\n";
             warn Dumper($top) if $opt_debug;
         }
         #die "panic: seqn2node should be empty ". Dumper(\%seqn2node) if %seqn2node;

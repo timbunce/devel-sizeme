@@ -49,6 +49,7 @@ Reduce data volume to optimize usage and visualizations
 Docs
     note TARG effect on total_size([[]]) not counting the inner ref due to refcnt
     note issues around sizing of hash keys (re shared string table)
+    note won't recurse into a struct that holds a ref to itself, by default
 
 Random References:
 http://cpansearch.perl.org/src/RURBAN/illguts-0.42/index.html
