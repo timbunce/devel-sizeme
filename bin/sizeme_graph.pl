@@ -128,6 +128,8 @@ get '/jit_tree/:id/:depth' => sub {
     my $id = $self->stash('id');
     my $depth = $self->stash('depth');
 
+    warn "/jit_tree/$id/$depth ... \n";
+
     # hack, would be best done on the client side
     my $logarea = (defined $self->param('logarea'))
         ? $self->param('logarea')
@@ -219,10 +221,11 @@ sub _fetch_node_tree {
 
     $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
-    $depth = 1 if $depth > 1 and $node->{name} =~ /^arena/;
-
     if ($node->{child_ids}) {
         my @child_ids = split /,/, $node->{child_ids};
+
+        # XXX hack to handle nodes that possibly have large numbers of children
+        $depth = 1 if $depth > 1 and $node->{name} =~ /^arena|^unaccounted|^unseen/;
 
         # if this node has only one child then we merge that child into this node
         # this makes the treemap more usable
