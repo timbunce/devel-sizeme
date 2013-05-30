@@ -39,7 +39,7 @@ $dangle = 0; ## Set true to enable warnings about dangling pointers
 XSLoader::load( __PACKAGE__);
 
 END {
-    Devel::SizeMe::perl_size() if $do_size_at_end; # heap_size()
+    Devel::SizeMe::heap_size() if $do_size_at_end;
 }
 
 1;
