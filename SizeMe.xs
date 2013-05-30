@@ -1615,7 +1615,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
     }
 #else
     str_size(st, HvNAME_get(thing), NPathLink("HvNAME"));
-#endif
+#endif /* HvAUX */
     TAG;break;
 
 
