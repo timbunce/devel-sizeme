@@ -97,7 +97,7 @@ GetOptions(
     'open!' => \my $opt_open,
 ) or exit 1;
 
-$| = 1 if $opt_debug;
+$| = 1; #if $opt_debug;
 my $run_size = 0;
 my $total_size = 0;
 
@@ -123,7 +123,8 @@ sub note_item_addr {
     # for items with addr we record the id of the item
     if (my $old = $node_id_of_addr{$addr}) {
         return if $id == $old;
-        warn "id for address $addr changed from $old to $id!\n";
+        warn "id for address $addr changed from $old to $id"
+            ." (type $seqn2node{$old}->{type} to $seqn2node{$id}->{type})!\n";
     }
     $node_id_of_addr{$addr} = $id;
     Dwarn { node_id_of_addr => $id } if $opt_debug;
@@ -288,7 +289,7 @@ while (<>) {
 
     # --- Leaf name and memory size
     elsif ($type eq "L") {
-        my $node = $seqn2node{$id} || die;
+        my $node = $seqn2node{$id} or die "panic: Leaf refers to unknown node $id: $_";
         $node->{leaves}{$name} += $val;
         $run_size += $val;
         printf "%s+%d=%d %s\n", $indent x ($node->{depth}+1), $val, $run_size, $name
