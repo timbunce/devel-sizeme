@@ -516,7 +516,8 @@ sub resolve_addr_to_item {
         # (because that'll get its own link drawn later)
         # current that's identified by not having a parent_id (yet)
         next if not $link_node->{parent_id};
-        warn "ITEM addr link $link_node->{id} ($seqn2node{$link_node->{parent_id}}{id}) -> $item->{id}\n";
+        warn "ITEM addr link $link_node->{id} ($seqn2node{$link_node->{parent_id}}{id}) -> $item->{id}\n"
+            if $opt_verbose;
         $self->assign_link_to_item($link_node, $item->{id}, { hard => 0 });
     }
 }
