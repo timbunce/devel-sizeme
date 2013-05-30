@@ -364,7 +364,7 @@ Welcome to the Mojolicious real-time web framework!
                 <a id="goto_parent" href="#" class="theme button white">Go to Parent</a>
                 <form name=params id="sizeme_form">
                 <label for="logarea">Log scale
-                <input type=checkbox id="logarea" name="logarea">
+                <input type=checkbox id="sizeme_logarea" name="logarea">
                 </form>
                 </p>
             </div>
