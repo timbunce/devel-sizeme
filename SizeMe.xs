@@ -645,7 +645,6 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
         return (check_new(st, sv)) ? FOLLOW_SINGLE_NOW : FOLLOW_SINGLE_DONE;
     }
 
-    /* XXX might need to bitshift to avoid ptr alignment issues on some systems */
     seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, (void*)sv));
     ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, (void*)seen_cnt);
 
@@ -659,7 +658,7 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
     if (seen_cnt > SvREFCNT(sv)) {
         if (st->trace_level >= 2)
             warn("Seen sv %p %lu times but ref count is only %d\n", sv, seen_cnt, SvREFCNT(sv));
-        if (st->trace_level >= 4)
+        if (st->trace_level >= 7)
             sv_dump((SV*)sv);
     }
 
@@ -1422,7 +1421,10 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 
   int follow_state = get_sv_follow_state(aTHX_ st, orig_thing);
   if (st->trace_level >= 2) {
-    warn("sv_size %p: %s refcnt=%d, follow=%d, type=%d\n", thing, svtypename(thing), SvREFCNT(thing), follow_state, SvTYPE(thing));
+    warn("sv_size 0x%p: %s refcnt=%d, seen=%lu, follow=%d, type=%d\n",
+        thing, svtypename(thing), SvREFCNT(thing),
+        get_sv_follow_seencnt(aTHX_ st, thing),
+        follow_state, SvTYPE(thing));
     if (st->trace_level >= 9)
         do_sv_dump(0, Perl_debug_log, (SV *)thing, 0, 2, 0, 40);
   }
@@ -1927,7 +1929,7 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
             if (visitcnt < SvREFCNT(sv)) {
                 if (st->trace_level >= 6)
                     fprintf(stderr, "SVs 0x%p with refcnt %d has been seen %d times\n", sv, SvREFCNT(sv), visitcnt);
-                ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, INT2PTR(void*,SvREFCNT(sv)-1));
+                ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, (void*)(SvREFCNT(sv)-1));
                 sv_size(aTHX_ st, NPathLink("cycle"), sv);
                 ++visited;
             }
@@ -2194,7 +2196,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
 
   /* iterate over our sv_refcnt_ptr_table looking for any SVs that haven't been */
   /* seen as often as their refcnt and follow them now */
-  deferred_by_refcnt_size(aTHX_ st, NPathLink("refcnt"), 1);
+  deferred_by_refcnt_size(aTHX_ st, NPathLink("ref_loops"), 1);
 
   /* iterate over all SVs to find any we've not accounted for yet */
   /* once the code above is visiting all SVs, any found here have been leaked */
@@ -2227,7 +2229,7 @@ malloc_free_size(pTHX_ struct state *const st, pPATH)
     NPathSetNode("unknown", NPtype_NAME);
     ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
 # else
-    ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "no_malloc_data", 0);
+    ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "no_malloc_info", 0);
     /* XXX ? */
 # endif
 }
