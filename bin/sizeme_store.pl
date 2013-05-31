@@ -1029,7 +1029,6 @@ BEGIN {
 package Devel::SizeMe::Output::Easy;
 use Moo;
 use autodie;
-use Graph::Easy;
 use Carp qw(croak);
 use HTML::Entities qw(encode_entities);;
 
@@ -1042,6 +1041,7 @@ has graph => (is => 'rw');
 
 sub create_output {
     my $self = shift;
+    require Graph::Easy;
     my $graph = Graph::Easy->new();
     $graph->id('sizeme');
     $self->graph($graph);
