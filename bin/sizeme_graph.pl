@@ -114,7 +114,7 @@ sub name_path_for_node {
 # Documentation browser under "/perldoc"
 plugin 'PODRenderer';
 
-get '/:id' => sub {
+get '/:id' => { id => 1 } => sub {
     my $self = shift;
     # JS handles the :id
     $self->render('index');
