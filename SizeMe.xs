@@ -26,6 +26,8 @@
 #define PERL_PV_ESCAPE_NONASCII 0
 #endif
 
+#include "smptr_tbl.c" /* XXX ought to link it */
+
 #include "refcounted_he.h"
 
 /* Not yet in ppport.h */
@@ -156,7 +158,7 @@ struct state {
     /* we use a pointer table to record the count of the number of times we've
      * seen an SV (for SVs with refcnt > 1) so that we only recurse into it
      * once we've 'seen' and thus accounted for all the refs to it */
-    PTR_TBL_t *sv_refcnt_ptr_table;
+    SMPTR_TBL_t *sv_refcnt_ptr_table;
     /* the initial SV the size func was called for is given a free pass
      * so it's counted regardless of it's ref count. TODO find a more elegant
      * way to do this, perhps by pre-loading the pointer table */
@@ -630,7 +632,7 @@ check_new(struct state *st, const void *const p) {
 static UV
 get_sv_follow_seencnt(pTHX_ struct state *st, const SV *const sv)
 {
-    return PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, (void*)sv));
+    return PTR2UV(smptr_table_fetch(aTHX_ st->sv_refcnt_ptr_table, (void*)sv));
 }
 
 static int
@@ -645,8 +647,8 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
         return (check_new(st, sv)) ? FOLLOW_SINGLE_NOW : FOLLOW_SINGLE_DONE;
     }
 
-    seen_cnt = 1 + PTR2UV(ptr_table_fetch(st->sv_refcnt_ptr_table, (void*)sv));
-    ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, (void*)seen_cnt);
+    seen_cnt = 1 + PTR2UV(smptr_table_fetch(aTHX_ st->sv_refcnt_ptr_table, (void*)sv));
+    smptr_table_store(aTHX_ st->sv_refcnt_ptr_table, (void*)sv, (void*)seen_cnt);
 
     ++st->multi_refcnt;
     if (st->trace_level >= 9)
@@ -706,7 +708,7 @@ free_state(pTHX_ struct state *st)
         Safefree(st->state_cb_data);
     free_tracking_at((void **)st->tracking, top_level);
     if (st->sv_refcnt_ptr_table)
-        ptr_table_free(st->sv_refcnt_ptr_table);
+        smptr_table_free(aTHX_ st->sv_refcnt_ptr_table);
     SvREFCNT_dec(st->tmp_sv);
     Safefree(st);
 }
@@ -1803,7 +1805,7 @@ new_state(pTHX_ SV *root_sv)
 #endif
 
     st->sv_refcnt_to_ignore = root_sv;
-    st->sv_refcnt_ptr_table = ptr_table_new();
+    st->sv_refcnt_ptr_table = smptr_table_new(aTHX);
 
 #ifdef PATH_TRACKING
     /* XXX quick hack */
@@ -1909,7 +1911,7 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
 {
     dNPathNodes(1, NPathArg);
     char node_name[20];
-    PTR_TBL_ENT_t **ary;
+    SMPTR_TBL_ENT_t **ary;
     int visited = 0;
     int i;
 
@@ -1920,16 +1922,19 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
     NPathPushNode(node_name, NPtype_NAME);
 
     /* visit each item in sv_refcnt_ptr_table */
+    /* TODO ought to be abstracted and moved into smptr_tbl.c */
     ary = st->sv_refcnt_ptr_table->tbl_ary;
-    for (i=0; i < st->sv_refcnt_ptr_table->tbl_max + 1; i++, ary++) {
-        PTR_TBL_ENT_t *tblent = *ary;
+    for (i=0; i <= st->sv_refcnt_ptr_table->tbl_max; i++, ary++) {
+        SMPTR_TBL_ENT_t *tblent = *ary;
         for (; tblent; tblent = tblent->next) {
             const SV *sv = tblent->oldval;
             UV visitcnt = PTR2UV(tblent->newval);
-            if (visitcnt < SvREFCNT(sv)) {
+            UV refcnt = SvREFCNT(sv);
+            if (visitcnt < refcnt) {
                 if (st->trace_level >= 6)
                     fprintf(stderr, "SVs 0x%p with refcnt %d has been seen %lu times\n", sv, SvREFCNT(sv), visitcnt);
-                ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, (void*)(SvREFCNT(sv)-1));
+                /* prime the visitcnt so we'll follow the sv on the sv_size call that follows */
+                smptr_table_store(aTHX_ st->sv_refcnt_ptr_table, (void*)sv, INT2PTR(void*, refcnt-1));
                 sv_size(aTHX_ st, NPathLink("cycle"), sv);
                 ++visited;
             }

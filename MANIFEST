@@ -36,7 +36,10 @@ lib/Devel/SizeMe/Graph/static/yesmeck-jquery-jsonview/jquery.jsonview.js
 lib/Devel/SizeMe/Graph/static/yesmeck-jquery-jsonview/jsonview.jquery.json
 ppport.h
 sizeme.db
+smptr_tbl.c
+smptr_tbl.h
 t/00-load.t
+t/10-sizeme.t
 t/basic.t
 t/code.t
 t/globs.t
