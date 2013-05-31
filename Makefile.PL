@@ -16,20 +16,21 @@ write_header(
 
 
 WriteMakefile1(
-    OPTIMIZE => "-g",
     NAME => 'Devel::SizeMe',
     VERSION_FROM => 'lib/Devel/SizeMe.pm',
+    #OPTIMIZE => "-g",
     DEFINE => "-DALIGN_BITS=$ptr_bits",
     PREREQ_PM => {
-        'Test::More' => 0,
+        'XSLoader' => 0,
+        'Moo' => '1.000007',
+        'Test::More' => '0.98',
         'JSON::XS' => 0,
         'HTML::Entities' => 0,
+        'Devel::Dwarn' => 0,
+        'DBD::SQLite' => '1.37',
         # Removed for now as it stops people using SizeMe with 5.8
         # sizeme_graph.pl will eventually become a separate module
         #'Mojolicious::Lite' => 0,
-        'Devel::Dwarn' => 0,
-        'XSLoader' => 0,
-        'DBD::SQLite' => 0,
     },
     EXE_FILES => [ 'bin/sizeme_store.pl', 'bin/sizeme_graph.pl' ],
     clean => {
