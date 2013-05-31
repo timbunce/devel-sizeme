@@ -27,6 +27,7 @@ WriteMakefile1(
         'JSON::XS' => 0,
         'HTML::Entities' => 0,
         'Devel::Dwarn' => 0,
+        'DBI' => '0',
         'DBD::SQLite' => '1.37',
         # Removed for now as it stops people using SizeMe with 5.8
         # sizeme_graph.pl will eventually become a separate module
