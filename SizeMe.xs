@@ -1928,7 +1928,7 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
             UV visitcnt = PTR2UV(tblent->newval);
             if (visitcnt < SvREFCNT(sv)) {
                 if (st->trace_level >= 6)
-                    fprintf(stderr, "SVs 0x%p with refcnt %d has been seen %d times\n", sv, SvREFCNT(sv), visitcnt);
+                    fprintf(stderr, "SVs 0x%p with refcnt %d has been seen %lu times\n", sv, SvREFCNT(sv), visitcnt);
                 ptr_table_store(st->sv_refcnt_ptr_table, (void*)sv, (void*)(SvREFCNT(sv)-1));
                 sv_size(aTHX_ st, NPathLink("cycle"), sv);
                 ++visited;
