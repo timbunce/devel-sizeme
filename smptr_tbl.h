@@ -14,6 +14,8 @@ struct smptr_tbl {
     struct smptr_tbl_arena      *tbl_arena;
     struct smptr_tbl_ent        *tbl_arena_next;
     struct smptr_tbl_ent        *tbl_arena_end;
+    bool                        tbl_split_disabled;
+    bool                        tbl_split_needed;
 };
 
 typedef struct smptr_tbl_ent SMPTR_TBL_ENT_t;

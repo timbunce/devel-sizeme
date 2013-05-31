@@ -1925,11 +1925,13 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
 
     /* visit each item in sv_refcnt_ptr_table */
     /* TODO ought to be abstracted and moved into smptr_tbl.c */
+    st->sv_refcnt_ptr_table->tbl_split_disabled = TRUE;
     ary = st->sv_refcnt_ptr_table->tbl_ary;
     for (i=0; i <= st->sv_refcnt_ptr_table->tbl_max; i++, ary++) {
         SMPTR_TBL_ENT_t *tblent = *ary;
         for (; tblent; tblent = tblent->next) {
             const SV *sv = tblent->oldval;
+
             UV visitcnt = PTR2UV(tblent->newval);
             UV refcnt = SvREFCNT(sv);
             if (visitcnt < refcnt) {
@@ -1942,6 +1944,9 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
             }
         }
     }
+    st->sv_refcnt_ptr_table->tbl_split_disabled = FALSE;
+    if (st->sv_refcnt_ptr_table->tbl_split_needed)
+        smptr_table_split(aTHX_ st->sv_refcnt_ptr_table);
 
     NPathPopNode;
 

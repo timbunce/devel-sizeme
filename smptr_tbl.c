@@ -56,13 +56,19 @@ smptr_table_fetch(pTHX_ SMPTR_TBL_t *const tbl, const void *const sv)
 
 /* double the hash bucket size of an existing ptr table */
 
-static void
+void
 smptr_table_split(pTHX_ SMPTR_TBL_t *const tbl)
 {
     SMPTR_TBL_ENT_t **ary = tbl->tbl_ary;
     const UV oldsize = tbl->tbl_max + 1;
     UV newsize = oldsize * 2;
     UV i;
+
+    if (tbl->tbl_split_disabled) {
+        tbl->tbl_split_needed = TRUE;
+        return;
+    }
+    tbl->tbl_split_needed = FALSE;
 
     PERL_UNUSED_CONTEXT;
 
@@ -123,7 +129,7 @@ smptr_table_store(pTHX_ SMPTR_TBL_t *const tbl, const void *const oldsv, void *c
 	tbl->tbl_ary[entry] = tblent;
 	tbl->tbl_items++;
 	if (tblent->next && tbl->tbl_items > tbl->tbl_max)
-	    smptr_table_split(aTHX_ tbl);
+            smptr_table_split(aTHX_ tbl);
     }
 }
 
