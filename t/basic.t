@@ -1,16 +1,8 @@
 #!/usr/bin/perl -w
 
-use Test::More tests => 30;
+use Test::More;
 use strict;
 use Devel::SizeMe qw(size total_size);
-
-can_ok ('Devel::SizeMe', qw/
-  size
-  total_size
-  /);
-
-die ("Uhoh, test uses an outdated version of Devel::SizeMe")
-    unless is ($Devel::SizeMe::VERSION, '0.11', 'VERSION MATCHES');
 
 #############################################################################
 # some basic checks:
@@ -173,3 +165,5 @@ sub shared_hash_keys {
 	       'Creating iteration state allocates storage');
     }
 }
+
+done_testing();
