@@ -2129,6 +2129,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #endif
 #endif
 
+#ifdef PL_stashpad
     if (1) { /* PL_stashpad */
         PADOFFSET o = 0;
         for (; o < PL_stashpadmax; ++o) {
@@ -2136,6 +2137,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
                 sv_size(aTHX_ st, NPathLink("PL_stashpad"), (SV*)PL_stashpad[o]);
         }
     }
+#else
+    /* XXX ??? */
+#endif
 
   op_size_class(aTHX_ (OP*)&PL_compiling, OPc_COP, 1, st, NPathLink("PL_compiling"));
   op_size_class(aTHX_ (OP*)PL_curcopdb, OPc_COP, 0, st, NPathLink("PL_curcopdb"));
@@ -2147,9 +2151,13 @@ perl_size(pTHX_ struct state *const st, pPATH)
   if (1) {
     int i;
     /* count character classes  */
+#ifdef POSIX_SWASH_COUNT
     for (i = 0; i < POSIX_SWASH_COUNT; i++) {
         sv_size(aTHX_ st, NPathLink("PL_utf8_swash_ptrs"), PL_utf8_swash_ptrs[i]);
     }
+#else
+    /* XXX ??? */
+#endif
     sv_size(aTHX_ st, NPathLink("PL_utf8_mark"), PL_utf8_mark);
     sv_size(aTHX_ st, NPathLink("PL_utf8_toupper"), PL_utf8_toupper);
     sv_size(aTHX_ st, NPathLink("PL_utf8_totitle"), PL_utf8_totitle);
@@ -2157,12 +2165,16 @@ perl_size(pTHX_ struct state *const st, pPATH)
     sv_size(aTHX_ st, NPathLink("PL_utf8_tofold"), PL_utf8_tofold);
     sv_size(aTHX_ st, NPathLink("PL_utf8_idstart"), PL_utf8_idstart);
     sv_size(aTHX_ st, NPathLink("PL_utf8_idcont"), PL_utf8_idcont);
+#ifdef PL_utf8_foldclosures
     sv_size(aTHX_ st, NPathLink("PL_utf8_foldclosures"), (SV*)PL_utf8_foldclosures);
+#endif
+#ifdef POSIX_CC_COUNT
     for (i = 0; i < POSIX_CC_COUNT; i++) {
         sv_size(aTHX_ st, NPathLink("PL_Posix_ptrs"), PL_Posix_ptrs[i]);
         sv_size(aTHX_ st, NPathLink("PL_L1Posix_ptrs"), PL_L1Posix_ptrs[i]);
         sv_size(aTHX_ st, NPathLink("PL_XPosix_ptrs"), PL_XPosix_ptrs[i]);
     }
+#endif
   }
 
   /* TODO stacks: cur, main, tmps, mark, scope, save */
