@@ -5,7 +5,7 @@
 #
 # command.
 #
-^Devel-SizeMe.*\.tar\.gz
+^Devel-SizeMe-*
 ^Makefile.old
 ^Makefile\z
 ^pm_to_blib
@@ -15,3 +15,4 @@
 tmon.out
 \.txt\z
 ^\.git
+refcounted_he.h

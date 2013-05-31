@@ -1,8 +1,14 @@
 Revision history for Perl extension Devel::SizeMe.
 
-0.08
+0.11 - 2013-05-31 - Tim Bunce
 
+ * Major update.
+ * Uses ref counts to limit extent of crawling.
+ * Optionally collapses cop_file's, hek's and other 'noise' nodes.
+ * Outputs Graph::Easy (for small graphs) and GEXF (for large).
+ * Many updates to treemap interface.
  * Don't follow method cache entries, thanks to Rafael Garcia-Suarez.
+ * This is rather rough release to get a usable version out before YAPC::NA.
 
 0.07 2013-01-10 Tim Bunce
 

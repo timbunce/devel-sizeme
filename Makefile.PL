@@ -51,6 +51,12 @@ WriteMakefile1(
     },
     MIN_PERL_VERSION => '5.008',
     LICENSE => 'perl',
+    dist  => {
+        DIST_DEFAULT => 'clean distcheck disttest tardist',
+        PREOP        => '$(MAKE) -f Makefile.old distdir',
+        COMPRESS     => 'gzip -v9',
+        SUFFIX       => 'gz',
+    },
 );
 
 

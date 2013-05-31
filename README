@@ -1,4 +1,3 @@
-
 Devel::SizeMe is a variant of Devel::Size that can stream out detailed
 information about the size of individual data-structures and the links
 between them.
