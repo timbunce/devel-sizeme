@@ -1467,9 +1467,11 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
-      warn("Devel::Size: Unknown variable type: %u encountered\n", type); /* TODO report path */
+      fprintf(stderr, "Unknown SV type: %u encountered at ", type);
+      np_dump_node_path(aTHX_ st, NP);
+      fprintf(stderr, ":\n");
       sv_dump((SV*)thing);
-      return 0; /* not strictly correct */
+      return 0;
   }
   NPathPushNode(thing, NPtype_SV);
   if (do_NPathNoteAddr || !NPathArg)
