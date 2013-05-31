@@ -7,7 +7,7 @@ BEGIN {
     if ($^P and keys %INC == 1) {
         warn "Note: Devel::SizeMe currently disables perl debugger mode\n";
         # default $^P set by "perl -d" is 0x73f
-        $^P = 0x10  # Keep info about source lines on which a sub is defined
+        $^P = 0x010 # Keep info about source lines on which a sub is defined
             | 0x100 # Provide informative "file" names for evals
             | 0x200 # Provide informative names to anonymous subroutines;
             ;
@@ -23,11 +23,11 @@ BEGIN {
 use strict;
 use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
-require 5.005;
+require 5.008;
 require Exporter;
 require XSLoader;
 
-$VERSION = '0.07';
+$VERSION = '0.11';
 @ISA = qw(Exporter);
 
 @EXPORT_OK = qw(size total_size perl_size heap_size);
