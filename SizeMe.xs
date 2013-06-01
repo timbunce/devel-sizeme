@@ -1852,7 +1852,6 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
         fprintf(stderr, "sweeping arenas for unseen SVs\n");
 
     NPathPushNode("unseen", NPtype_NAME);
-    NPathPushNode("dummy", NPtype_LINK);
 
     /* by this point we should have visited all the SVs
      * so now we'll run through all the SVs via the arenas
@@ -1867,9 +1866,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
      */
     for (want_type = SVt_LAST-1; want_type >= 0; --want_type) {
         char path_link_group[40];
-
         sprintf(path_link_group, "arena-%s", svtypenames[want_type]);
-        NPathSetNode(path_link_group, NPtype_LINK);
 
         for (sva = PL_sv_arenaroot; sva; sva = MUTABLE_SV(SvANY(sva))) {
             const SV * const svend = &sva[SvREFCNT(sva)];
@@ -1882,6 +1879,9 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
                 if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
                     /* is a live SV */
                     if (SvTYPE(sv) == want_type) {
+                        /* TODO optimize by checking if sv has been seen first */
+                        NPathPushNode(path_link_group, NPtype_LINK);
+                        NPathPushNode(path_link_group, NPtype_NAME);
                         if (sv_size(aTHX_ st, NPathLink("arena"), sv)) {
                             /* TODO - resolve these 'unseen' SVs by expanding the coverage of perl_size() */
                             /* you can enable the sv_dump below and try to work out what the SVs are */
@@ -1891,6 +1891,8 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
                                 sv_dump(sv);
                             }
                         }
+                        NPathPopNode;
+                        NPathPopNode;
                     }
                     continue;
                 }
@@ -1911,19 +1913,19 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
 }
 
 
-static void
+static UV
 deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
 {
     dNPathNodes(1, NPathArg);
     char node_name[20];
     SMPTR_TBL_ENT_t **ary;
-    int visited = 0;
+    UV visited = 0;
     int i;
 
     if (st->trace_level)
         fprintf(stderr, "sweeping probable ref loops, cycle %d\n", cycle);
 
-    sprintf(node_name, "cycles-%d", cycle);
+    sprintf(node_name, "cycle-%d", cycle);
     NPathPushNode(node_name, NPtype_NAME);
 
     /* visit each item in sv_refcnt_ptr_table */
@@ -1956,11 +1958,7 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
     if (st->trace_level)
         fprintf(stderr, "visited %d deferred SVs on cycle %d\n", visited, cycle);
 
-    /* if we visited any SVs then try again since we may have encountered some
-     * more SVs that haven't been visited yet
-     */
-    if (visited)
-        deferred_by_refcnt_size(aTHX_ st, NPathArg, cycle+1);
+    return visited;
 }
 
 #ifdef PERL_MAD
@@ -2224,7 +2222,17 @@ perl_size(pTHX_ struct state *const st, pPATH)
 
   /* iterate over our sv_refcnt_ptr_table looking for any SVs that haven't been */
   /* seen as often as their refcnt and follow them now */
-  deferred_by_refcnt_size(aTHX_ st, NPathLink("ref_loops"), 1);
+  if (1) {
+    int ref_loop_cycle = 0;
+    char name[20];
+    /* if we visited any SVs then try again since we may have encountered some
+     * more SVs that haven't been visited yet
+     */
+    do {
+        ++ref_loop_cycle;
+        sprintf(name, "ref_loops_%d", ref_loop_cycle);
+    } while (deferred_by_refcnt_size(aTHX_ st, NPathLink(name), ref_loop_cycle));
+  }
 
   /* iterate over all SVs to find any we've not accounted for yet */
   /* once the code above is visiting all SVs, any found here have been leaked */
