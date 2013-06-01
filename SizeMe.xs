@@ -1780,12 +1780,15 @@ new_state(pTHX_ SV *root_sv)
 {
     SV *sv;
     struct state *st;
+    char *sizeme_hide = PerlEnv_getenv("SIZEME_HIDE"); /* XXX hack */
 
     Newxz(st, 1, struct state);
     st->start_time_nv = gettimeofday_nv(aTHX);
     st->recurse = RECURSE_INTO_OWNED;
     st->go_yell = TRUE;
-    if(1)st->hide_detail = NPf_DETAIL_HEK | NPf_DETAIL_COPFILE | NPf_DETAIL_REFCNT1; /* XXX make an option XXX invert */
+    if (sizeme_hide && *sizeme_hide) {
+        st->hide_detail = atoi(sizeme_hide);
+    }
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
     }
@@ -1800,11 +1803,11 @@ new_state(pTHX_ SV *root_sv)
     check_new(st, &PL_sv_undef);
     check_new(st, &PL_sv_no);
     check_new(st, &PL_sv_yes);
-    st->tmp_sv = newSV(0);
-    check_new(st, st->tmp_sv);
-#if PERL_VERSION > 8 || (PERL_VERSION == 8 && PERL_SUBVERSION > 0)
+#if (PERL_BCDVERSION >= 0x5008000)
     check_new(st, &PL_sv_placeholder);
 #endif
+    st->tmp_sv = newSV(0);
+    check_new(st, st->tmp_sv);
 
     st->sv_refcnt_to_ignore = root_sv;
     st->sv_refcnt_ptr_table = smptr_table_new(aTHX);
