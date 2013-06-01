@@ -1983,7 +1983,7 @@ parser_size(pTHX_ struct state *const st, pPATH, yy_parser *parser)
   dNPathNodes(2, NPathArg);
   if (!check_new(st, parser))
     return;
-  NPathPushNode("parser_size", NPtype_NAME);
+  NPathPushNode("parser", NPtype_NAME);
   ADD_SIZE(st, "yy_parser", sizeof(yy_parser));
 
   NPathPushNode("stack", NPtype_NAME);
@@ -2214,6 +2214,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
     }
     NPathPushNode("unused_sv_heads", NPtype_NAME);
     ADD_SIZE(st, "sv", free_heads * sizeof(SV));
+    ADD_ATTR(st, NPattr_NOTE, "n", free_heads);
     NPathPopNode;
   }
   /* XXX iterate over bodies_by_type and crawl the free chains for each */
