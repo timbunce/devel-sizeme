@@ -1885,7 +1885,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
                         if (sv_size(aTHX_ st, NPathLink("arena"), sv)) {
                             /* TODO - resolve these 'unseen' SVs by expanding the coverage of perl_size() */
                             /* you can enable the sv_dump below and try to work out what the SVs are */
-                            ADD_ATTR(st, NPattr_ADDR, "", PTR2UV(sv)); /* TODO control via detail */
+                            ADD_LINK_ATTR_TO_TOP(st, NPattr_ADDR, "", PTR2UV(sv)); /* TODO control via detail */
                             if (st->trace_level > 2) {
                                 fprintf(stderr, "UNSEEN ");
                                 sv_dump(sv);
