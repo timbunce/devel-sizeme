@@ -15,10 +15,9 @@ write_header(
 );
 
 
-WriteMakefile1(
+my %MakefileOpts = (
     NAME => 'Devel::SizeMe',
     VERSION_FROM => 'lib/Devel/SizeMe.pm',
-    #OPTIMIZE => "-g",
     DEFINE => "-DALIGN_BITS=$ptr_bits",
     PREREQ_PM => {
         'XSLoader' => 0,
@@ -59,6 +58,13 @@ WriteMakefile1(
         SUFFIX       => 'gz',
     },
 );
+
+if (-d ".git") {
+    $MakefileOpts{OPTIMIZE} = "-g";
+    warn "Forcing OPTIMIZE=$MakefileOpts{OPTIMIZE}\n";
+}
+
+WriteMakefile1(%MakefileOpts);
 
 
 sub WriteMakefile1 {
