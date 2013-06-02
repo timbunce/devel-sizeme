@@ -89,6 +89,7 @@ my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR REFCNT)); # XXX g
 GetOptions(
     'text!' => \my $opt_text,
     'dot=s' => \my $opt_dot,
+    'tree!' => \my $opt_tree,
     'gexf=s' => \my $opt_gexf,
     'db=s'  => \my $opt_db,
     'verbose|v+' => \my $opt_verbose,
@@ -349,6 +350,12 @@ while (<>) {
     elsif ($type eq 'S') { # start of a run
         die "Unexpected start token" if @stack;
 
+        if ($opt_tree) {
+            my $out = Devel::SizeMe::Output::Text->new();
+            $out->start_event_stream;
+            push @outputs, $out;
+        }
+
         if ($opt_dot) {
             my $out = Devel::SizeMe::Output::Graphviz->new(file => $opt_dot);
             $out->start_event_stream;
@@ -443,6 +450,9 @@ use Moo;
 use autodie;
 use Carp qw(croak);
 use HTML::Entities qw(encode_entities);;
+
+my @attr_names = qw(label_attr size_attr kids_size_attr total_size_attr weight_attr);
+has \@attr_names => (is => 'rw');
 
 has file => (is => 'ro');
 
@@ -566,7 +576,7 @@ sub view_output {
     my $self = shift;
 
     my $file = $self->file;
-    if ($file ne '/dev/tty') {
+    if ($file && $file ne '/dev/tty') {
         system("cat $file") if $opt_debug;
     }
 }
@@ -611,31 +621,85 @@ sub leave_node {
 
 BEGIN {
 
-# based on https://metacpan.org/source/SHLOMIF/Graph-Easy-0.72/lib/Graph/Easy/As_graphml.pm#L221
-# and https://metacpan.org/source/SZABGAB/SVG-2.59/lib/SVG/XML.pm#L47
-sub ::xml_escape {
-    local $_ = shift
-        or return $_;
-    #carp "xml_escape called with undef" if not defined $_;
-    
-    s/&/&amp;/g;    # quote &
-    s/>/&gt;/g;     # quote >
-    s/</&lt;/g;     # quote <
-    s/"/&quot;/g;   # quote "
-    s/'/&apos;/g;   # quote '
-    s/\\\\/\\/g;    # "\\" to "\"
+package Devel::SizeMe::Output::Text;
 
-    # Invalid XML characters are removed and warned about
-    # Tabs (\x09) and newlines (\x0a) are valid.
-    while ( s/([\x00-\x08\x0b\x1f])// ) {
-        my $char = "'\\x".sprintf('%02X',ord($1))."'";
-        Carp::carp("Removed $char from xml");
-    }
-    s/([\200-\377])/'&#'.ord($1).';'/ge;
+use Moo;
+use autodie;
+use Carp qw(croak);
+use Devel::Dwarn;
+use HTML::Entities qw(encode_entities);;
 
+extends 'Devel::SizeMe::Output';
+
+has fh => (is => 'rw');
+
+my @buffered_edges;
+
+*fmt_size = \&main::fmt_size;
+
+sub BUILD {
+    my $self = shift;
+    @buffered_edges = ();
+}
+
+sub create_output {
+    my $self = shift;
+    $self->fh(\*STDOUT);
+    $self->fh->autoflush if $opt_debug;
+}
+
+sub close_output {
+    my $self = shift;
+    $self->fh(undef);
+}
+
+sub leave_node {
+    my ($self, $node) = @_;
+    my $fh = $self->fh or return;
+
+    my $size_str = sprintf "%s+%s=%s",
+        fmt_size($node->{self_size}),
+        fmt_size($node->{kids_size}),
+        fmt_size($node->{self_size}+$node->{kids_size});
+    my $pad = $indent x $node->{depth};
+
+    printf "%s%s", $pad, $node->{name};
+
+    printf q{ \"%s\"}, _escape($node->{attr}{label})
+        if exists $node->{attr}{label};
+
+    printf " --^" if ($node->{type} == ::NPtype_LINK);
+
+    printf " [#%d @%d] %s\n", $node->{id}, $node->{depth}, $size_str;
+
+    our $j ||= JSON::XS->new->ascii->pretty(0);
+    printf "%s `attr %s\n", $pad, $j->encode($node->{attr})
+        if keys %{$node->{attr}};
+    print "$pad\n";
+}
+
+
+sub write_pending_links {
+    print "write_pending_links skipped\n";
+}
+
+sub write_dangling_links {
+    print "write_dangling_links skipped\n";
+}
+
+sub _escape {
+    local $_ = shift;
+    return "" if not defined $_;
+    # escape unprintables XXX correct sins against unicode
+    s/([\000-\037\200-\237])/sprintf("\\x%02x",ord($1))/eg;
     return $_;
 }
 
+} # END Text
+
+
+
+BEGIN {
 
 package Devel::SizeMe::Output::GEXF;
 # http://gexf.net/format/index.html
@@ -647,11 +711,7 @@ use HTML::Entities qw(encode_entities);;
 
 extends 'Devel::SizeMe::Output';
 
-
 has fh => (is => 'rw');
-
-my @attr_names = qw(label_attr size_attr kids_size_attr total_size_attr weight_attr);
-has \@attr_names => (is => 'rw');
 
 my @buffered_edges;
 
@@ -1094,6 +1154,32 @@ sub fmt_item_label {
 }
 
 } # END
+
+
+# based on https://metacpan.org/source/SHLOMIF/Graph-Easy-0.72/lib/Graph/Easy/As_graphml.pm#L221
+# and https://metacpan.org/source/SZABGAB/SVG-2.59/lib/SVG/XML.pm#L47
+sub ::xml_escape {
+    local $_ = shift
+        or return $_;
+    #carp "xml_escape called with undef" if not defined $_;
+
+    s/&/&amp;/g;    # quote &
+    s/>/&gt;/g;     # quote >
+    s/</&lt;/g;     # quote <
+    s/"/&quot;/g;   # quote "
+    s/'/&apos;/g;   # quote '
+    s/\\\\/\\/g;    # "\\" to "\"
+
+    # Invalid XML characters are removed and warned about
+    # Tabs (\x09) and newlines (\x0a) are valid.
+    while ( s/([\x00-\x08\x0b\x1f])// ) {
+        my $char = "'\\x".sprintf('%02X',ord($1))."'";
+        Carp::carp("Removed $char from xml");
+    }
+    s/([\200-\377])/'&#'.ord($1).';'/ge;
+
+    return $_;
+}
 
 
 =for This is out of date but gives you an idea of the data and stream
