@@ -637,50 +637,6 @@ sub ::xml_escape {
 }
 
 
-{
-package # hide from PAUSE
-    graphml::attr;
-use Moo;
-use Carp;
-my $next_id = 0;
-my %by_name;
-
-# graph, node, edge, or all
-has for => ( is=>'ro', required=>1 );
-# boolean, int, long, float, double, or string are supported by gephi
-has type => ( is=>'ro', required=>1 );
-has name => ( is=>'ro', required=>1 );
-has default => ( is=>'ro' );
-has key => ( is=>'rw' );
-
-sub BUILD {
-    my $self = shift;
-    croak "Duplicate attribute name ".$self->name
-        if $by_name{ $self->name };
-    $by_name{ $self->name } = $self;
-    $next_id++;
-    $self->key( ($self->name =~ m/^\w+$/) ? $self->name : "a$next_id")
-        unless defined $self->key;
-}
-
-sub fmt_data_key_declaration {
-    my $self = shift;
-
-    my $default = '';
-    $default = sprintf "<default>%s</default>", ::xml_escape($self->default)
-        if defined $self->default;
-
-    return sprintf qq{\t<key id="%s" for="%s" attr.name="%s" attr.type="%s">%s</key>\n},
-        $self->key, $self->for, $self->name, $self->type, $default;
-}
-
-sub fmt_data {
-    my ($self, $value) = @_;
-    return sprintf qq{<data key="%s">%s</data>}, $self->key, ::xml_escape($value);
-}
-
-}
-
 package Devel::SizeMe::Output::GEXF;
 # http://gexf.net/format/index.html
 
@@ -703,12 +659,6 @@ my @buffered_edges;
 
 sub BUILD {
     my $self = shift;
-
- #   $self->label_attr( graphml::attr->new(for=>'all', type=>'string', name=>'label', key=>"d3"));
- #   $self->size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'size'));
- #   $self->kids_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'kids_size'));
- #   $self->total_size_attr( graphml::attr->new(for=>'node', type=>'int', name=>'total_size'));
- #   $self->weight_attr( graphml::attr->new(for=>'edge', type=>'double', name=>'weight', key=>'weight'));
     @buffered_edges = ();
 }
 
