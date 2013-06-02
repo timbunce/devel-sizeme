@@ -401,9 +401,8 @@ while (<>) {
 
         my $top_size = $top->{self_size}+$top->{kids_size};
 
-        printf "Stored %d nodes totalling %s [lines=%d size=%d write=%.2fs]\n",
-            1+$top->{kids_node_count}, fmt_size($top_size),
-            $., $top_size, $val;
+        printf "Total size %s spread over %d nodes [lines=%d bytes=%d write=%.2fs]\n",
+            fmt_size($top_size), 1+$top->{kids_node_count}, $., $top_size, $val;
         # the duration here ($val) is from Devel::SizeMe perspective
         # ie doesn't include time to read file/pipe and commit to database.
 
@@ -432,9 +431,9 @@ die "EOF without end token" if @stack;
 sub fmt_size {
     my $size = shift;
     my $kb = $size / 1024;
-    return $size if $kb < 5;
-    return sprintf "%.1fKb", $kb if $kb < 1000;
-    return sprintf "%.1fMb", $kb/1024;
+    return sprintf "%d", $size if $kb < 5;
+    return sprintf "%.1fKB", $kb if $kb < 1000;
+    return sprintf "%.1fMB", $kb/1024;
 }
 
 
@@ -588,7 +587,7 @@ sub leave_item_node {
 sub leave_link_node {
     my ($self, $link_node) = @_;
     my @kids = @{$link_node->{child_id}||[]};
-    warn "panic: NPtype_LINK has more than one child: @kids"
+    warn "warning: NPtype_LINK $link_node->{id} ($link_node->{name}) has more than one child: @kids"
         if @kids > 1;
     for my $child_id (@kids) {
         $self->assign_link_to_item($link_node, $child_id, { hard => 1 });
@@ -734,7 +733,7 @@ sub view_output {
     if ($file ne '/dev/tty') {
         #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
         #system("open sizeme.html") if $^O eq 'darwin'; # OSX
-        #system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
+        system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
     }
 }
 
