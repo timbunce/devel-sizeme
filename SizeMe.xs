@@ -110,9 +110,9 @@
 #define FOLLOW_MULTI_DONE   22 /* refcnt>1, already followed */
 
 /* detail types to control simplification of node tree */
-#define NPf_DETAIL_COPFILE      0b0001
-#define NPf_DETAIL_HEK          0b0010
-#define NPf_DETAIL_REFCNT1      0b0100
+#define NPf_DETAIL_COPFILE      0x01
+#define NPf_DETAIL_HEK          0x02
+#define NPf_DETAIL_REFCNT1      0x04
 
 
 /*
