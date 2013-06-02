@@ -1573,7 +1573,7 @@ if (SvREFCNT(thing) > 63000) {
 
             if (!(st->hide_detail & NPf_DETAIL_HEK)) {
                 NPathPushLink("HE");
-                NPathPushNode("HE+HEK", NPtype_NAME);
+                NPathPushNode("HE", NPtype_NAME);
             }
 
             ADD_SIZE(st, "he", sizeof(HE));
@@ -2275,7 +2275,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
 static void
 malloc_free_size(pTHX_ struct state *const st, pPATH)
 {
-    dNPathNodes(1, NPathArg);
+    dNPathNodes(3, NPathArg);
 
 # ifdef _MALLOC_MALLOC_H_ /* OSX. Not sure where else mstats is available */
 # define HAS_MSTATS
@@ -2284,18 +2284,27 @@ malloc_free_size(pTHX_ struct state *const st, pPATH)
     /* some systems have the SVID2/XPG mallinfo structure and function */
     struct mstats ms = mstats(); /* mstats() first */
 # endif
+    NPathPushNode("malloc", NPtype_NAME);
 
 # ifdef HAS_MSTATS
-    NPathPushNode("malloc.bytes_free", NPtype_NAME);
+    NPathPushLink("bytes_free");
+    NPathPushNode("bytes_free", NPtype_NAME);
     ADD_SIZE(st, "bytes_free", ms.bytes_free);
     ADD_ATTR(st, NPattr_NOTE, "bytes_total", ms.bytes_total);
     ADD_ATTR(st, NPattr_NOTE, "bytes_used",  ms.bytes_used);
     ADD_ATTR(st, NPattr_NOTE, "chunks_used", ms.chunks_used);
     ADD_ATTR(st, NPattr_NOTE, "chunks_free", ms.chunks_free);
+    NPathPopNode;
+    NPathPopNode;
+
     /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
     /* for now we use bytes_total as an approximation */
-    NPathSetNode("unknown", NPtype_NAME);
+    NPathPushLink("unknown");
+    NPathPushNode("unknown", NPtype_NAME);
     ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
+    NPathPopNode;
+    NPathPopNode;
+
 # else
     ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "no_malloc_info", 0);
     /* XXX ? */
