@@ -169,18 +169,18 @@ sub leave_node {
             # elem link <- SV(PVAV) <- elem link <- PADLIST
             my $padnames = $padlist->{attr}{+NPattr_PADNAME} || [];
             if (my $padname = $padnames->[$index]) {
-                $x->{name} = "my($padname)";
+                $x->{attr}{label} = "my($padname)";
             }
             else {
-                $x->{name} = ($index) ? "PAD[$index]" : '@_';
+                $x->{attr}{label} = ($index) ? "PAD[$index]" : '@_';
             }
         }
         elsif (@stack >= 1 && ($padlist=$stack[-1])->{name} eq 'PADLIST') {
             my $padnames = $padlist->{attr}{+NPattr_PADNAME} || [];
-            $x->{name} = "Pad$index";
+            $x->{attr}{label} = "Pad$index";
         }
         else {
-            $x->{name} = "[$index]";
+            $x->{attr}{label} = "[$index]";
         }
     }
 
@@ -588,7 +588,9 @@ sub enter_node {
 
 sub leave_item_node {
     my ($self, $item_node) = @_;
-    $self->emit_item_node($item_node, { label => $self->fmt_item_label($item_node) });
+    my $label = $item_node->{attr}{label};
+    $label = $item_node->{name} if not defined $label;
+    $self->emit_item_node($item_node, { label => $label });
     if (my $addr = $item_node->{attr}{addr}) {
         $self->resolve_addr_to_item($addr, $item_node);
     }
@@ -665,7 +667,7 @@ sub leave_node {
 
     printf "%s%s", $pad, $node->{name};
 
-    printf q{ \"%s\"}, _escape($node->{attr}{label})
+    printf q{ "%s"}, _escape($node->{attr}{label})
         if exists $node->{attr}{label};
 
     printf " --^" if ($node->{type} == ::NPtype_LINK);
@@ -740,11 +742,7 @@ sub view_output {
     $self->SUPER::view_output(@_);
 
     my $file = $self->file;
-    if ($file ne '/dev/tty') {
-        #system("dot -Tsvg $file > sizeme.svg && open sizeme.svg");
-        #system("open sizeme.html") if $^O eq 'darwin'; # OSX
-        system("open -a Graphviz $file") if $^O eq 'darwin'; # OSX
-    }
+    system("open -a Gephi $file") if $^O eq 'darwin'; # OSX
 }
 
 sub write_prologue {
@@ -765,6 +763,7 @@ sub write_prologue {
     print $fh qq{<graph defaultedgetype="directed">
         <attributes class="node" type="static">
         <attribute id="label" title="label" type="string"/>
+        <attribute id="name" title="name" type="string"/>
         <attribute id="nsb" title="self_bytes" type="int"/>
         <attribute id="nkb" title="kids_bytes" type="int"/>
         <attribute id="ntb" title="total_bytes" type="int"/>
@@ -809,8 +808,7 @@ sub emit_link {
     else {
         push @link_attr, ($attr->{hard}) ? () : ('style="dashed"');
     }
-    (my $link_name = $link_node->{attr}{label} || $link_node->{name}) =~ s/->$//; # XXX hack
-    push @link_attr, (sprintf "label=%s", _dotlabel($link_name, $link_node));
+    my $link_name = $link_node->{attr}{label} || $link_node->{name};
 
     my $label = _dotlabel($link_name, $link_node),
     my $weight = 1;
@@ -852,9 +850,10 @@ sub emit_item_node {
         nkb => $item_node->{kids_size},
         ntb => $item_node->{self_size}+$item_node->{kids_size},
         nrc => $item_node->{refcnt},
+        name => $item_node->{name},
     );
     my %viz;
-    my $label = _dotlabel($attr->{label}, $item_node);
+    my $label = _dotlabel($attr->{label}||$item_node->{name}, $item_node);
     $self->_emit_node($item_node->{id}, $label, \%attr, \%viz);
 }
 
@@ -876,16 +875,6 @@ sub fmt_item_label {
     push @name, "\"$item_node->{attr}{label}\""
         if $item_node->{attr}{label};
     push @name, $item_node->{name};
-    if ($item_node->{kids_size}) {
-        push @name, sprintf " %s+%s=%s",
-            fmt_size($item_node->{self_size}),
-            fmt_size($item_node->{kids_size}),
-            fmt_size($item_node->{self_size}+$item_node->{kids_size});
-    }
-    else {
-        push @name, sprintf " +%s",
-            fmt_size($item_node->{self_size});
-    }
     return \@name;
 }
 
