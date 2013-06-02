@@ -239,7 +239,7 @@ sub _fetch_node_tree {
         my @child_ids = split /,/, $node->{child_ids};
 
         # XXX hack to handle nodes that possibly have large numbers of children
-        $depth = 1 if $depth > 1 and $node->{name} =~ /^arena|^unaccounted|^unseen/;
+        $depth = 1 if $depth > 1 and $node->{name} =~ /^arena|^unaccounted|^unseen|^ref_loop/;
 
         # if this node has only one child then we merge that child into this node
         # this makes the treemap more usable
@@ -277,13 +277,13 @@ sub _fetch_node_tree {
                     my $idx = @$src;
                     while (--$idx >= 0) {
                         warn "Node $child->{id} attr $attr_type:$idx=$dst->[$idx] overwritten by $src->[$idx]\n"
-                            if defined $dst->[$idx];
+                            if defined $dst->[$idx] and $dst->[$idx] ne $src->[$idx];
                         $dst->[$idx] = $src->[$idx];
                     }
                 }
                 else { # assume scalar
                     warn "Node $child->{id} attr $attr_type=$child->{attr}{$attr_type} overwritten by $src\n"
-                        if exists $child->{attr}{$attr_type};
+                        if exists $child->{attr}{$attr_type} and $child->{attr}{$attr_type} ne $src;
                     $child->{attr}{$attr_type} = $src;
                 }
             }
