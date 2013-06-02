@@ -64,7 +64,10 @@ use Devel::Dwarn;
 use Devel::SizeMe::Graph;
 use DBI;
 
-
+my $dbh;
+my %node_queue;
+my %node_cache;
+my $db_modtime;
 my $j = JSON::XS->new;
 
 GetOptions(
@@ -76,8 +79,19 @@ GetOptions(
 die "Can't open $opt_db: $!\n" unless -r $opt_db;
 warn "Reading $opt_db\n";
 
-my $dbh = DBI->connect("dbi:SQLite:$opt_db", undef, undef, { RaiseError => 1 });
-my $select_node_by_id_sth = $dbh->prepare("select * from node where id = ?");
+sub init {
+    warn "Opening $opt_db\n";
+    $db_modtime = -t $opt_db;
+    $dbh = DBI->connect("dbi:SQLite:$opt_db", undef, undef, { RaiseError => 1 });
+    %node_queue = ();
+    %node_cache = ();
+}
+
+sub check_for_db_update {
+    init() if !$db_modtime or $db_modtime = -t $opt_db;
+}
+
+check_for_db_update();
 
 
 my $static_dir = $INC{'Devel/SizeMe/Graph.pm'} or die 'panic';
@@ -124,6 +138,8 @@ get '/:id' => { id => 1 } => sub {
 # /jit_tree are AJAX requests from the treemap visualization
 get '/jit_tree/:id/:depth' => sub {
     my $self = shift;
+
+    check_for_db_update();
 
     my $id = $self->stash('id');
     my $depth = $self->stash('depth');
@@ -173,8 +189,6 @@ get '/jit_tree/:id/:depth' => sub {
     $self->render(json => \%response);
 };
 
-my %node_queue;
-my %node_cache;
 sub _set_node_queue {
     my $nodes = shift;
     ++$node_queue{$_} for @$nodes;
