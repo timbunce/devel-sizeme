@@ -449,7 +449,7 @@ package Devel::SizeMe::Output;
 use Moo;
 use autodie;
 use Carp qw(croak);
-use HTML::Entities qw(encode_entities);;
+use HTML::Entities qw(encode_entities);
 
 my @attr_names = qw(label_attr size_attr kids_size_attr total_size_attr weight_attr);
 has \@attr_names => (is => 'rw');

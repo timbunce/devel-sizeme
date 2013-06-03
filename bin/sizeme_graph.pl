@@ -59,6 +59,7 @@ use warnings;
 
 use Mojolicious::Lite; # possibly needs v3
 use JSON::XS;
+use HTML::Entities qw(encode_entities);
 use Getopt::Long;
 use Devel::Dwarn;
 use Devel::SizeMe::Graph;
@@ -110,7 +111,7 @@ sub name_path_for_node {
     my @name_path;
 
     while ($id) { # work backwards towards root
-        my $node = _get_node($id);
+        my $node = inflate_node(_get_node($id));
         push @name_path, $node;
         $id = ($parent_id_only) ? $node->{parent_id} : $node->{namedby_id} || $node->{parent_id};
         if (@name_path > 1_000) {
@@ -180,13 +181,18 @@ get '/jit_tree/:id/:depth' => sub {
         name_path  => name_path_for_node($id),
         nodes => $jit_tree
     );
+
     # XXX temp hack
     #     //   <li><a href="#">Home</a> <span class="divider">/</span></li>
     #     //   <li><a href="#">Library</a> <span class="divider">/</span></li>
     #     //   <li class="active">Data</li>
     $response{name_path_html} = join "", map {
-        sprintf q{<li><a href="/%d">%s</a><span class="divider">/</span></li>},
-            $_->{id}, $_->{name};
+        my $html = ($_->{type} == 2) # link
+            ? sprintf q{%s}, $_->{name}
+            : sprintf q{<a href="/%d" title="%s">%s</a>},
+                $_->{id}, encode_entities($_->{name}), encode_entities($_->{attr}{label} || $_->{name});
+        my $divider = ($_->{type} == 2) ? "&rarr;" : "&rarr;";
+        qq{<li>$html<span class="divider">$divider</span></li>}
     } @{$response{name_path}};
 
     $self->render(json => \%response);
@@ -222,6 +228,14 @@ sub _get_node {
     return $node_cache{$id};
 }
 
+sub inflate_node {
+    my $node = shift or return undef;
+    $node = { %$node }; # XXX copy for inflation
+    $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size)); # numify
+    $node->{leaves} = $j->decode(delete $node->{leaves_json});
+    $node->{attr}   = $j->decode(delete $node->{attr_json});
+    return $node;
+}
 
 sub _fetch_node_tree {
     my ($id, $depth) = @_;
@@ -229,12 +243,8 @@ sub _fetch_node_tree {
     warn "#$id fetching\n"
         if $opt_debug;
 
-    my $node = _get_node($id)
+    my $node = inflate_node(_get_node($id))
         or die "No node $id";
-    $node = { %$node }; # XXX copy for inflation
-    $node->{$_} += 0 for (qw(child_count kids_node_count kids_size self_size)); # numify
-    $node->{leaves} = $j->decode(delete $node->{leaves_json});
-    $node->{attr}   = $j->decode(delete $node->{attr_json});
 
     $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
