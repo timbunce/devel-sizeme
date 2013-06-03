@@ -2216,15 +2216,16 @@ perl_size(pTHX_ struct state *const st, pPATH)
   /* iterate over our sv_refcnt_ptr_table looking for any SVs that haven't been */
   /* seen as often as their refcnt and follow them now */
   if (1) {
-    int ref_loop_cycle = 0;
-    char name[20];
-    /* if we visited any SVs then try again since we may have encountered some
+    int cycle = 0;
+    NPathPushLink("ref_loops");
+    NPathPushNode("ref_loops", NPtype_NAME);
+    /* loop so that if we visited any SVs then try again since we may have encountered some
      * more SVs that haven't been visited yet
      */
-    do {
-        ++ref_loop_cycle;
-        sprintf(name, "ref_loops_%d", ref_loop_cycle);
-    } while (deferred_by_refcnt_size(aTHX_ st, NPathLink(name), ref_loop_cycle));
+    while (deferred_by_refcnt_size(aTHX_ st, NPathLink("ref_loops"), ++cycle))
+        1;
+    NPathPopNode;
+    NPathPopNode;
   }
 
   /* iterate over all SVs to find any we've not accounted for yet */
