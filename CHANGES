@@ -1,5 +1,9 @@
 Revision history for Perl extension Devel::SizeMe.
 
+0.14 - 2013-06-02 - Tim Bunce
+
+ * Work in progress - lots of internals improvements - released for smoke testing
+
 0.13 - 2013-06-01 - Tim Bunce
 
  * Assorted portability fixes and updates.
