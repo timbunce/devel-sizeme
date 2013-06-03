@@ -408,7 +408,6 @@ np_print_node_name(pTHX_ FILE *fp, npath_node_t *npath_node)
         fprintf(fp, "%s", (const char *)npath_node->id);
         break;
     case NPtype_PLACEHOLDER:
-        fprintf(fp, "placeholder", (const char *)npath_node->id);
         croak("Unset placeholder encountered");
         break;
     default:    /* assume id is a string pointer */
@@ -668,7 +667,7 @@ get_sv_follow_state(pTHX_ struct state *st, const SV *const sv)
     /* For SVs we defer calling check_new() until we've 'seen' the SV
      * at least as often as the reference count. 
      */
-    if (SvREFCNT(sv) <= 1 || sv == st->sv_refcnt_to_ignore) {
+    if (SvREFCNT(sv) <= 1 || sv == st->sv_refcnt_to_ignore || SvIMMORTAL(sv)) {
         return (check_new(st, sv)) ? FOLLOW_SINGLE_NOW : FOLLOW_SINGLE_DONE;
     }
 
@@ -1467,13 +1466,6 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
             ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         return 0;
   case FOLLOW_MULTI_DEFER:
-if (SvREFCNT(thing) > 63000) {
-      np_dump_node_path(aTHX_ st, NP);
-      fprintf(stderr, " SvREFCNT:\n");
-      sv_dump((SV*)thing);
-}
-        if (SvIMMORTAL(thing)) /* avoid clutter from links to immortals */
-            return 0;
         ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         if (get_sv_follow_seencnt(aTHX_ st, thing) == 1) {
             ADD_LINK_ATTR_TO_PREV(st, NPattr_LABEL, svtypename(thing), 0);
@@ -1785,7 +1777,7 @@ free_memnode_state(pTHX_ struct state *st)
         fprintf(st->node_stream_fh, "E %d %f %s\n",
             getpid(), gettimeofday_nv(aTHX)-st->start_time_nv, "unnamed");
         if (*st->node_stream_name == '|') {
-            if (pclose(st->node_stream_fh))
+            if (pclose(st->node_stream_fh)) /* XXX PerlIO! */
                 warn("%s exited with an error status\n", st->node_stream_name);
         }
         else {
@@ -1971,7 +1963,7 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
     NPathPopNode;
 
     if (st->trace_level)
-        fprintf(stderr, "visited %d deferred SVs on cycle %d\n", visited, cycle);
+        fprintf(stderr, "visited %lu deferred SVs on cycle %d\n", visited, cycle);
 
     return visited;
 }
