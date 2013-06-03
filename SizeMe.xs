@@ -1850,7 +1850,7 @@ new_state(pTHX_ SV *root_sv)
 }
 
 
-/* XXX based on S_visit() in sv.c */
+/* based on S_visit() in sv.c */
 static void
 unseen_sv_size(pTHX_ struct state *st, pPATH)
 {
@@ -2247,7 +2247,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
             warn("Free'd SV head 0x%p unexpectedly already seen", p);
         ++free_heads;
     }
-    NPathPushLink("SvARENA_CHAIN");
+    NPathPushLink("free_sv_heads");
     NPathPushNode("free_sv_heads", NPtype_NAME);
     ADD_SIZE(st, "sv", free_heads * sizeof(SV));
     ADD_ATTR(st, NPattr_NOTE, "n", free_heads);
@@ -2255,7 +2255,43 @@ perl_size(pTHX_ struct state *const st, pPATH)
     NPathPopNode;
   }
 
-  /* XXX iterate over bodies_by_type and crawl the free chains for each */
+  if (1) {
+    int sv_type;
+    for (sv_type = SVt_LAST-1; sv_type >= 0; --sv_type) {
+        void **next;
+        UV free_bodies = 0;
+        UV body_size = body_sizes[sv_type];
+        char nodename[40];
+        const char *typename = svtypenames[sv_type];
+
+        for (next = &PL_body_roots[sv_type]; *next; next = *next) {
+            ++free_bodies;
+        }
+        if (!free_bodies)
+            continue;
+
+        switch (sv_type) { /* see struct body_details comments in sv.c */
+        case SVt_NULL:
+            typename = "HE";
+            body_size = sizeof(HE);
+            break;
+        case SVt_IV:
+            typename = "ptr_tbl_ent";
+            body_size = sizeof(struct ptr_tbl_ent);
+            break;
+        }
+        sprintf(nodename, "free_sv_bodies.%s", typename);
+
+        NPathPushLink(nodename);
+        NPathPushNode(nodename, NPtype_NAME);
+
+        ADD_SIZE(st, "sv_bodies", free_bodies * body_size);
+        ADD_ATTR(st, NPattr_NOTE, "n", free_bodies);
+
+        NPathPopNode;
+        NPathPopNode;
+    }
+  }
 
 }
 
