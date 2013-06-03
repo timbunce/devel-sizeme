@@ -2322,7 +2322,7 @@ malloc_free_size(pTHX_ struct state *const st, pPATH)
     NPathPopNode;
 
     /* TODO get heap size from OS and add a node: unknown = heapsize - perl - ms.bytes_free */
-    /* for now we use bytes_total as an approximation */
+    /* for now we use malloc bytes_total as a good approximation */
     NPathPushLink("unknown");
     NPathPushNode("unknown", NPtype_NAME);
     ADD_SIZE(st, "unknown", ms.bytes_total - st->total_size);
@@ -2330,7 +2330,7 @@ malloc_free_size(pTHX_ struct state *const st, pPATH)
     NPathPopNode;
 
 # else
-    ADD_LINK_ATTR_TO_PREV(st, NPattr_NOTE, "no_malloc_info", 0);
+    ADD_ATTR(st, NPattr_NOTE, "no_malloc_info", 0);
     /* XXX ? */
 # endif
 }
@@ -2392,7 +2392,8 @@ CODE:
 
   st->recurse = RECURSE_INTO_OWNED;
   perl_size(aTHX_ st, NPathLink("perl_interp"));
-  malloc_free_size(aTHX_ st, NPathLink("malloc"));
+  /* TODO size memory used by Devel::SizeMe here (so it's subtracted from malloc.unknown) */
+  malloc_free_size(aTHX_ st, NPathLink("malloc")); /* call last */
 
   RETVAL = st->total_size;
   free_state(aTHX_ st);
