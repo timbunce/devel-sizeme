@@ -243,89 +243,88 @@ sub _fetch_node_tree {
     warn "#$id fetching\n"
         if $opt_debug;
 
-    my $node = inflate_node(_get_node($id))
+    my $node = _merge_up_only_children(inflate_node(_get_node($id)))
         or die "No node $id";
 
-    $node->{name} .= "->" if $node->{type} == 2 && $node->{name};
+    #$node->{name} .= "->" if $node->{type} == 2 && $node->{name};
 
-    if ($node->{child_ids}) {
+    if ($node->{child_ids} && $depth) {
         my @child_ids = split /,/, $node->{child_ids};
-
-        # XXX hack to handle nodes that possibly have large numbers of children
-        $depth = 1 if $depth > 1 and $node->{name} =~ /^arena|^unaccounted|^unseen|^ref_loop/;
-
-        # if this node has only one child then we merge that child into this node
-        # this makes the treemap more usable
-        if (@child_ids == 1
-            #        && $node->{type} == 2 # only collapse links XXX
-                and $node->{name} !~ /^arena/
-        ) {
-            warn "#$id fetch only child $child_ids[0]\n"
-                if $opt_debug;
-            my $child = _fetch_node_tree($child_ids[0], $depth); # same depth
-            # merge node into child
-            # XXX id, depth, parent_id
-            warn "Merged $node->{name} (#$node->{id} d$node->{depth}) with only child $child->{name} #$child->{id}\n"
-                if $opt_debug;
-            $child->{name} = "$node->{name} $child->{name}";
-            $child->{$_} += $node->{$_} for (qw(self_size));
-            $child->{$_}  = $node->{$_} for (qw(parent_id));
-
-            $child->{title} = join " ", grep { defined && length } $child->{title}, $node->{title};
-            #warn "Titled $child->{title}" if $child->{title};
-
-            # somewhat hackish attribute merging
-            for my $attr_type (keys %{ $node->{attr} }) {
-                my $src = $node->{attr}{$attr_type};
-                if (ref $src eq 'HASH') { # eg NPattr_NAME: {attr}{1}{$name} = $value
-                    my $dst = $child->{attr}{$attr_type} ||= {};
-                    for my $k (keys %$src) {
-                        warn "Node $child->{id} attr $attr_type:$k=$dst->{$k} overwritten by $src->{$k}\n"
-                            if defined $dst->{$k} and $dst->{$k} ne $src->{$k};
-                        $dst->{$k} = $src->{$k};
-                    }
-                }
-                elsif (ref $src eq 'ARRAY') { # eg NPattr_PADNAME: {attr}{2}[$val] = $name
-                    my $dst = $child->{attr}{$attr_type} ||= [];
-                    my $idx = @$src;
-                    while (--$idx >= 0) {
-                        warn "Node $child->{id} attr $attr_type:$idx=$dst->[$idx] overwritten by $src->[$idx]\n"
-                            if defined $dst->[$idx] and $dst->[$idx] ne $src->[$idx];
-                        $dst->[$idx] = $src->[$idx];
-                    }
-                }
-                else { # assume scalar
-                    warn "Node $child->{id} attr $attr_type=$child->{attr}{$attr_type} overwritten by $src\n"
-                        if exists $child->{attr}{$attr_type} and $child->{attr}{$attr_type} ne $src;
-                    $child->{attr}{$attr_type} = $src;
-                }
-            }
-
-            $child->{leaves}{$_} += $node->{leaves}{$_}
-                for keys %{ $node->{leaves} };
-
-            $child->{_ids_merged} .= ",$node->{id}";
-            my @child_ids = split /,/, $node->{child_ids};
-            $child->{child_count} = @child_ids;
-
-            $node = $child; # use the merged child as this node
-        }
 
         if (@child_ids > 1_000) {
             warn "Node $id ($node->{name}) has ".scalar(@child_ids)." children\n";
             # XXX merge/prune/something?
         }
 
-        if ($node->{name} =~ /^arena-g\d+/) {
-            warn "$node->{name} $depth";
-        }
+        # XXX hack to handle nodes that possibly have large numbers of children
+        $depth = 1 if $depth > 1 and $node->{name} =~ /^arena|^unaccounted|^unseen|^ref_loop/;
 
-        if ($depth) { # recurse to required depth
-            _set_node_queue(\@child_ids);
-            $node->{children} = [ map { _fetch_node_tree($_, $depth-1) } @child_ids ];
-            $node->{child_count} = @{ $node->{children} };
+        _set_node_queue(\@child_ids);
+        $node->{children} = [ map { _fetch_node_tree($_, $depth-1) } @child_ids ];
+        $node->{child_count} = @{ $node->{children} };
+    }
+
+    return $node;
+}
+
+
+sub get_only_child {
+    my $node = shift;
+    my @child_ids = split /,/, $node->{child_ids}||'';
+    return undef if @child_ids != 1;
+    return inflate_node(_get_node($child_ids[0]))
+}
+
+
+# if this node has only one child then we merge that child into this node
+# this makes the treemap much more usable.
+# this probably ought to be a transform of the db data (also update depth)
+sub _merge_up_only_children {
+    my $node = shift or return undef;
+
+    my @merge = ($node);
+    while (my $onlychild = get_only_child($merge[-1])) {
+        push @merge, $onlychild;
+    }
+    $node = shift @merge;
+    return $node unless @merge;
+
+    warn "merging up into $node->{id} children: @{[ map { $_->{id} } @merge ]}\n";
+
+    # sum these numeric attributes
+    for (qw(self_size kids_size)) {
+        for (@merge) {
+            $node->{$_} += $_->{$_} if defined $_->{$_};
         }
     }
+    # accumulate leafs
+    for (@merge) {
+        my $leaves = $_->{leaves} or next;
+        $node->{leaves}{$_} += $leaves->{$_} for keys %$leaves;
+    }
+    # take these from the deepest child
+    for (qw(child_ids kids_node_count type)) {
+        $node->{$_} = $merge[-1]->{$_};
+    }
+    if ($merge[-1]->{type} != $node->{type}) {
+        warn "merging only children changes type of $node->{id} from $node->{type} to $merge[-1]->{type} (from $merge[-1]->{id})\n";
+        $node->{type} = $merge[-1]->{type}; # XXX?
+    }
+    # pick deepest true instance
+    $node->{namedby_id} = (grep { $_ } map { $_->{namedby_id} } reverse @merge) || $node->{namedby_id};
+
+    # join unique values
+    for my $k (qw(name title)) {
+        $node->{$k} = join "; ", uniq( map { $_->{$k} } ($node, @merge) );
+    }
+
+    # TODO attr merging is skipped till there's a clear need
+
+    # these fields we don't change:
+    # depth, parent_id
+
+    $node->{_ids_merged} = join ",", map { $_->{id} } @merge;
+
     return $node;
 }
 
@@ -336,6 +335,11 @@ sub _transform_node_tree {  # recurse depth first
         $_ = _transform_node_tree($_, $transform) for @$children;
     }
     return $transform->($node);
+}
+
+sub uniq (@) {
+    my %seen = ();
+    grep { defined $_ and not $seen{$_}++ } @_;
 }
 
 
