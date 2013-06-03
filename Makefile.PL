@@ -11,7 +11,7 @@ my $ptr_bits = length $1;
 
 write_header(
     'refcounted_he.h' =>
-    extract_refcounted_he(catfile($Config{archlib}, 'CORE', 'hv.h'))
+    extract_chunk_from_file(catfile($Config{archlib}, 'CORE', 'hv.h'), qr/struct refcounted_he \{/, qr/\};/)
 );
 
 
@@ -134,19 +134,20 @@ sub CheckConflicts {
 }
 
 
-sub extract_refcounted_he {
-    my ($header) = @_;
-    open my $fh, '<', $header or die $!;
+sub extract_chunk_from_file {
+    my ($file, $start_regex, $end_regex) = @_;
+    open my $fh, '<', $file or die $!;
 
     my $def;
     while (<$fh>) {
-        next unless /struct refcounted_he \{/ .. /\};/;
+        next unless /$start_regex/ .. /$end_regex/;
         $def .= $_;
     }
     close $fh or die $!;
 
     return $def;
 }
+
 
 sub write_header {
     my ($filename, $contents) = @_;
