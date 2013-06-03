@@ -1023,10 +1023,6 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
     int use_node_for_hek = !(st->hide_detail & NPf_DETAIL_HEK);
 
     /* Hash keys can be shared. Have we seen this before? */
-    /* XXX when shared is true we could perhaps to allocate
-     * (size of the hek / shared_he_he.he_valu.hent_refcount)
-     * rather than let the first use of the key carry the cost
-     */
     if (!check_new(st, hek)) {
         if (use_node_for_hek)
             ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(hek));
@@ -1045,13 +1041,17 @@ hek_size(pTHX_ struct state *st, HEK *hek, U32 shared, pPATH)
 #else
 	+ 2
 #endif
-	);
+    );
     if (shared) {
 #if PERL_VERSION < 10
 	ADD_SIZE(st, "he", sizeof(struct he));
 #else
 	ADD_SIZE(st, "shared_he", STRUCT_OFFSET(struct shared_he, shared_he_hek));
 #endif
+        /* XXX when shared is true we could perhaps to allocate
+        * (size of the hek / shared_he_he.he_valu.hent_refcount)
+        * rather than let the first use of the key carry the cost
+        */
     }
     return 1;
 }
@@ -1552,6 +1552,9 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 #else
     if (HvNAME(thing))  { ADD_ATTR(st, NPattr_LABEL, HvNAME(thing), 0); }
 #endif
+    if (orig_thing == (SV*)PL_strtab) {
+        ADD_ATTR(st, NPattr_LABEL, "PL_strtab", 0);
+    }
     ADD_SIZE(st, "hv_max", (sizeof(HE *) * (HvMAX(thing) + 1)));
     /* Now walk the bucket chain */
     if (HvARRAY(thing)) {
@@ -1932,8 +1935,9 @@ deferred_by_refcnt_size(pTHX_ struct state *st, pPATH, int cycle)
     if (st->trace_level)
         fprintf(stderr, "sweeping probable ref loops, cycle %d\n", cycle);
 
+    NPathPushNode("cycle", NPtype_NAME);
     sprintf(node_name, "cycle-%d", cycle);
-    NPathPushNode(node_name, NPtype_NAME);
+    ADD_ATTR(st, NPattr_LABEL, node_name, 0);
 
     /* visit each item in sv_refcnt_ptr_table */
     /* TODO ought to be abstracted and moved into smptr_tbl.c */
@@ -2283,11 +2287,12 @@ perl_size(pTHX_ struct state *const st, pPATH)
         }
         sprintf(nodename, "free_sv_bodies.%s", typename);
 
-        NPathPushLink(nodename);
-        NPathPushNode(nodename, NPtype_NAME);
+        NPathPushLink("free_sv_bodies");
+        NPathPushNode("free_sv_bodies", NPtype_NAME);
 
         ADD_SIZE(st, "sv_bodies", free_bodies * body_size);
         ADD_ATTR(st, NPattr_NOTE, "n", free_bodies);
+        ADD_ATTR(st, NPattr_LABEL, nodename, 0);
 
         NPathPopNode;
         NPathPopNode;
