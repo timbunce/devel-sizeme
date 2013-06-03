@@ -292,6 +292,7 @@ while (<>) {
     elsif ($type eq "L") {
         my $node = $seqn2node{$id} or die "panic: Leaf refers to unknown node $id: $_";
         $node->{leaves}{$name} += $val;
+        $node->{attr}{n}{$name}++;
         $run_size += $val;
         printf "%s+%d=%d %s\n", $indent x ($node->{depth}+1), $val, $run_size, $name
             if $opt_text;

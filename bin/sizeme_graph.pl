@@ -319,6 +319,13 @@ sub _merge_up_only_children {
     }
 
     # TODO attr merging is skipped till there's a clear need
+    for my $n (@merge) {
+
+        # handle {n} attribute
+        my $an = $n->{attr}{n};
+        next unless $an and %$an;
+        $node->{attr}{n}{$_} += $an->{$_} for keys %$an;
+    }
 
     # these fields we don't change:
     # depth, parent_id
