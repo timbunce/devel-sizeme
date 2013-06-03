@@ -1,8 +1,5 @@
-Treemap history support, including linking to specific nodes
-Displaying node path with treemap, as links, with tooltips (name, total_size etc)
 Sort out naming:
     id vs name vs label
-    item type CV/NV/RV etc (short)
     descriptive: Foo::, {keystr}, [42], *GLOB, etc (longer)
 Better handling of pads
     especially padtmp
@@ -11,6 +8,11 @@ Better handling of pads
 Review general SV and attribute handling
     Emit more raw info
 Add global attributes, especially perl version
+PL_strtab sizing
+    See hek_size()
+    Long unique keys show up as bloat in PL_strtab even though they've been seen before PL_strtab is sized
+    make && SIZEME_HIDE=7 SIZEME='|bin/sizeme_store.pl --db sizeme.db --gexf sizeme.gexf' perl -Mblib -MDevel::SizeMe=:all -e '$k="k" x 10_000; push @a, { $k.scalar(@a) => 1 } while @a<1_000; perl_size()'
+Fix spelling of leafs!
 
 *** Random TODOs:
 
