@@ -105,19 +105,22 @@ if ( $Mojolicious::VERSION >= 2.49 ) {
 
 
 sub name_path_for_node {
-    my ($id) = @_;
+    my ($id, $parent_id_only) = @_;
+    my $orig_id = $id;
     my @name_path;
 
     while ($id) { # work backwards towards root
         my $node = _get_node($id);
         push @name_path, $node;
-        $id = $node->{namedby_id} || $node->{parent_id};
+        $id = ($parent_id_only) ? $node->{parent_id} : $node->{namedby_id} || $node->{parent_id};
         if (@name_path > 1_000) {
             my %id_count;
             ++$id_count{$_->{id}} for @name_path;
             my $desc = join ", ", map { "n$_ ($id_count{$_})" } keys %id_count;
             warn "name_path too deep (possible parent_id/namedby_id loop involving $desc)\n";
-            last;
+            # switch to using only parent_id if not already doing so
+            return name_path_for_node($orig_id, 1) if not $parent_id_only;
+            last; # else return what we've got so far
         }
     }
 
