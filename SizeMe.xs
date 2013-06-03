@@ -1584,14 +1584,10 @@ if (SvREFCNT(thing) > 63000) {
             }
             else {
                 if (sv_size(aTHX_ st, NPathLink("HeVAL"), HeVAL(cur_entry))) {
-                    char buf[20];
-                    /* XXX make this the NPattr_LABEL of the HeVAL link if not showing detail */
                     /* give a safe short hint of the key string */
-                    pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), sizeof(buf)-(3+2+1),
+                    pv_pretty(st->tmp_sv, HEK_KEY(hek), HEK_LEN(hek), 20,
                         NULL, NULL, PERL_PV_ESCAPE_NONASCII|PERL_PV_PRETTY_ELLIPSES);
-                    buf[0] = '{';
-                    strcpy(stpcpy(&buf[1], SvPVX(st->tmp_sv)), "}");
-                    ADD_LINK_ATTR_TO_TOP(st, NPattr_LABEL, buf, 0);
+                    ADD_LINK_ATTR_TO_TOP(st, NPattr_LABEL, SvPVX(st->tmp_sv), 0);
                 }
             }
 
