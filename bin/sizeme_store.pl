@@ -983,7 +983,7 @@ sub emit_addr_node {
 sub emit_item_node {
     my ($self, $item_node, $attr) = @_;
     my $fh = $self->fh or return;
-    my $name = $attr->{label};
+    my $name = $self->fmt_item_label($item_node); # $attr->{label};
     my @node_attr = ( "id=$item_node->{id}" );
     push @node_attr, sprintf("label=%s", _dotlabel($name, $item_node))
         if $name;
