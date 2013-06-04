@@ -1805,8 +1805,8 @@ new_state(pTHX_ SV *root_sv)
     st->start_time_nv = gettimeofday_nv(aTHX);
     st->recurse = RECURSE_INTO_OWNED;
     st->go_yell = TRUE;
-    if (sizeme_hide && *sizeme_hide) {
-        st->hide_detail = atoi(sizeme_hide);
+    if (sizeme_hide) {
+        st->hide_detail = (*sizeme_hide) ? atoi(sizeme_hide) : NPf_DETAIL_REFCNT1;
     }
     if (NULL != (sv = get_sv("Devel::Size::warn", FALSE))) {
 	st->dangle_whine = st->go_yell = SvIV(sv) ? TRUE : FALSE;
