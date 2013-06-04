@@ -218,6 +218,7 @@ sub leave_node {
         # link to parent
         $x->{parent_id} = $parent->{id};
         # accumulate into parent
+        # XXX should be done in the db after db transforms
         $parent->{kids_node_count} += 1 + ($x->{kids_node_count}||0);
         $parent->{kids_size} += $self_size + $x->{kids_size};
         push @{$parent->{child_id}}, $x->{id}; # XXX 
@@ -269,14 +270,13 @@ while (<>) {
         die "panic: stack already has item at depth $val" if $stack[$val];
         die "Depth out of sync\n" if $val != @stack;
 
-        my $node = enter_node({
+        my $node = { # enter_node({...})
             id => $id, type => $type, name => $name, extra => $extra,
             attr => { }, leaves => {}, depth => $val, self_size=>0,
             kids_size=>0, kids_node_count=>0
-        });
+        };
 
-        $stack[$val] = $node;
-        $seqn2node{$id} = $node;
+        $stack[$val] = $seqn2node{$id} = $node;
 
         # if parent is a link that has an addr then note the addr is associated with this node
         if ($type != NPtype_LINK
@@ -583,10 +583,6 @@ sub view_output {
 }
 
 
-sub enter_node {
-    return shift;
-}
-
 sub leave_item_node {
     my ($self, $item_node) = @_;
     my $label = $item_node->{attr}{label};
@@ -636,13 +632,13 @@ extends 'Devel::SizeMe::Output';
 
 has fh => (is => 'rw');
 
-my @buffered_edges;
+my %buffered_edges;
 
 *fmt_size = \&main::fmt_size;
 
 sub BUILD {
     my $self = shift;
-    @buffered_edges = ();
+    %buffered_edges = ();
 }
 
 sub create_output {
@@ -711,18 +707,19 @@ use Moo;
 use autodie;
 use Carp qw(croak);
 use HTML::Entities qw(encode_entities);;
+use Carp qw(carp cluck croak confess);
 
 extends 'Devel::SizeMe::Output';
 
 has fh => (is => 'rw');
 
-my @buffered_edges;
+my %buffered_edges;
 
 *fmt_size = \&main::fmt_size;
 
 sub BUILD {
     my $self = shift;
-    @buffered_edges = ();
+    %buffered_edges = ();
 }
 
 sub create_output {
@@ -785,8 +782,8 @@ sub write_epilogue {
     my $fh = $self->fh or return;
 
     print $fh qq{<edges>\n};
-    for my $edge (@buffered_edges) {
-        my ($id, $src, $dest, $label, $weight, $viz) = @$edge;
+    while ( my ($id, $edge) = each %buffered_edges ) {
+        my ($src, $dest, $label, $weight, $viz) = @$edge;
         my $viz_str = _fmt_viz($viz);
         my $suffix = ($viz_str) ? ">$viz_str</edge>" : " />";
         print $fh sprintf qq{\t<edge id="%s" source="%s" target="%s" label="%s" weight="%s"%s\n},
@@ -815,7 +812,13 @@ sub emit_link {
     my $weight = 1;
     my %viz;
 
-    push @buffered_edges, [ $link_id, $link_node->{parent_id}, $dest_id, $label, $weight, \%viz ];
+    my $new = [ $link_node->{parent_id}, $dest_id, $label, $weight, \%viz ];
+    #push @$new, Carp::longmess('');
+    if (my $old = $buffered_edges{$link_id}) {
+        return;
+        cluck "\nduplicate edge $link_id:\nold: @$old\nnew: @$new"
+    }
+    $buffered_edges{$link_id} = $new;
 }
 
 =pod
