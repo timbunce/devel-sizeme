@@ -1,6 +1,7 @@
 Add flags arg to sv_size:
     flag to use link label as sv label
-Add mechanism to hide RV's
+Move addr out of attr.
+Add db transform to hide RV's (though check for addrs pointing to it first)
 Split db into separate node and link tables
 Sort out naming:
     id vs name vs label
@@ -15,7 +16,7 @@ Review general SV and attribute handling
 Add global attributes, especially perl version
 PL_strtab sizing
     See hek_size()
-    Long unique keys show up as bloat in PL_strtab even though they've been seen before PL_strtab is sized
+    Long unique keys show up as bloat in PL_strtab even though they've been seen before PL_strtab is sized?
     make && SIZEME_HIDE=7 SIZEME='|bin/sizeme_store.pl --db sizeme.db --gexf sizeme.gexf' perl -Mblib -MDevel::SizeMe=:all -e '$k="k" x 10_000; push @a, { $k.scalar(@a) => 1 } while @a<1_000; perl_size()'
 Fix spelling of leafs!
 
