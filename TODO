@@ -1,6 +1,11 @@
+Add flags arg to sv_size:
+    flag to use link label as sv label
+Add mechanism to hide RV's
+Split db into separate node and link tables
 Sort out naming:
     id vs name vs label
     descriptive: Foo::, {keystr}, [42], *GLOB, etc (longer)
+    pass-thru enogh info to perform 'decoration' on output
 Better handling of pads
     especially padtmp
     eg add scope, or ideally line range when emiting pad names
