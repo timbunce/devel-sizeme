@@ -14,7 +14,7 @@ can_ok ('Devel::SizeMe', qw/
 /);
 
 die ("Uhoh, test uses an outdated version of Devel::SizeMe")
-    unless is ($Devel::SizeMe::VERSION, '0.14', 'VERSION MATCHES');
+    unless is ($Devel::SizeMe::VERSION, '0.15', 'VERSION MATCHES');
 
 my $this_perl = $^X;
 $this_perl .= $Config{_exe} if $^O ne 'VMS' and $this_perl !~ m/$Config{_exe}$/i;
