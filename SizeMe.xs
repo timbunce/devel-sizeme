@@ -110,9 +110,9 @@
 #define FOLLOW_MULTI_DONE   22 /* refcnt>1, already followed */
 
 /* detail types to control simplification of node tree */
-#define NPf_DETAIL_COPFILE      0x01
-#define NPf_DETAIL_HEK          0x02
-#define NPf_DETAIL_REFCNT1      0x04
+#define NPf_DETAIL_REFCNT1      0x01
+#define NPf_DETAIL_COPFILE      0x02
+#define NPf_DETAIL_HEK          0x04
 
 
 /*
@@ -1399,7 +1399,8 @@ padlist_size(pTHX_ struct state *const st, pPATH, PADLIST *padl)
     ADD_SIZE(st, "PADs", sizeof(PAD*) * ix);
 
     for (ix = 1; ix <= PadlistMAX(padl); ix++) {
-	if (sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[ix]))
+	sv_size(aTHX_ st, NPathLink("elem"), (SV*)PadlistARRAY(padl)[ix]);
+        if (NP->seqn) /* link was emitted, so we can add attr XXX encapsulate */
             ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", ix);
     }
 
@@ -1460,7 +1461,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
         break;
   case FOLLOW_SINGLE_DONE:
         /* we don't output addr note for refcnt=1 (FOLLOW_SINGLE_NOW)
-         * so there's no point in outputting one here
+         * so there's no point in outputting one here.
+         * The SvIMMORTAL's also pass through here.
          */
         if (!(st->hide_detail & NPf_DETAIL_REFCNT1))
             ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
@@ -1468,6 +1470,7 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
   case FOLLOW_MULTI_DEFER:
         ADD_LINK_ATTR_TO_PREV(st, NPattr_ADDR, "", PTR2UV(thing));
         if (get_sv_follow_seencnt(aTHX_ st, thing) == 1) {
+            /* XXX use name of link here ? */
             ADD_LINK_ATTR_TO_PREV(st, NPattr_LABEL, svtypename(thing), 0);
             ADD_LINK_ATTR_TO_PREV(st, NPattr_REFCNT, "", SvREFCNT(thing));
         }
@@ -1522,7 +1525,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
         dbg_printf(("total_size: %li AvMAX: %li av_len: $i\n", st->total_size, AvMAX(thing), av_len((AV*)thing)));
 
         for (i=0; i <= AvFILLp(thing); ++i) { /* in natural order */
-            if (sv_size(aTHX_ st, NPathLink("elem"), AvARRAY(thing)[i]))
+            sv_size(aTHX_ st, NPathLink("elem"), AvARRAY(thing)[i]);
+            if (NP->seqn) /* link was emitted, so we can add attr XXX encapsulate */
                 ADD_LINK_ATTR_TO_TOP(st, NPattr_NOTE, "i", i);
         }
     }
