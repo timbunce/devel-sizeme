@@ -1897,8 +1897,7 @@ unseen_sv_size(pTHX_ struct state *st, pPATH)
             for (sv = sva + 1; sv < svend; ++sv) {
                 if (SvTYPE(sv) != (svtype)SVTYPEMASK && SvREFCNT(sv)) {
                     /* is a live SV */
-                    if (SvTYPE(sv) == want_type) {
-                        /* TODO optimize by checking not_yet_sized first */
+                    if (SvTYPE(sv) == want_type && not_yet_sized(st, sv)) {
                         NPathPushLink(path_link_group);
                         NPathPushNode(path_link_group, NPtype_NAME);
                         if (sv_size(aTHX_ st, NPathLink("arena"), sv)) {
