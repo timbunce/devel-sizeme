@@ -2,6 +2,8 @@
 use strict;
 use Term::ReadKey;
 
+$ENV{SIZEME_HIDE} = 1; # hide addr to refcnt=1 and immortals
+
 my @steps = (
     {
         note => "Integer value",
@@ -106,9 +108,8 @@ sub runstep {
     my @exports;
     local $ENV{SIZEME} = $spec->{sizeme};
     push @exports, "SIZEME='$spec->{sizeme}'";
-    local $ENV{SIZEME_HIDE} = $spec->{hide};
-    push @exports, "SIZEME_HIDE='$spec->{hide}'"
-        if $spec->{hide};
+    local $ENV{SIZEME_HIDE} = $spec->{hide}      if defined $spec->{hide};
+    push @exports, "SIZEME_HIDE='$spec->{hide}'" if defined $spec->{hide};
 
     print "-------- $spec->{note} --------\n\n";
     print "\$ export @exports\n";
