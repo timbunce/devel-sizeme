@@ -25,18 +25,18 @@ use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
 require 5.008;
 require Exporter;
-require XSLoader;
+require Devel::SizeMe::Core;
 
 $VERSION = '0.15';  # also update t/00-load.t
 @ISA = qw(Exporter);
 
-@EXPORT_OK = qw(size total_size perl_size heap_size);
-%EXPORT_TAGS = ( 'all' => \@EXPORT_OK ); # for use Devel::SizeMe ':all';
+%EXPORT_TAGS = (
+    all => [ qw(size total_size perl_size heap_size) ],
+);
+push @EXPORT_OK, map { @$_ } values %EXPORT_TAGS;
 
 $warn = 1;
 $dangle = 0; ## Set true to enable warnings about dangling pointers
-
-XSLoader::load( __PACKAGE__);
 
 END {
     Devel::SizeMe::heap_size() if $do_size_at_end;

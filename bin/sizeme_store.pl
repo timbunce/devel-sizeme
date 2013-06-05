@@ -68,21 +68,8 @@ use Data::Dumper;
 use Getopt::Long;
 use Carp qw(carp croak confess);
 
-# XXX import these from the XS code
-use constant NPtype_NAME     => 0x01;
-use constant NPtype_LINK     => 0x02;
-use constant NPtype_SV       => 0x03;
-use constant NPtype_MAGIC    => 0x04;
-use constant NPtype_OP       => 0x05;
+use Devel::SizeMe::Core qw(:type :attr NPattr_NOTE);
 
-use constant NPattr_LEAFSIZE => 0x00;
-use constant NPattr_LABEL    => 0x01;
-use constant NPattr_PADFAKE  => 0x02;
-use constant NPattr_PADNAME  => 0x03;
-use constant NPattr_PADTMP   => 0x04;
-use constant NPattr_NOTE     => 0x05;
-use constant NPattr_ADDR     => 0x06;
-use constant NPattr_REFCNT   => 0x07;
 my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR REFCNT)); # XXX get from XS in some way
 
 

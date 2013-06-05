@@ -2345,9 +2345,111 @@ malloc_free_size(pTHX_ struct state *const st, pPATH)
 }
 
 
-MODULE = Devel::SizeMe        PACKAGE = Devel::SizeMe       
+static UV
+perform(SV *actions_sv, SV *options_sv)
+{
+    dTHX;
+    UV total_size;
+#define MaxPathNodeCount 100
+    /* XXX this has some leaks if it croaks */
+    struct state *st = new_state(aTHX_ (SV*)NULL);
+    dNPathNodes(MaxPathNodeCount, NULL);
+    SSize_t i;
+    HV *options_hv;
+
+    if (!SvROK(actions_sv) || SvTYPE(SvRV(actions_sv)) != SVt_PVAV)
+        croak("perform needs an array reference");
+
+    if (options_sv && (!SvROK(options_sv) || SvTYPE(SvRV(options_sv)) != SVt_PVAV))
+        croak("perform options must be a hash reference");
+    options_hv = (options_sv) ? (HV*)SvRV(options_sv) : (HV*)sv_2mortal((SV*)newHV());
+
+    /* [ [ "action", ...args... ], [ ... ], ... ] */
+    for (i=0; i <= AvFILLp((AV*)SvRV(actions_sv)); ++i) {
+        SV *act_spec_sv = AvARRAY((AV*)SvRV(actions_sv))[i];
+        AV *act_spec_av;
+        int action_argcount;
+        char *action_name;
+
+        if (!act_spec_sv || !SvROK(act_spec_sv) || SvTYPE(SvRV(act_spec_sv)) != SVt_PVAV)
+            croak("perform: action[%d] isn't an array ref", i);
+        act_spec_av = (AV*)SvRV(act_spec_sv);
+        action_argcount = av_len(act_spec_av);
+        action_name = SvPV_nolen(AvARRAY(act_spec_av)[0]);
+
+#define IS_ACTION(wanted_name, wanted_argcount) \
+    (strEQ(action_name, wanted_name) \
+        && ((action_argcount != wanted_argcount) \
+            ? (croak("action[%d] %s needs %d args but has %d", i, action_name, wanted_argcount, action_argcount),1) \
+            : 1) )
+#define ACTION_ARG_PV(argnum) (SvPV_nolen(AvARRAY(act_spec_av)[argnum]))
+#define ACTION_ARG_UV(argnum) (SvUV(      AvARRAY(act_spec_av)[argnum]))
+
+        warn("perform %s\n", action_name);
+        if (IS_ACTION("pushnode", 2)) {
+            NPathPushNode(ACTION_ARG_PV(1), ACTION_ARG_UV(2));
+        }
+        else if (IS_ACTION("popnode", 0)) {
+            NPathPopNode;
+        }
+        else if (IS_ACTION("addsize", 2)) {
+            ADD_SIZE(st, ACTION_ARG_PV(1), ACTION_ARG_UV(2));
+        }
+        else if (IS_ACTION("addattr", 3)) {
+            ADD_ATTR(st, ACTION_ARG_UV(1), ACTION_ARG_PV(2), ACTION_ARG_UV(3));
+        }
+        else {
+            croak("perform: Unknown action '%p' at index %d", action_name, i);
+        }
+    }
+
+    total_size = st->total_size;
+    warn("perform complete - total_size %lu\n", total_size);
+    free_state(aTHX_ st);
+    return total_size;
+}
+
+
+MODULE = Devel::SizeMe        PACKAGE = Devel::SizeMe::TestWrite
 
 PROTOTYPES: DISABLE
+
+UV
+perform(SV *actions_sv, SV *options_sv=NULL)
+OUTPUT:
+    RETVAL
+
+
+MODULE = Devel::SizeMe        PACKAGE = Devel::SizeMe::Core
+
+PROTOTYPES: DISABLE
+
+
+UV
+constant()
+    PROTOTYPE:
+    ALIAS:
+        NPtype_NAME	    = NPtype_NAME
+        NPtype_LINK	    = NPtype_LINK
+        NPtype_SV	    = NPtype_SV
+        NPtype_MAGIC	    = NPtype_MAGIC
+        NPtype_OP	    = NPtype_OP
+        NPtype_PLACEHOLDER  = NPtype_PLACEHOLDER
+        NPattr_LEAFSIZE	    = NPattr_LEAFSIZE
+        NPattr_LABEL	    = NPattr_LABEL
+        NPattr_PADFAKE	    = NPattr_PADFAKE
+        NPattr_PADNAME	    = NPattr_PADNAME
+        NPattr_PADTMP	    = NPattr_PADTMP
+        NPattr_NOTE	    = NPattr_NOTE
+        NPattr_ADDR	    = NPattr_ADDR
+        NPattr_REFCNT	    = NPattr_REFCNT
+    CODE:
+        RETVAL = ix;
+    OUTPUT:
+        RETVAL
+
+
+MODULE = Devel::SizeMe        PACKAGE = Devel::SizeMe
 
 UV
 size(orig_thing)
@@ -2373,6 +2475,7 @@ CODE:
 }
 OUTPUT:
   RETVAL
+
 
 UV
 perl_size()
@@ -2409,3 +2512,4 @@ CODE:
 }
 OUTPUT:
   RETVAL
+
