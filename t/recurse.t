@@ -287,7 +287,8 @@ sub cmp_array_ro {
 
 {
     my $sub_size = total_size(\&cmp_array_ro);
-    cmp_ok($sub_size, '>=', 3072, 'subroutine is at least 3K');
+    # 2941 from http://www.cpantesters.org/cpan/report/8c407bd8-cd37-11e2-8c80-50d7c5c10595
+    cmp_ok($sub_size, '>=', 2941, 'subroutine is at least 3K');
     cmp_ok($sub_size, '<=', 51200, 'subroutine is no more than 50K')
 	or diag 'Is total_size() dragging in the entire symbol table?';
     cmp_ok(total_size(\%::), '>=', 10240, 'symbol table is at least 100K');
