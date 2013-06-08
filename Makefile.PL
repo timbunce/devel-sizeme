@@ -20,6 +20,7 @@ my %MakefileOpts = (
     VERSION_FROM => 'lib/Devel/SizeMe.pm',
     DEFINE => "-DALIGN_BITS=$ptr_bits",
     PREREQ_PM => {
+        'autodie' => '2.12',
         'XSLoader' => 0,
         'Moo' => '1.000007',
         'Test::More' => '0.98',
