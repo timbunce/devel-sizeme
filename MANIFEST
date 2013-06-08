@@ -12,6 +12,7 @@ TODO
 bin/sizeme_graph.pl
 bin/sizeme_store.pl
 lib/Devel/SizeMe.pm
+lib/Devel/SizeMe/Core.pm
 lib/Devel/SizeMe/Graph.pm
 lib/Devel/SizeMe/Graph/static/bootstrap/css/bootstrap-responsive.css
 lib/Devel/SizeMe/Graph/static/bootstrap/css/bootstrap-responsive.min.css
