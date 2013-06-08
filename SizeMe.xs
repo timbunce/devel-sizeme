@@ -114,6 +114,8 @@
 #define NPf_DETAIL_COPFILE      0x02
 #define NPf_DETAIL_HEK          0x04
 
+#define SMopt_IS_TEST           0x01
+
 
 /*
  * A 'Node Path' is a chain of node structures.
@@ -149,6 +151,7 @@ struct state {
     bool go_yell;
     int trace_level;
     UV hide_detail;
+    UV opts;
     SV *tmp_sv;
     /* My hunch (not measured) is that for most architectures pointers will
        start with 0 bits, hence the start of this array will be hot, and the
@@ -1781,8 +1784,13 @@ static void
 free_memnode_state(pTHX_ struct state *st)
 {
     if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
-        fprintf(st->node_stream_fh, "E %d %f %s\n",
-            getpid(), gettimeofday_nv(aTHX)-st->start_time_nv, "unnamed");
+        Pid_t pid = getpid();
+        NV dur = gettimeofday_nv(aTHX)-st->start_time_nv;
+        if (st->opts & SMopt_IS_TEST) {
+            pid = 0; dur = 0;
+        }
+        fprintf(st->node_stream_fh, "E %lu %d %g %s\n",
+            st->total_size, pid, dur, "unnamed");
         if (*st->node_stream_name == '|') {
             if (pclose(st->node_stream_fh)) /* XXX PerlIO! */
                 warn("%s exited with an error status\n", st->node_stream_name);
@@ -1795,7 +1803,7 @@ free_memnode_state(pTHX_ struct state *st)
 }
 
 static struct state *
-new_state(pTHX_ SV *root_sv)
+new_state(pTHX_ SV *root_sv, UV bool_opts)
 {
     SV *sv;
     struct state *st;
@@ -1803,6 +1811,7 @@ new_state(pTHX_ SV *root_sv)
 
     Newxz(st, 1, struct state);
     st->start_time_nv = gettimeofday_nv(aTHX);
+    st->opts = bool_opts;
     st->recurse = RECURSE_INTO_OWNED;
     st->go_yell = TRUE;
     if (sizeme_hide) {
@@ -1835,8 +1844,10 @@ new_state(pTHX_ SV *root_sv)
     /* XXX quick hack */
     st->node_stream_name = PerlEnv_getenv("SIZEME");
     if (st->node_stream_name) {
+        Pid_t pid = getpid();
+        NV start_time = st->start_time_nv;
         if (*st->node_stream_name) {
-            if (*st->node_stream_name == '|')
+            if (*st->node_stream_name == '|') /* XXX PerlIO! */
                 st->node_stream_fh = popen(st->node_stream_name+1, "w");
             else
                 st->node_stream_fh = fopen(st->node_stream_name, "wb");
@@ -1844,8 +1855,12 @@ new_state(pTHX_ SV *root_sv)
                 croak("Can't open '%s' for writing: %s", st->node_stream_name, strerror(errno));
             if(0)setlinebuf(st->node_stream_fh); /* XXX temporary for debugging */
             st->add_attr_cb = np_stream_node_path_info;
-            fprintf(st->node_stream_fh, "S %d %f %s\n",
-                getpid(), st->start_time_nv, "unnamed");
+            if (st->opts & SMopt_IS_TEST) {
+                pid = 0;
+                start_time = 0;
+            }
+            fprintf(st->node_stream_fh, "S %d %d %g %s\n",
+                1, pid, start_time, "unnamed");
         }
         else 
             st->add_attr_cb = np_dump_node_path_info;
@@ -2352,7 +2367,7 @@ perform(SV *actions_sv, SV *options_sv)
     UV total_size;
 #define MaxPathNodeCount 100
     /* XXX this has some leaks if it croaks */
-    struct state *st = new_state(aTHX_ (SV*)NULL);
+    struct state *st = new_state(aTHX_ (SV*)NULL, SMopt_IS_TEST);
     dNPathNodes(MaxPathNodeCount, NULL);
     SSize_t i;
     HV *options_hv;
@@ -2467,7 +2482,7 @@ CODE:
     thing = SvRV(thing);
   }
 
-  st = new_state(aTHX_ thing);
+  st = new_state(aTHX_ thing, 0);
   st->recurse = ix;
   sv_size(aTHX_ st, NULL, thing);
   RETVAL = st->total_size;
@@ -2483,7 +2498,7 @@ CODE:
 {
   /* just the current perl interpreter */
   /* PL_defstash works around the main:: => :: ref loop */
-  struct state *st = new_state(aTHX_ (SV*)PL_defstash);
+  struct state *st = new_state(aTHX_ (SV*)PL_defstash, 0);
   st->recurse = RECURSE_INTO_OWNED;
   perl_size(aTHX_ st, NULL);
   RETVAL = st->total_size;
@@ -2498,7 +2513,7 @@ CODE:
 {
   /* the current perl interpreter plus malloc, in the context of total heap size */
 
-  struct state *st = new_state(aTHX_ (SV*)PL_defstash);
+  struct state *st = new_state(aTHX_ (SV*)PL_defstash, 0);
   dNPathNodes(1, NULL);
   NPathPushNode("heap", NPtype_NAME);
 
