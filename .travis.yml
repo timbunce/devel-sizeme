@@ -6,5 +6,9 @@ perl:
   - "5.12"
   - "5.10"
 before_script:
+# use --force instead of --notest so we can see failures in deps (eg DBD::SQLite)
+install: cpanm --installdeps --force .
+notifications:
+  irc: "irc.perl.org#sizeme"
 
 #env:
