@@ -209,7 +209,7 @@ struct state {
             NP->id = nodeid; \
             NP->type = nodetype; \
             NP->seqn = 0; \
-            if(st->trace_level>=9)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%d %p]\n", NP->prev, NP, nodetype,nodeid);\
+            if(st->trace_level>=9)fprintf(stderr,"NPathPushNode (%p <-) %p <- [%ld %p]\n", NP->prev, NP, (long)nodetype,nodeid);\
             NP++; \
             NP->id = Nullch; /* safety/debug */ \
             NP->seqn = 0; \
@@ -2245,7 +2245,7 @@ perl_size(pTHX_ struct state *const st, pPATH)
      * more SVs that haven't been visited yet
      */
     while (deferred_by_refcnt_size(aTHX_ st, NPathLink("ref_loops"), ++cycle))
-        1;
+        (void)1;
     NPathPopNode;
     NPathPopNode;
   }
@@ -2387,7 +2387,7 @@ perform(SV *actions_sv, SV *options_sv)
         char *action_name;
 
         if (!act_spec_sv || !SvROK(act_spec_sv) || SvTYPE(SvRV(act_spec_sv)) != SVt_PVAV)
-            croak("perform: action[%d] isn't an array ref", i);
+            croak("perform: action[%lu] isn't an array ref", i);
         act_spec_av = (AV*)SvRV(act_spec_sv);
         action_argcount = av_len(act_spec_av);
         action_name = SvPV_nolen(AvARRAY(act_spec_av)[0]);
@@ -2395,7 +2395,7 @@ perform(SV *actions_sv, SV *options_sv)
 #define IS_ACTION(wanted_name, wanted_argcount) \
     (strEQ(action_name, wanted_name) \
         && ((action_argcount != wanted_argcount) \
-            ? (croak("action[%d] %s needs %d args but has %d", i, action_name, wanted_argcount, action_argcount),1) \
+            ? (croak("action[%lu] %s needs %d args but has %d", i, action_name, wanted_argcount, action_argcount),1) \
             : 1) )
 #define ACTION_ARG_PV(argnum) (SvPV_nolen(AvARRAY(act_spec_av)[argnum]))
 #define ACTION_ARG_UV(argnum) (SvUV(      AvARRAY(act_spec_av)[argnum]))
@@ -2414,7 +2414,7 @@ perform(SV *actions_sv, SV *options_sv)
             ADD_ATTR(st, ACTION_ARG_UV(1), ACTION_ARG_PV(2), ACTION_ARG_UV(3));
         }
         else {
-            croak("perform: Unknown action '%p' at index %d", action_name, i);
+            croak("perform: Unknown action '%p' at index %lu", action_name, i);
         }
     }
 
