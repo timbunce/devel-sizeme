@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gexf xmlns="http://www.gexf.net/1.2draft"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:viz="http://www.gexf.net/1.2draft/viz"
+        xsi:schemaLocation="http://www.gexf.net/1.2draft
+        http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">
+    <meta lastmodifieddate="2013-01-01">
+        <creator>Devel::SizeMe</creator>
+        <description>Perl Internals Memory</description>
+    </meta>
+<graph defaultedgetype="directed">
+        <attributes class="node" type="static">
+        <attribute id="label" title="label" type="string"/>
+        <attribute id="name" title="name" type="string"/>
+        <attribute id="nsb" title="self_bytes" type="int"/>
+        <attribute id="nkb" title="kids_bytes" type="int"/>
+        <attribute id="ntb" title="total_bytes" type="int"/>
+        <attribute id="nrc" title="refcnt" type="int"/>
+        </attributes>
+	<node id="1" label="foo">
+	<attvalues>
+		<attvalue for="nkb" value="0"/>
+		<attvalue for="nsb" value="3"/>
+		<attvalue for="name" value="foo"/>
+		<attvalue for="ntb" value="3"/>
+	</attvalues>
+	</node>
+<edges>
+</edges>
+</graph>
+</gexf>
