@@ -1,6 +1,5 @@
 *.bak
 *.db
-*.dot
 *.o
 *.swp
 .gdb_history
@@ -15,4 +14,4 @@ SizeMe.xsc
 blib/
 pm_to_blib
 refcounted_he.h
-t/*-*.*_new
+t/*-*.*new*
