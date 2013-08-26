@@ -266,8 +266,9 @@ struct state {
 #define NPtype_MAGIC    0x04
 #define NPtype_OP       0x05
 #define NPtype_PLACEHOLDER  0x06
+#define NPtype_max          0x06
 
-/* XXX these should probably be generalized into flag bits */
+/* XXX these should possibly be generalized into flag bits */
 #define NPattr_LEAFSIZE 0x00
 #define NPattr_LABEL    0x01
 #define NPattr_PADFAKE  0x02
@@ -276,6 +277,7 @@ struct state {
 #define NPattr_NOTE     0x05
 #define NPattr_ADDR     0x06
 #define NPattr_REFCNT   0x07
+#define NPattr_max      0x07
 
 #define _ADD_ATTR_NP(st, attr_type, attr_name, attr_value, np) \
   STMT_START { \
@@ -2415,7 +2417,10 @@ perform(SV *actions_sv, SV *options_sv)
             ADD_SIZE(st, ACTION_ARG_PV(1), ACTION_ARG_UV(2));
         }
         else if (IS_ACTION("addattr", 3)) {
-            ADD_ATTR(st, ACTION_ARG_UV(1), ACTION_ARG_PV(2), ACTION_ARG_UV(3));
+            UV attr_type = ACTION_ARG_UV(1);
+            char *attr_name = ACTION_ARG_PV(2);
+            UV attr_value = ACTION_ARG_UV(3);
+            ADD_ATTR(st, attr_type, attr_name, attr_value);
         }
         else {
             croak("perform: Unknown action '%p' at index %lu", action_name, i);
@@ -2454,6 +2459,7 @@ constant()
         NPtype_MAGIC	    = NPtype_MAGIC
         NPtype_OP	    = NPtype_OP
         NPtype_PLACEHOLDER  = NPtype_PLACEHOLDER
+        NPtype_max          = NPtype_max
         NPattr_LEAFSIZE	    = NPattr_LEAFSIZE
         NPattr_LABEL	    = NPattr_LABEL
         NPattr_PADFAKE	    = NPattr_PADFAKE
@@ -2462,6 +2468,7 @@ constant()
         NPattr_NOTE	    = NPattr_NOTE
         NPattr_ADDR	    = NPattr_ADDR
         NPattr_REFCNT	    = NPattr_REFCNT
+        NPattr_max	    = NPattr_max
     CODE:
         RETVAL = ix;
     OUTPUT:

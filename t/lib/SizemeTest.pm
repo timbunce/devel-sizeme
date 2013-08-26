@@ -9,6 +9,7 @@ use Getopt::Long;
 use Data::Dumper;
 use File::Spec;
 use File::Temp qw(tempfile);
+use Scalar::Util qw(looks_like_number);
 use List::Util qw(shuffle);
 
 use Test::More;
@@ -58,15 +59,33 @@ sub run_test_group {
     my (%opts) = @_;
 
     # split lines on commas and skip comments
-    my @steps = map {
-        chomp;
-        m/^#/ ? () : [ split /,/, $_, -1 ]
-    } @{$opts{lines}};
+    my @steps;
+    for my $line (@{$opts{lines}}) {
+        chomp $line;
+        next if $line =~ m/^\s*#/;
+        my ($action, @args) = split /,/, $line, -1;
+        for my $arg (@args) {
+            if (looks_like_number($arg)) {
+                next;
+            }
+            elsif ($arg =~ /^'(.*)'$/) {
+                $arg = $1;
+            }
+            elsif (1) {
+                my $fullname = "Devel::SizeMe::Core::$arg";
+                no strict 'refs';
+                my $value = &$fullname();
+                $arg = $value;
+            }
+        }
+        push @steps, [ $action, @args ];
+    }
 
     # obtain group from file name
     my $group = ((caller)[1] =~ /([^\/\\]+)\.t$/) ? $1
         : croak "Can't determine test group";
 
+    # .smt is "SizeMe Token" file
     my $smt_file_old = "$group.smt";
     my $smt_file_new = "$smt_file_old\_new";
     unlink <$group.*_new>; # delete all _new files for this group
