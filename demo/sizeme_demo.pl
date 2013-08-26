@@ -1,6 +1,7 @@
 
 use strict;
 use Term::ReadKey;
+use IO::Handle;
 
 $ENV{SIZEME_HIDE} = 1; # hide addr to refcnt=1 and immortals
 
