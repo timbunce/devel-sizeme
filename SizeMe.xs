@@ -2406,9 +2406,13 @@ perform(SV *actions_sv, SV *options_sv)
 #define ACTION_ARG_PV(argnum) (SvPV_nolen(AvARRAY(act_spec_av)[argnum]))
 #define ACTION_ARG_UV(argnum) (SvUV(      AvARRAY(act_spec_av)[argnum]))
 
-        warn("perform %s\n", action_name);
+        if (st->trace_level)
+            warn("perform %s\n", action_name);
         if (IS_ACTION("pushnode", 2)) {
             NPathPushNode(ACTION_ARG_PV(1), ACTION_ARG_UV(2));
+        }
+        else if (IS_ACTION("pushlink", 1)) {
+            NPathPushLink(ACTION_ARG_PV(1));
         }
         else if (IS_ACTION("popnode", 0)) {
             NPathPopNode;
@@ -2423,12 +2427,13 @@ perform(SV *actions_sv, SV *options_sv)
             ADD_ATTR(st, attr_type, attr_name, attr_value);
         }
         else {
-            croak("perform: Unknown action '%p' at index %lu", action_name, i);
+            croak("perform: Unknown action '%s' at index %lu", action_name, i);
         }
     }
 
     total_size = st->total_size;
-    warn("perform complete - total_size %lu\n", total_size);
+    if (st->trace_level)
+        warn("perform complete - total_size %lu\n", total_size);
     free_state(aTHX_ st);
     return total_size;
 }
