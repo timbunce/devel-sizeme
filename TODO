@@ -61,6 +61,7 @@ Docs
 
 Random References:
 http://cpansearch.perl.org/src/RURBAN/illguts-0.42/index.html
+http://www.html5rocks.com/en/tutorials/memory/effectivemanagement/
 
 Graph file formats:
     dot (graphviz)
@@ -77,7 +78,7 @@ Graph file formats:
     Suitable: gexf, gml, graphml (also gdf)
 
 Useful techniques:
-    Treemap
+    Treemap (switch to d3, eg http://jasonlally.github.io/data-portal-treemap/)
     Hypergraph - hides distant detail
 
 Network Visualization tools:
@@ -89,6 +90,7 @@ https://gephi.org
         https://marketplace.gephi.org/plugin/sigmajs-exporter/
     http://stackoverflow.com/questions/tagged/gephi
     Opt-click-drag on mac trackpad to alter 3d view
+    http://wiki.gephi.org/index.php/Scripting_Plugin
 
 http://www.cytoscape.org
     http://cytoscape.org/manual/Cytoscape2_8Manual.html#Supported%20Network%20File%20Formats
