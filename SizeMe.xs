@@ -103,6 +103,10 @@
 
 
 /* the values are arbitrary but chosen to be mnemonic */
+/* XXX we don't yet account for pointers that might be chased from
+ * structures that don't "own" a ref count, we just treat all pointers
+ * to SVs as owning a ref - this may need refining
+ */
 #define FOLLOW_SINGLE_NOW   11 /* refcnt=1, follow now */
 #define FOLLOW_SINGLE_DONE  12 /* refcnt=1, already followed */
 #define FOLLOW_MULTI_DEFER  20 /* refcnt>1, follow later */
