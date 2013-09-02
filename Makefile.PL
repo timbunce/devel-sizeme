@@ -39,6 +39,7 @@ my %MakefileOpts = (
     },
     META_MERGE => {
         resources => {
+            'meta-spec' => { version => 2 },
             repository  => {
                 type => 'git',
                 url => 'git://github.com/timbunce/devel-sizeme.git',
