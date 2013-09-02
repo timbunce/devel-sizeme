@@ -16,3 +16,7 @@ tmon.out
 \.txt\z
 ^\.git
 refcounted_he.h
+t/*-new.*
+^\.DS_Store
+^\.gdb_history
+^examples
