@@ -27,7 +27,7 @@ require 5.008;
 require Exporter;
 require Devel::SizeMe::Core;
 
-$VERSION = '0.16';  # see aso lib/Devel/SizeMe/Core.pm
+$VERSION = $Devel::SizeMe::Core::VERSION;
 @ISA = qw(Exporter);
 
 %EXPORT_TAGS = (

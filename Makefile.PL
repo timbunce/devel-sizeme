@@ -17,7 +17,7 @@ write_header(
 
 my %MakefileOpts = (
     NAME => 'Devel::SizeMe',
-    VERSION_FROM => 'lib/Devel/SizeMe.pm',
+    VERSION_FROM => 'lib/Devel/SizeMe/Core.pm',
     DEFINE => "-DALIGN_BITS=$ptr_bits",
     PREREQ_PM => {
         'autodie' => '2.12',
