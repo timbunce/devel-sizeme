@@ -46,13 +46,14 @@ SKIP: {
     my $after_size = total_size($string);
     cmp_ok($after_size, '>', $before_size, 'size increases due to magic');
     is($string, undef, 'No value yet');
+    my $small_size = total_size($string);
     # This is defineately cheating, in that we're poking inside the
     # implementation of Tie::StdScalar, but if we just write to $string, the way
     # magic works, the (nice long) value is first written to the regular scalar,
     # then picked up by the magic. So it grows, which defeats the purpose of the
     # test.
     ${tied $string} = 'X' x 1024;
-    cmp_ok(total_size($string), '>', $after_size + 1024,
+    cmp_ok(total_size($string), '>', $small_size + 1024,
 	   'the magic object is counted');
 }
 
