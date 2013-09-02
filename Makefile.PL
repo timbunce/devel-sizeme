@@ -137,6 +137,7 @@ sub CheckConflicts {
 
 sub extract_chunk_from_file {
     my ($file, $start_regex, $end_regex) = @_;
+    $file =~ s/^~/$ENV{HOME}/ if $ENV{HOME};
     open my $fh, '<', $file or die $!;
 
     my $def;
