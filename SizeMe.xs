@@ -1495,7 +1495,8 @@ sv_size(pTHX_ struct state *const st, pPATH, const SV * const orig_thing)
 
   type = SvTYPE(thing);
   if (type > SVt_LAST) {
-      fprintf(stderr, "Unknown SV type: %u encountered at ", type);
+      fprintf(stderr, "%s SV type: %u encountered at ",
+        (SvTYPE(thing) == (svtype)SVTYPEMASK) ? "Freed" : "Unknown", type);
       np_dump_node_path(aTHX_ st, NP);
       fprintf(stderr, ":\n");
       sv_dump((SV*)thing);
