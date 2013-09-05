@@ -1,5 +1,10 @@
 Revision history for Perl extension Devel::SizeMe.
 
+0.19 - 2013-09-05 - Tim Bunce
+
+  * Fix S & E token output for systems where NV is long double.
+  * Report "Unknown SV type" as "Freed" if SvTYPE==SVTYPEMASK
+
 0.18 - 2013-09-03 - Tim Bunce
 
   * Work in progress - lots of internals improvements - released for smoke testing
