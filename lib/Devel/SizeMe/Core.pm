@@ -6,7 +6,7 @@ require 5.008;
 require Exporter;
 require XSLoader;
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 our @ISA = qw(Exporter);
 
 XSLoader::load("Devel::SizeMe", $VERSION);

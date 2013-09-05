@@ -27,7 +27,7 @@ require 5.008;
 require Exporter;
 require Devel::SizeMe::Core;
 
-$VERSION = '0.18';
+$VERSION = '0.19';
 @ISA = qw(Exporter);
 
 %EXPORT_TAGS = (
