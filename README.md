@@ -14,6 +14,9 @@ various forms, including graphs and an interactive treemap.
 
 Current implementation is alpha and somewhat hackish in places.
 
+It currently doesn't work on systems built with -Duse64bitint (use -Duse64bitall if possible).
+Patches welcome - I think it mainly needs %d's etc changing to use IVdf etc.
+
 For more info see http://blog.timbunce.org/2012/10/05/introducing-develsizeme-visualizing-perl-memory-use/
 and http://blog.timbunce.org/tag/sizeme/
 

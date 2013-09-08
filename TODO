@@ -19,6 +19,7 @@ PL_strtab sizing
     See hek_size()
     Long unique keys show up as bloat in PL_strtab even though they've been seen before PL_strtab is sized?
     make && SIZEME_HIDE=7 SIZEME='|bin/sizeme_store.pl --db sizeme.db --gexf sizeme.gexf' perl -Mblib -MDevel::SizeMe=:all -e '$k="k" x 10_000; push @a, { $k.scalar(@a) => 1 } while @a<1_000; perl_size()'
+Fix to work on use64bitint perl config!
 Fix spelling of leafs!
 
 *** Random TODOs:
