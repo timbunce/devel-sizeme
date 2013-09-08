@@ -1792,7 +1792,7 @@ free_memnode_state(pTHX_ struct state *st)
 {
     if (st->node_stream_fh && st->node_stream_name && *st->node_stream_name) {
         Pid_t pid = getpid();
-        NV dur = gettimeofday_nv(aTHX)-st->start_time_nv;
+        NV dur = gettimeofday_nv(aTHX) - st->start_time_nv;
         if (st->opts & SMopt_IS_TEST) {
             pid = 0; dur = 0;
         }

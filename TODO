@@ -11,6 +11,7 @@ Better handling of pads
     especially padtmp
     eg add scope, or ideally line range when emiting pad names
     Perhaps add general flags UV attr that contains flags appropriate to the node (eg SV or pad)
+Generate groups in GEXF format, ideally pre-collapsed
 Review general SV and attribute handling
     Emit more raw info
 Add global attributes, especially perl version

@@ -8,6 +8,15 @@ sizeme_store.pl - process and store the raw data stream from Devel::SizeMe
 
     sizeme_store.pl [--text] [--dot=sizeme.dot] [--db=sizeme.db]
 
+    -v --verbose
+    -d --debug
+    --showid
+
+    --db file
+    --dot file
+    --gexf file
+    --open
+
 Typically used with Devel::SizeMe via the C<SIZEME> env var:
 
     export SIZEME='|sizeme_store.pl --text'
@@ -75,8 +84,8 @@ my @attr_type_name = (qw(size NAME PADFAKE my PADTMP NOTE ADDR REFCNT)); # XXX g
 
 GetOptions(
     'text!' => \my $opt_text,
-    'dot=s' => \my $opt_dot,
     'tree!' => \my $opt_tree,
+    'dot=s' => \my $opt_dot,
     'gexf=s' => \my $opt_gexf,
     'db=s'  => \my $opt_db,
     'verbose|v+' => \my $opt_verbose,
@@ -772,8 +781,8 @@ sub write_epilogue {
     my $fh = $self->fh or return;
 
     print $fh qq{<edges>\n};
-    for my $id (sort { $a <=> $b } %buffered_edges) {
-        my $edge = $buffered_edges{$id};
+    for my $id (sort { $a <=> $b } keys %buffered_edges) {
+        my $edge = $buffered_edges{$id} or die "panic: buffered_edges $id";
         my ($src, $dest, $label, $weight, $viz) = @$edge;
         my $viz_str = _fmt_viz($viz);
         my $suffix = ($viz_str) ? ">$viz_str</edge>" : " />";
@@ -813,11 +822,13 @@ sub emit_link {
 }
 
 =pod
+
 <node id="646" label="java.beans.PropertyEditorManager">
 <viz:size value="4.18782"/>
 <viz:color b="2" g="110" r="254"/>
 <viz:position x="102.81538" y="-427.74304" z="0.0"/>
 </node>
+
 =cut
 
 sub _emit_node {

@@ -1,6 +1,7 @@
 package Devel::SizeMe::Core;
 
 use strict;
+use warnings;
 
 require 5.008;
 require Exporter;

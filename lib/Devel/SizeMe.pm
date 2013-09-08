@@ -21,6 +21,7 @@ BEGIN {
 }
 
 use strict;
+use warnings;
 use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS $warn $dangle);
 
 require 5.008;
