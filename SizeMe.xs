@@ -2223,7 +2223,9 @@ perl_size(pTHX_ struct state *const st, pPATH)
 #ifdef POSIX_CC_COUNT
     for (i = 0; i < POSIX_CC_COUNT; i++) {
         sv_size(aTHX_ st, NPathLink("PL_Posix_ptrs"), PL_Posix_ptrs[i]);
+#ifdef PL_L1Posix_ptrs
         sv_size(aTHX_ st, NPathLink("PL_L1Posix_ptrs"), PL_L1Posix_ptrs[i]);
+#endif
         sv_size(aTHX_ st, NPathLink("PL_XPosix_ptrs"), PL_XPosix_ptrs[i]);
     }
 #endif
